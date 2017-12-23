@@ -1,31 +1,17 @@
 import numpy as np
+import pandas as pd
 import collections
 import ROOT
 import root_numpy
 
 from threeML.io.cern_root_utils.io_utils import get_list_of_keys, open_ROOT_file
-from threeML.io.cern_root_utils.tobject_to_numpy import tgraph_to_arrays, th2_to_arrays, tree_to_ndarray
+from threeML.io.cern_root_utils.tobject_to_numpy import tree_to_ndarray
+from threeML.io.file_utils import file_existing_and_readable, sanitize_filename
+
+from psf_fast import TF1Wrapper
 
 
-class TF1Wrapper(object):
-
-    def __init__(self, tf1_instance):
-
-        # Make a copy so that if the passed instance was a pointer from a TFile,
-        # it will survive the closing of the associated TFile
-
-        self._tf1 = ROOT.TF1(tf1_instance)
-
-    def integral(self, *args, **kwargs):
-
-        return self._tf1.Integral(*args, **kwargs)
-
-    def __call__(self, *args, **kwargs):
-
-        return self._tf1.Eval(*args, **kwargs)
-
-
-class AnalysisBin(object):
+class ResponseBin(object):
 
     def __init__(self, open_ttree, dec_id, analysis_bin_id, log_log_spectrum):
 
@@ -52,20 +38,24 @@ class AnalysisBin(object):
 
         # Now let's see what has been simulated, i.e., the differential flux
         # at the center of each bin of the en_sig histogram
-        self._en_sig_log_energy = np.zeros(this_en_sig_th1d.GetNbinsX())
-        self._en_sig_simulated_diff_flux = np.zeros_like(self._en_sig_log_energy)
+        self._en_sig_energy_centers = np.zeros(this_en_sig_th1d.GetNbinsX())
+        self._en_sig_detected_counts = np.zeros_like(self._en_sig_energy_centers)
+        self._en_sig_simulated_diff_fluxes = np.zeros_like(self._en_sig_energy_centers)
 
-        for i in range(self._en_sig_log_energy.shape[0]):
+        for i in range(self._en_sig_energy_centers.shape[0]):
             # Remember: bin 0 is the underflow bin, that is why there
             # is a "i+1" and not just "i"
             bin_center = this_en_sig_th1d.GetBinCenter(i + 1)
 
             # Store the center of the logarithmic bin
-            self._en_sig_log_energy[i] = bin_center
+            self._en_sig_energy_centers[i] = 10 ** bin_center  # TeV
 
             # Get from the simulated spectrum the value of the differential flux
             # at the center energy
-            self._en_sig_simulated_diff_flux[i] = 10 ** log_log_spectrum(bin_center)
+            self._en_sig_simulated_diff_fluxes[i] = 10 ** log_log_spectrum(bin_center)  # TeV^-1 cm^-1 s^-1
+
+            # Get from the histogram the detected events in each log-energy bin
+            self._en_sig_detected_counts[i] = this_en_sig_th1d.GetBinContent(i + 1)
 
         # Read the histogram of the bkg events detected in this bin
         # NOTE: we do not copy this TH1D instance because we won't use it after the
@@ -97,7 +87,6 @@ class AnalysisBin(object):
                                                                   analysis_bin_id_label,
                                                                   en_bg_label_tf1)))
 
-
     @property
     def psf(self):
 
@@ -113,10 +102,39 @@ class AnalysisBin(object):
 
         return self._sim_n_bg_events
 
+    @property
+    def sim_energy_bin_centers(self):
 
-class ResponseFile(object):
+        return self._en_sig_energy_centers
+
+    @property
+    def sim_differential_photon_fluxes(self):
+
+        return self._en_sig_simulated_diff_fluxes
+
+    @property
+    def sim_signal_events_per_bin(self):
+
+        return self._en_sig_detected_counts
+
+
+class HAWCResponse(object):
 
     def __init__(self, response_file_name):
+
+        # Make sure file is readable
+
+        response_file_name = sanitize_filename(response_file_name)
+
+        # Check that they exists and can be read
+
+        if not file_existing_and_readable(response_file_name):
+
+            raise IOError("Response %s does not exist or is not readable" % response_file_name)
+
+        self._response_file_name = response_file_name
+
+        # Read response
 
         with open_ROOT_file(response_file_name) as f:
 
@@ -141,23 +159,34 @@ class ResponseFile(object):
 
             self._dec_bins = zip(dec_bins_lower_edge, dec_bins_center, dec_bins_upper_edge)
 
-            # Read in the ids of the analysis bins
-            analysis_bins_ids = tree_to_ndarray(f.Get("AnalysisBins"), "id")  # type: np.ndarray
+            # Read in the ids of the response bins ("analysis bins" in LiFF jargon)
+            response_bins_ids = tree_to_ndarray(f.Get("AnalysisBins"), "id")  # type: np.ndarray
 
-            # Now we create a list of AnalysisBin instances for each dec bin
-            self._analysis_bins = collections.OrderedDict()
+            # Now we create a list of ResponseBin instances for each dec bin
+            self._response_bins = collections.OrderedDict()
 
             for dec_id in range(len(self._dec_bins)):
 
-                this_analysis_bins = []
+                this_response_bins = []
 
-                for analysis_bin_id in analysis_bins_ids:
+                for response_bin_id in response_bins_ids:
 
-                    this_analysis_bin = AnalysisBin(f, dec_id, analysis_bin_id, self._log_log_spectrum)
+                    this_response_bin = ResponseBin(f, dec_id, response_bin_id, self._log_log_spectrum)
 
-                    this_analysis_bins.append(this_analysis_bin)
+                    this_response_bins.append(this_response_bin)
 
-                self._analysis_bins[dec_id] = this_analysis_bins
+                self._response_bins[self._dec_bins[dec_id][1]] = this_response_bins
+
+    def get_response_dec_bin(self, dec):
+
+        # Find the closest dec bin. We iterate over all the dec bins because we don't want to assume
+        # that the bins are ordered by Dec in the file (and the operation is very cheap anyway,
+        # since the dec bins are few)
+
+        dec_bins_keys = self._response_bins.keys()
+        closest_dec_id = min(range(len(dec_bins_keys)), key=lambda i: abs(dec_bins_keys[i] - dec))
+
+        return self._response_bins[closest_dec_id], closest_dec_id
 
     @property
     def dec_bins(self):
@@ -165,6 +194,17 @@ class ResponseFile(object):
         return self._dec_bins
 
     @property
-    def analysis_bins(self):
+    def response_bins(self):
 
-        return self._analysis_bins
+        return self._response_bins
+
+    @property
+    def n_energy_planes(self):
+
+        return len(self._response_bins[0])
+
+    def display(self):
+
+        print("Response file: %s" % self._response_file_name)
+        print("Number of dec bins: %s" % len(self._dec_bins))
+        print("Number of energy/nHit planes per dec bin: %s" % (self.n_energy_planes))

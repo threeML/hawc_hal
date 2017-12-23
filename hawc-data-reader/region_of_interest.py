@@ -1,5 +1,5 @@
-import numpy as np
 import healpy as hp
+from healpix_utils import radec_to_vec
 
 from astromodels.core.sky_direction import SkyDirection
 
@@ -94,14 +94,9 @@ class HealpixConeROI(HealpixROIBase):
 
             lon, lat = self._center.get_l(), self._center.get_b()
 
-        theta = 0.5 * np.pi - np.deg2rad(lat)
-        phi = np.deg2rad(lon)
-
-        ipix = hp.ang2pix(nside, theta, phi)
+        vec = radec_to_vec(lon, lat)
 
         nest = ordering is _NESTED
-
-        vec = hp.pix2vec(nside, ipix, nest=nest)
 
         pixels_inside_cone = hp.query_disc(nside, vec, self._radius_radians, inclusive=False, nest=nest)
 
