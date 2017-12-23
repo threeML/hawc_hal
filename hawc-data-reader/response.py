@@ -186,7 +186,7 @@ class HAWCResponse(object):
         dec_bins_keys = self._response_bins.keys()
         closest_dec_id = min(range(len(dec_bins_keys)), key=lambda i: abs(dec_bins_keys[i] - dec))
 
-        return self._response_bins[closest_dec_id], closest_dec_id
+        return self._response_bins[dec_bins_keys[closest_dec_id]], closest_dec_id
 
     @property
     def dec_bins(self):

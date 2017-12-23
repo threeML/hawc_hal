@@ -161,13 +161,13 @@ class TF1Wrapper(object):
 
         # ... and for the inverse of the area of the pixel ...
 
-        pixel_area_inv = 1.0 / proj_plane_pixel_area(target_wcs)  # square degrees
+        pixel_area_inv = proj_plane_pixel_area(target_wcs)  # square degrees
 
-        renorm = total_counts * pixel_area_inv
+        renorm = pixel_area_inv / total_counts
 
         # ... and for the area of the ring between inner radius (a) and outer radius (b)
 
-        interp_y = np.array(map(lambda (a, b): self._tf1.Integral(a, b) / (np.pi * (b ** 2 - a ** 2)) / renorm,
+        interp_y = np.array(map(lambda (a, b): self._tf1.Integral(a, b) / (np.pi * (b ** 2 - a ** 2)) * renorm,
                              zip(interp_r[:-1], interp_r[1:])))
 
         # Let's interpolate
