@@ -1,7 +1,8 @@
 import numpy as np
-import pandas as pd
 import collections
 import ROOT
+ROOT.SetMemoryPolicy(ROOT.kMemoryStrict)
+
 import root_numpy
 
 from threeML.io.cern_root_utils.io_utils import get_list_of_keys, open_ROOT_file
@@ -118,6 +119,34 @@ class ResponseBin(object):
         return self._en_sig_detected_counts
 
 
+
+_instances = {}
+
+
+def hawc_response_factory(response_file_name):
+    """
+    A factory function for the response which keeps a cache, so that the same response is not read over and
+    over again.
+
+    :param response_file_name:
+    :return: an instance of HAWCResponse
+    """
+
+    # See if this response is in the cache, if not build it
+
+    if not response_file_name in _instances:
+
+        print("Creating singleton for %s" % response_file_name)
+
+        new_instance = HAWCResponse(response_file_name)
+
+        _instances[response_file_name] = new_instance
+
+    # return the response, whether it was already in the cache or we just built it
+
+    return _instances[response_file_name]
+
+
 class HAWCResponse(object):
 
     def __init__(self, response_file_name):
@@ -148,7 +177,7 @@ class HAWCResponse(object):
             assert 'AnalysisBins' in object_names
 
             # Read spectrum used during the simulation
-            self._log_log_spectrum = TF1Wrapper(ROOT.TF1(f.Get("LogLogSpectrum")))
+            self._log_log_spectrum = TF1Wrapper(f.Get("LogLogSpectrum"))
 
             # Get the analysis bins definition
             dec_bins = tree_to_ndarray(f.Get("DecBins"))
@@ -176,6 +205,8 @@ class HAWCResponse(object):
                     this_response_bins.append(this_response_bin)
 
                 self._response_bins[self._dec_bins[dec_id][1]] = this_response_bins
+
+        del f
 
     def get_response_dec_bin(self, dec):
 

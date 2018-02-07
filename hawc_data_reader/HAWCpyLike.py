@@ -1,12 +1,13 @@
 import collections
 import numpy as np
 import astropy.units as u
+from numba import jit, float64, float32
 
 from threeML.plugin_prototype import PluginPrototype
 from threeML.plugins.gammaln import logfactorial
 
-from map_tree import MapTree
-from response import HAWCResponse
+from map_tree import map_tree_factory
+from response import hawc_response_factory
 from convolved_source import ConvolvedPointSource
 
 
@@ -47,25 +48,15 @@ class ConvolvedSourcesContainer(object):
         return size.to(u.megabyte)
 
 
+@jit(float64(float32[:], float32[:], float64[:]), nopython=True, parallel=True)
 def log_likelihood(observed_counts, expected_bkg_counts, expected_model_counts):
-
-    log_likes = np.zeros(expected_bkg_counts.shape[0])
 
     predicted_counts = expected_bkg_counts + expected_model_counts
 
-    # o log(m) is 0 if o=0 and m=0, but for the computer 0 x nan = nan, so we need
-    # to divide the cases
+    # Remember: because of how the DataAnalysisBin in map_tree.py initializes the maps,
+    # observed_counts > 0 everywhere
 
-    idx = (observed_counts > 0)
-
-    log_likes[idx] = observed_counts[idx] * np.log(predicted_counts[idx]) - predicted_counts[idx]
-
-    log_likes[~idx] = -predicted_counts[~idx]
-
-    # The log(o!) factor is not needed for fitting, but it allows the likelihood to -> chi2 for a high
-    # number of counts, so we keep it
-
-    log_likes -= logfactorial(observed_counts)
+    log_likes = observed_counts * np.log(predicted_counts) - predicted_counts
 
     return np.sum(log_likes)
 
@@ -76,11 +67,11 @@ class HAWCpyLike(PluginPrototype):
 
         # Read map tree (data)
 
-        self._maptree = MapTree(maptree, roi=roi)
+        self._maptree = map_tree_factory(maptree, roi=roi)
 
         # Read detector response
 
-        self._response = HAWCResponse(response)
+        self._response = hawc_response_factory(response)
 
         # Make sure that the response and the map tree are aligned
         assert len(self._maptree) == self._response.n_energy_planes, "Response and map tree are not aligned"
@@ -101,6 +92,14 @@ class HAWCpyLike(PluginPrototype):
         # By default all energy/nHit bins are used
         self._all_planes = range(len(self._maptree))
         self._active_planes = range(len(self._maptree))
+
+        # Pre-compute the log-factorial factor in the likelihood, so we do not keep to computing it over and over
+        # again
+        self._log_factorial = np.zeros(len(self._maptree))
+
+        for i, data_analysis_bin in enumerate(self._maptree):
+
+            self._log_factorial[i] = np.sum(logfactorial(data_analysis_bin.observation_map.as_partial()))
 
     def set_active_measurements(self, bin_id_min, bin_id_max):
 
@@ -176,9 +175,8 @@ class HAWCpyLike(PluginPrototype):
             this_model_map = None
 
             # Make sure that no source has been added since we filled the cache
-            assert n_point_sources == self._convolved_point_sources.n_sources_in_cache, "The number of sources has changed. " \
-                                                                                    "Please re-assign the model to " \
-                                                                                    "the plugin."
+            assert n_point_sources == self._convolved_point_sources.n_sources_in_cache, \
+                "The number of sources has changed. Please re-assign the model to the plugin."
 
             for pts_id in range(n_point_sources):
 
@@ -201,11 +199,11 @@ class HAWCpyLike(PluginPrototype):
                     this_model_map += expectation * these_maps[i]
 
             # Now compare with observation
-            this_log_like = log_likelihood(data_analysis_bin.observation_map.as_array(cache=True),
-                                           data_analysis_bin.background_map.as_array(cache=True),
+            this_log_like = log_likelihood(data_analysis_bin.observation_map.as_partial(),
+                                           data_analysis_bin.background_map.as_partial(),
                                            this_model_map)
 
-            total_log_like += this_log_like
+            total_log_like += this_log_like - self._log_factorial[i]
 
         return total_log_like
 
@@ -220,4 +218,12 @@ class HAWCpyLike(PluginPrototype):
 
         return self.get_log_like()
 
+    def get_number_of_data_points(self):
 
+        n_points = 0
+
+        for i, data_analysis_bin in enumerate(self._maptree):
+
+            n_points += data_analysis_bin.observation_map.as_partial().shape[0]
+
+        return n_points
