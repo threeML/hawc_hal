@@ -110,7 +110,7 @@ def convert_world_coordinates(lon_in, lat_in, wcs_in, wcs_out):
 
 def image_to_healpix(data, wcs_in, coord_system_out,
                      nside, pixels_id, order='bilinear', nested=False,
-                     fill_value=UNSEEN, pixels_to_be_zeroed=None):
+                     fill_value=UNSEEN, pixels_to_be_zeroed=None, full=False):
 
     npix = hp.nside2npix(nside)
 
@@ -139,14 +139,66 @@ def image_to_healpix(data, wcs_in, coord_system_out,
                                     order=order,
                                     mode='constant', cval=fill_value)
 
-    healpix_data = np.full(npix, fill_value)
+    if not full:
 
-    healpix_data[pixels_id] = healpix_data_
+        # Return partial map
+        return healpix_data_
 
-    if pixels_to_be_zeroed is not None:
+    else:
 
-        healpix_data[pixels_to_be_zeroed] = np.where(np.isnan(healpix_data[pixels_to_be_zeroed]),
-                                                     0.0,
-                                                     healpix_data[pixels_to_be_zeroed])
+        # Return full healpix map
 
-    return healpix_data
+        healpix_data = np.full(npix, fill_value)
+
+        healpix_data[pixels_id] = healpix_data_
+
+        if pixels_to_be_zeroed is not None:
+
+            healpix_data[pixels_to_be_zeroed] = np.where(np.isnan(healpix_data[pixels_to_be_zeroed]),
+                                                         0.0,
+                                                         healpix_data[pixels_to_be_zeroed])
+
+        return healpix_data
+
+
+class FlatSkyToHealpixTransform(object):
+    """
+    A class to perform transformation from a flat sky projection to Healpix optimized to be used for the same
+    transformation over and over again.
+
+    The constructor will pre-compute all needed quantities for the transformation, and the __call__ method just applies
+    the transformation. This avoids to re-compute the same quantities over and over again.
+    """
+
+    def __init__(self, wcs_in, coord_system_out, nside, pixels_id, order='bilinear', nested=False):
+
+        # Look up lon, lat of pixels in output system and convert colatitude theta
+        # and longitude phi to longitude and latitude.
+        theta, phi = hp.pix2ang(nside, pixels_id, nested)
+
+        lon_out = np.degrees(phi)
+        lat_out = 90. - np.degrees(theta)
+
+        # Convert between celestial coordinates
+        coord_system_out = parse_coord_system(coord_system_out)
+
+        with np.errstate(invalid='ignore'):
+            lon_in, lat_in = convert_world_coordinates(lon_out, lat_out, (coord_system_out, u.deg, u.deg), wcs_in)
+
+        # Look up pixels in input system
+        self._yinds, self._xinds = wcs_in.wcs_world2pix(lon_in, lat_in, 0)
+
+        # Interpolate
+
+        if isinstance(order, six.string_types):
+            order = ORDER[order]
+
+        self._order = order
+
+    def __call__(self, data, fill_value=UNSEEN):
+
+        healpix_data = map_coordinates(data, [self._xinds, self._yinds],
+                                        order=self._order,
+                                        mode='constant', cval=fill_value)
+
+        return healpix_data

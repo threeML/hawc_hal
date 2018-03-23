@@ -39,7 +39,7 @@ class ParallelTSmap(object):
         
         self._points = []
         
-        # It is important that dec is the first one because the PSF for a Dec bin
+        # It is important that dec is the first one because the PSF for a Dec bin_name
         # is cached within one engine
         
         max_d = 0

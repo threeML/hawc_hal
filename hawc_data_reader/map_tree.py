@@ -126,7 +126,7 @@ class MapTree(object):
 
             n_bins = len(self._data_bins_labels)
 
-            # These are going to be Healpix maps, one for each data analysis bin
+            # These are going to be Healpix maps, one for each data analysis bin_name
 
             self._data_analysis_bins = []
 
@@ -194,7 +194,7 @@ class MapTree(object):
 
             ... do something ...
 
-        :return: analysis bin iterator
+        :return: analysis bin_name iterator
         """
 
         for analysis_bin in self._data_analysis_bins:
@@ -209,10 +209,10 @@ class MapTree(object):
 
         or by name:
 
-        first_analysis_bin = maptree["bin 0"]
+        first_analysis_bin = maptree["bin_name 0"]
 
         :param item: integer for serial access, string for access by name
-        :return: the analysis bin
+        :return: the analysis bin_name
         """
 
         if isinstance(item, six.string_types):
@@ -223,7 +223,7 @@ class MapTree(object):
 
             except ValueError:
 
-                raise KeyError("There is no analysis bin named %s" % item)
+                raise KeyError("There is no analysis bin_name named %s" % item)
 
             else:
 
@@ -237,7 +237,7 @@ class MapTree(object):
 
             except IndexError:
 
-                raise IndexError("Analysis bin with index %i does not exist" % (item))
+                raise IndexError("Analysis bin_name with index %i does not exist" % (item))
 
     def __len__(self):
 

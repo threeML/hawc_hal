@@ -4,7 +4,9 @@ from healpix_utils import radec_to_vec
 from astromodels.core.sky_direction import SkyDirection
 
 import astropy.units as u
+import numpy as np
 
+from flat_sky_projection import FlatSkyProjection
 
 _EQUATORIAL = 'equatorial'
 _GALACTIC = 'galactic'
@@ -27,24 +29,79 @@ class HealpixROIBase(object):
         # Let's transform to lower case (so Equatorial will work, as well as EQuaTorial, or whatever)
         system = system.lower()
 
-        assert system in [_EQUATORIAL, _GALACTIC], "The reference system must be '%s' or '%s'" % (_EQUATORIAL,
-                                                                                                  _GALACTIC)
+        assert system == _EQUATORIAL, "%s reference system not supported" % system
 
         assert ordering in [_RING, _NESTED], "Could not understand ordering %s. Must be %s or %s" % (ordering,
                                                                                                      _RING,
                                                                                                      _NESTED)
 
-        return self._active_pixels(nside, system, ordering)
+        return self._active_pixels(nside, ordering)
 
     # This is supposed to be overridden by child classes
-    def _active_pixels(self, nside, system, ordering):
+    def _active_pixels(self, nside, ordering):
+
+        raise NotImplementedError("You need to implement this")
+
+    def active_pixels_for_convolution(self, nside, ordering=_RING):
+        """
+        Returns the non-zero elements, i.e., the pixels selected according to this Region Of Interest to be used
+        for the convolution of extended sources
+
+        :param nside: the NSIDE of the healpix map
+        :param ordering: numbering scheme for Healpix. Either RING or NESTED (default: RING)
+        :return: an array of pixels IDs (in healpix RING numbering scheme)
+        """
+
+        assert ordering in [_RING, _NESTED], "Could not understand ordering %s. Must be %s or %s" % (ordering,
+                                                                                                     _RING,
+                                                                                                     _NESTED)
+
+        return self._active_pixels_for_convolution(nside, ordering)
+
+    # This is supposed to be overridden by child classes
+    def _active_pixels_for_convolution(self, nside, ordering):
+
+        raise NotImplementedError("You need to implement this")
+
+    def coordinates_for_convolution(self, pixel_size):
+        """
+        Returns a flat image and its WCS covering the convolution ROI (slightly larger than the actual ROI to cover
+        leakage from the PSF)
+
+        :param pixel_size: size of the pixel in the WCS image (quantity or float, which is assumed to represent degrees)
+        :param system: the system of the Healpix map, either 'equatorial' or 'galactic' (default: equatorial)
+        :return: (nhpix, nwpix, all RAs, all Decs)
+        """
+
+        pixel_size_rad = _get_radians(pixel_size)
+
+        return self._coordinates_for_convolution(pixel_size_rad)
+
+    def _coordinates_for_convolution(self, pixel_size_rad):
+
+        raise NotImplementedError("You need to implement this")
+
+    def display(self):
 
         raise NotImplementedError("You need to implement this")
 
 
+def _get_radians(my_angle):
+
+    if isinstance(my_angle, u.Quantity):
+
+        my_angle_radians = my_angle.to(u.rad).value
+
+    else:
+
+        my_angle_radians = np.deg2rad(my_angle)
+
+    return my_angle_radians
+
+
 class HealpixConeROI(HealpixROIBase):
 
-    def __init__(self, radius, *args, **kwargs):
+    def __init__(self, data_radius, model_radius, *args, **kwargs):
         """
         A cone Region of Interest defined by a center and a radius.
 
@@ -58,46 +115,78 @@ class HealpixConeROI(HealpixROIBase):
 
             > roi = HealpixConeROI(30.0 * u.arcmin, l=1.23, dec=4.56)
 
-        :param radius: radius of the cone. Either an astropy.Quantity instance, or a float, in which case it is assumed
+        :param data_radius: radius of the cone. Either an astropy.Quantity instance, or a float, in which case it is assumed
         to be the radius in degrees
+        :param model_radius: radius of the model cone. Either an astropy.Quantity instance, or a float, in which case it
+        is assumed to be the radius in degrees
         :param args: arguments for the SkyDirection class of astromodels
         :param kwargs: keywords for the SkyDirection class of astromodels
         """
 
         self._center = SkyDirection(*args, **kwargs)
 
-        if isinstance(radius, u.Quantity):
+        self._data_radius_radians = _get_radians(data_radius)
+        self._model_radius_radians = _get_radians(model_radius)
 
-            self._radius_radians = radius.to(u.rad).value
+        self._convolution_coordinates_cache = {}
 
-        else:
+    def display(self):
 
-            self._radius_radians = (float(radius) * u.deg).to(u.rad).value
-
-    @property
-    def center(self):
-
-        return self._center
+        print("%s: Center (R.A., Dec) = (%.3f, %.3f), data radius = %.3f deg, model radius: %.3f deg" %
+              (type(self).__name__, self.lon_lat_center[0], self.lon_lat_center[1],
+               self.data_radius.to(u.deg).value, self.model_radius.to(u.deg).value))
 
     @property
-    def radius(self):
+    def lon_lat_center(self):
 
-        return self._radius_radians * u.rad
+        return self._get_lon_lat()
 
-    def _active_pixels(self, nside, system, ordering):
+    @property
+    def data_radius(self):
 
-        if system == _EQUATORIAL:
+        return self._data_radius_radians * u.rad
 
-            lon, lat = self._center.get_ra(), self._center.get_dec()
+    @property
+    def model_radius(self):
+        return self._model_radius_radians * u.rad
 
-        else:
+    def _get_lon_lat(self):
 
-            lon, lat = self._center.get_l(), self._center.get_b()
+        lon, lat = self._center.get_ra(), self._center.get_dec()
+
+        return lon, lat
+
+    def _get_healpix_vec(self):
+
+        lon, lat = self._get_lon_lat()
 
         vec = radec_to_vec(lon, lat)
 
+        return vec
+
+    def _active_pixels(self, nside, ordering):
+
+        vec = self._get_healpix_vec()
+
         nest = ordering is _NESTED
 
-        pixels_inside_cone = hp.query_disc(nside, vec, self._radius_radians, inclusive=False, nest=nest)
+        pixels_inside_cone = hp.query_disc(nside, vec, self._data_radius_radians, inclusive=False, nest=nest)
 
         return pixels_inside_cone
+
+    def get_flat_sky_projection(self, pixel_size_deg):
+
+        # Decide side for image
+
+        # Compute number of pixels, making sure it is going to be even (by approximating up)
+        npix_per_side = 2 * int(np.ceil(np.rad2deg(self._model_radius_radians) / pixel_size_deg))
+
+        # Get lon, lat of center
+        ra, dec = self._get_lon_lat()
+
+        # This gets a list of all RA, Decs for an AIT-projected image of npix_per_size x npix_per_side
+        flat_sky_proj = FlatSkyProjection(ra, dec, pixel_size_deg, npix_per_side, npix_per_side)
+
+        return flat_sky_proj
+
+
