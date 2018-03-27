@@ -9,7 +9,7 @@ from threeML.plugins.gammaln import logfactorial
 
 from map_tree import map_tree_factory
 from response import hawc_response_factory
-from convolved_source import ConvolvedPointSource, ConvolvedExtendedSource
+from convolved_source import ConvolvedPointSource, ConvolvedExtendedSource2D, ConvolvedExtendedSource3D
 from partial_image_to_healpix import FlatSkyToHealpixTransform
 
 
@@ -81,7 +81,7 @@ class HAWCpyLike(PluginPrototype):
 
     def __init__(self, name, maptree, response, roi,
                  flat_sky_pixels_sizes=(0.05, 0.05, 0.05, 0.05, 0.05,
-                                        0.05, 0.05, 0.04, 0.03, 0.01)):
+                                        0.05, 0.05, 0.05, 0.05, 0.05)):
 
         # Store ROI
         self._roi = roi
@@ -240,7 +240,17 @@ class HAWCpyLike(PluginPrototype):
 
         for source in self._likelihood_model.extended_sources.values():
 
-            this_convolved_ext_source = ConvolvedExtendedSource(source, self._response, self._flat_sky_projections)
+            if source.spatial_shape.n_dim == 2:
+
+                this_convolved_ext_source = ConvolvedExtendedSource2D(source,
+                                                                      self._response,
+                                                                      self._flat_sky_projections)
+
+            else:
+
+                this_convolved_ext_source = ConvolvedExtendedSource3D(source,
+                                                                      self._response,
+                                                                      self._flat_sky_projections)
 
             self._convolved_ext_sources.append(this_convolved_ext_source)
 
