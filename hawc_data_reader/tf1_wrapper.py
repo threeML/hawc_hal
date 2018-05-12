@@ -6,6 +6,10 @@ class TF1Wrapper(object):
 
         self._tf1 = tf1_instance.Clone()
 
+    @property
+    def name(self):
+        return self._tf1.GetName()
+
     def integral(self, *args, **kwargs):
         return self._tf1.Integral(*args, **kwargs)
 

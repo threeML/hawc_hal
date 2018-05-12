@@ -3,6 +3,7 @@ import healpy as hp
 import root_numpy
 import pandas as pd
 import six
+import os
 
 import ROOT
 ROOT.SetMemoryPolicy( ROOT.kMemoryStrict )
@@ -121,8 +122,9 @@ class MapTree(object):
             self._data_bins_labels = list(root_numpy.tree2array(f.Get("BinInfo"), "name"))
 
             # A transit is defined as 1 day, and totalDuration is in hours
-
-            self._n_transits = np.average(root_numpy.tree2array(f.Get("BinInfo"), "totalDuration")) / 24.0
+            # Get the number of transit from bin 0 (as LiFF does)
+            
+            self._n_transits = root_numpy.tree2array(f.Get("BinInfo"), "totalDuration")[0] / 24.0
 
             n_bins = len(self._data_bins_labels)
 
@@ -170,8 +172,8 @@ class MapTree(object):
 
                     # Read the entire sky.
 
-                    counts = tree_to_ndarray(f.Get(bin_label), "count").astype(np.float32)
-                    bkg = tree_to_ndarray(f.Get(bkg_label), "count").astype(np.float32)
+                    counts = tree_to_ndarray(f.Get(bin_label), "count").astype(np.float64)
+                    bkg = tree_to_ndarray(f.Get(bkg_label), "count").astype(np.float64)
 
                     this_data_analysis_bin = DataAnalysisBin(name,
                                                              DenseHealpix(counts),
@@ -271,18 +273,23 @@ class MapTree(object):
             ttree_instance.SetEntryList(entrylist)
 
             # Get copy of the subset
+            # We need to create a dumb TFile to silence a lot of warnings from ROOT
+            dumb_tfile = ROOT.TFile("__test.root", "RECREATE")
             new_tree = ttree_instance.CopyTree("")
 
             # Actually read it from disk
-            partial_map = root_numpy.tree2array(new_tree, "count").astype(np.float32)
+            partial_map = root_numpy.tree2array(new_tree, "count").astype(np.float64)
 
             # Now reset the entry list
             ttree_instance.SetEntryList(0)
 
+            dumb_tfile.Close()
+            os.remove("__test.root")
+
         else:
 
             # The smart scheme starts to become slower than the brute force approach, so let's read the whole thing
-            partial_map = tree_to_ndarray(ttree_instance, "count").astype(np.float32)
+            partial_map = tree_to_ndarray(ttree_instance, "count").astype(np.float64)
 
             assert partial_map.shape[0] >= elements_to_read.shape[0], "Trying to read more pixels than present in TTree"
 

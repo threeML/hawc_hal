@@ -133,13 +133,13 @@ class HealpixConeROI(HealpixROIBase):
     def display(self):
 
         print("%s: Center (R.A., Dec) = (%.3f, %.3f), data radius = %.3f deg, model radius: %.3f deg" %
-              (type(self).__name__, self.lon_lat_center[0], self.lon_lat_center[1],
+              (type(self).__name__, self.ra_dec_center[0], self.ra_dec_center[1],
                self.data_radius.to(u.deg).value, self.model_radius.to(u.deg).value))
 
     @property
-    def lon_lat_center(self):
+    def ra_dec_center(self):
 
-        return self._get_lon_lat()
+        return self._get_ra_dec()
 
     @property
     def data_radius(self):
@@ -150,7 +150,7 @@ class HealpixConeROI(HealpixROIBase):
     def model_radius(self):
         return self._model_radius_radians * u.rad
 
-    def _get_lon_lat(self):
+    def _get_ra_dec(self):
 
         lon, lat = self._center.get_ra(), self._center.get_dec()
 
@@ -158,7 +158,7 @@ class HealpixConeROI(HealpixROIBase):
 
     def _get_healpix_vec(self):
 
-        lon, lat = self._get_lon_lat()
+        lon, lat = self._get_ra_dec()
 
         vec = radec_to_vec(lon, lat)
 
@@ -182,7 +182,7 @@ class HealpixConeROI(HealpixROIBase):
         npix_per_side = 2 * int(np.ceil(np.rad2deg(self._model_radius_radians) / pixel_size_deg))
 
         # Get lon, lat of center
-        ra, dec = self._get_lon_lat()
+        ra, dec = self._get_ra_dec()
 
         # This gets a list of all RA, Decs for an AIT-projected image of npix_per_size x npix_per_side
         flat_sky_proj = FlatSkyProjection(ra, dec, pixel_size_deg, npix_per_side, npix_per_side)

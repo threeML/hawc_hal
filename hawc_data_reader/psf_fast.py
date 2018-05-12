@@ -3,6 +3,7 @@ import matplotlib.pyplot as plt
 
 import numpy as np
 from numpy.fft import rfftn, irfftn
+from scipy.signal import fftconvolve
 from numba import jit, float64
 import collections
 import scipy.optimize
@@ -59,21 +60,21 @@ class PSFWrapper(TF1Wrapper):
 
         # Memorize the total integral (will use it for normalization)
 
-        self._total_integral = self._tf1_interpolated.integral(1e-4, 30)
+        self._total_integral = self._tf1_interpolated.integral(0, 30)
 
         # Now compute the truncation radius, which is a very conservative measurement
         # of the size of the PSF
 
-        self._truncation_radius = self._find_eef_radius(0.9999)
+        self._truncation_radius = self.find_eef_radius(0.999)
 
         # Let's also compute another measurement more appropriate for convolution
-        self._kernel_radius = self._find_eef_radius(0.999)
+        self._kernel_radius = self.find_eef_radius(0.99)
 
-        assert self._kernel_radius < self._truncation_radius
+        assert self._kernel_radius <= self._truncation_radius
 
-        # print("Psf: %s, R_t = %.3f, R_k = %.3f" % (tf1_instance.GetName(), self._truncation_radius, self._kernel_radius))
+        #print("Psf: %s, R_t = %.3f, R_k = %.3f" % (tf1_instance.GetName(), self._truncation_radius, self._kernel_radius))
 
-    def _find_eef_radius(self, fraction):
+    def find_eef_radius(self, fraction):
 
         f = lambda r: fraction - self._tf1_interpolated.integral(1e-4, r) / self._total_integral
 
@@ -231,6 +232,14 @@ class PSFConvolutor(object):
 
         # Renormalize to exactly 1
         self._kernel = self._kernel / self._kernel.sum()
+        #
+        # import matplotlib.pyplot as plt
+        #
+        # fig = plt.figure()
+        #
+        # plt.imshow(self._kernel, interpolation='none')
+        #
+        # fig.savefig("kernel_%s.png" % self._psf.name)
 
         self._expected_shape = (flat_sky_proj.npix_height, flat_sky_proj.npix_width)
 
@@ -250,13 +259,28 @@ class PSFConvolutor(object):
 
     def extended_source_image(self, ideal_image):
 
+        conv = fftconvolve(ideal_image, self._kernel, mode='same')
+
+        return conv
+
+    def extended_source_image_(self, ideal_image):
+
         # Convolve
 
         assert np.alltrue(ideal_image.shape == self._expected_shape), "Shape of image to be convolved is not correct."
 
         ret = irfftn(rfftn(ideal_image, self._fshape) * self._psf_fft, self._fshape)[self._fslice].copy()
 
-        return _centered(ret, self._expected_shape)
+        conv = _centered(ret, self._expected_shape)
+        #
+        # fig, sub = plt.subplots(1,1)
+        #
+        # #sub[0].imshow(ideal_image, interpolation='none', cmap='gist_heat')
+        # sub.imshow(conv, interpolation='none', cmap='gist_heat')
+        #
+        # fig.savefig("convolution.png")
+
+        return conv
 
 
 # Copied from scipy.signaltools.fftconvolve

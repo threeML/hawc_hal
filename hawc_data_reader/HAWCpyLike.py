@@ -2,15 +2,18 @@ import collections
 import numpy as np
 import healpy as hp
 import astropy.units as u
-from numba import jit, float64, float32
+from numba import jit, float64
+import matplotlib.pyplot as plt
 
 from threeML.plugin_prototype import PluginPrototype
 from threeML.plugins.gammaln import logfactorial
 
 from map_tree import map_tree_factory
 from response import hawc_response_factory
-from convolved_source import ConvolvedPointSource, ConvolvedExtendedSource2D, ConvolvedExtendedSource3D
+from convolved_source import ConvolvedPointSource, ConvolvedExtendedSource3D, ConvolvedExtendedSource2D
 from partial_image_to_healpix import FlatSkyToHealpixTransform
+from sparse_healpix import SparseHealpix
+from psf_fast import PSFConvolutor
 
 
 class ConvolvedSourcesContainer(object):
@@ -48,7 +51,10 @@ class ConvolvedSourcesContainer(object):
         return size.to(u.megabyte)
 
 
-@jit(float64(float32[:], float32[:], float64[:]), nopython=True, parallel=False)
+# This function has two signatures in numba because if there are no sources in the likelihood model,
+# then expected_model_counts is 0.0
+@jit(["float64(float64[:], float64[:], float64[:])", "float64(float64[:], float64[:], float64)"],
+     nopython=True, parallel=False)
 def log_likelihood(observed_counts, expected_bkg_counts, expected_model_counts):
     """
     Poisson log-likelihood minus log factorial minus bias. The bias migth be needed to keep the numerical value
@@ -77,11 +83,7 @@ class HAWCpyLike(PluginPrototype):
     # NOTE: the pre-defined flat_sky_pixels_sizes are the truncation radius for the PSF at the Crab position
     # divided by 100
 
-    #(0.15, 0.1497, 0.1098, 0.0928, 0.0675, 0.051, 0.0494, 0.0412, 0.03496, 0.03218)
-
-    def __init__(self, name, maptree, response, roi,
-                 flat_sky_pixels_sizes=(0.05, 0.05, 0.05, 0.05, 0.05,
-                                        0.05, 0.05, 0.05, 0.05, 0.05)):
+    def __init__(self, name, maptree, response_file, roi, flat_sky_pixels_sizes=0.17):
 
         # Store ROI
         self._roi = roi
@@ -90,11 +92,11 @@ class HAWCpyLike(PluginPrototype):
 
         self._maptree = map_tree_factory(maptree, roi=roi)
 
-        # Read detector response
+        # Read detector response_file
 
-        self._response = hawc_response_factory(response)
+        self._response = hawc_response_factory(response_file)
 
-        # Make sure that the response and the map tree are aligned
+        # Make sure that the response_file and the map tree are aligned
         assert len(self._maptree) == self._response.n_energy_planes, "Response and map tree are not aligned"
 
         # No nuisance parameters at the moment
@@ -116,22 +118,22 @@ class HAWCpyLike(PluginPrototype):
         self._all_planes = range(len(self._maptree))
         self._active_planes = range(len(self._maptree))
 
-        # Set up the flat-sky projections (one for each energy/nHit bin)
-        self._flat_sky_pixels_sizes = flat_sky_pixels_sizes
+        # Set up the flat-sky projection
 
-        self._flat_sky_projections = map(lambda pix_size: roi.get_flat_sky_projection(pix_size),
-                                         self._flat_sky_pixels_sizes)
+        self._flat_sky_projection = roi.get_flat_sky_projection(flat_sky_pixels_sizes)
 
-        # Set up the transformations from the flat-sky projections to Healpix, as well as the list of active pixels
-        # (one for each energy/nHit bin)
+        # Set up the transformations from the flat-sky projection to Healpix, as well as the list of active pixels
+        # (one for each energy/nHit bin). We make a separate transformation because different energy bins might have
+        # different nsides
         self._active_pixels = []
         self._flat_sky_to_healpix_transform = []
 
-        for flat_sky_proj, this_maptree in zip(self._flat_sky_projections, self._maptree):
+        for i, this_maptree in enumerate(self._maptree):
 
             this_nside = this_maptree.nside
             this_active_pixels = roi.active_pixels(this_nside)
-            this_flat_sky_to_hpx_transform = FlatSkyToHealpixTransform(flat_sky_proj.wcs,
+
+            this_flat_sky_to_hpx_transform = FlatSkyToHealpixTransform(self._flat_sky_projection.wcs,
                                                                        'icrs',
                                                                        this_nside,
                                                                        this_active_pixels,
@@ -139,6 +141,15 @@ class HAWCpyLike(PluginPrototype):
 
             self._active_pixels.append(this_active_pixels)
             self._flat_sky_to_healpix_transform.append(this_flat_sky_to_hpx_transform)
+
+        # Setup the PSF convolutors for Extended Sources
+
+        self._central_response_bins, dec_bin_id = self._response.get_response_dec_bin(self._roi.ra_dec_center[1])
+
+        print("Using PSF from Dec Bin %i for source %s" % (dec_bin_id, self._name))
+
+        self._psf_convolutors = map(lambda response_bin: PSFConvolutor(response_bin.psf, self._flat_sky_projection),
+                                    self._central_response_bins)
 
         # Pre-compute the log-factorial factor in the likelihood, so we do not keep to computing it over and over
         # again.
@@ -184,21 +195,12 @@ class HAWCpyLike(PluginPrototype):
         self._roi.display()
 
         print("")
-        print("Flat sky projections: ")
+        print("Flat sky projection: ")
         print("----------------------\n")
 
-        widths = []
-        heights = []
-        pix_sizes = []
-
-        for proj in self._flat_sky_projections:
-
-            widths.append(proj.npix_width)
-            heights.append(proj.npix_height)
-            pix_sizes.append(proj.pixel_size)
-
-        print("Width x height: %s px" % ", ".join(map(lambda (w, h): "%ix%i" % (w, h), zip(widths, heights))))
-        print("Pixel sizes: %s deg" % ", ".join(map(lambda r: "%.3f" % r, pix_sizes)))
+        print("Width x height: %s x %s px" % (self._flat_sky_projection.npix_width,
+                                              self._flat_sky_projection.npix_height))
+        print("Pixel sizes: %s deg" % self._flat_sky_projection.pixel_size)
 
         print("")
         print("Response: ")
@@ -232,7 +234,7 @@ class HAWCpyLike(PluginPrototype):
 
         for source in self._likelihood_model.point_sources.values():
 
-            this_convolved_point_source = ConvolvedPointSource(source, self._response, self._flat_sky_projections)
+            this_convolved_point_source = ConvolvedPointSource(source, self._response, self._flat_sky_projection)
 
             self._convolved_point_sources.append(this_convolved_point_source)
 
@@ -244,13 +246,13 @@ class HAWCpyLike(PluginPrototype):
 
                 this_convolved_ext_source = ConvolvedExtendedSource2D(source,
                                                                       self._response,
-                                                                      self._flat_sky_projections)
+                                                                      self._flat_sky_projection)
 
             else:
 
                 this_convolved_ext_source = ConvolvedExtendedSource3D(source,
                                                                       self._response,
-                                                                      self._flat_sky_projections)
+                                                                      self._flat_sky_projection)
 
             self._convolved_ext_sources.append(this_convolved_ext_source)
 
@@ -263,6 +265,11 @@ class HAWCpyLike(PluginPrototype):
         n_point_sources = self._likelihood_model.get_number_of_point_sources()
         n_ext_sources = self._likelihood_model.get_number_of_extended_sources()
 
+        # Make sure that no source has been added since we filled the cache
+        assert n_point_sources == self._convolved_point_sources.n_sources_in_cache and \
+               n_ext_sources == self._convolved_ext_sources.n_sources_in_cache, \
+            "The number of sources has changed. Please re-assign the model to the plugin."
+
         # This will hold the total log-likelihood
         total_log_like = 0
 
@@ -271,73 +278,7 @@ class HAWCpyLike(PluginPrototype):
             if i not in self._active_planes:
                 continue
 
-            # Compute the expectation from the model
-
-            this_model_map = None
-
-            # Make sure that no source has been added since we filled the cache
-            assert n_point_sources == self._convolved_point_sources.n_sources_in_cache and \
-                   n_ext_sources == self._convolved_ext_sources.n_sources_in_cache, \
-                "The number of sources has changed. Please re-assign the model to the plugin."
-
-            for pts_id in range(n_point_sources):
-
-                this_convolved_source = self._convolved_point_sources[pts_id]
-
-                expectation_per_transit = this_convolved_source.get_source_map(i, tag=None)
-
-                expectation_from_this_source = expectation_per_transit * self._maptree.n_transits
-
-                if this_model_map is None:
-
-                    # First addition
-
-                    this_model_map = expectation_from_this_source
-
-                else:
-
-                    this_model_map += expectation_from_this_source
-
-            # Now process extended sources
-            for ext_id in range(n_ext_sources):
-
-                this_convolved_source = self._convolved_ext_sources[ext_id]
-
-                expectation_per_transit = this_convolved_source.get_source_map(i)
-
-                expectation_from_this_source = expectation_per_transit * self._maptree.n_transits
-
-                if this_model_map is None:
-
-                    # First addition
-
-                    this_model_map = expectation_from_this_source
-
-                else:
-
-                    this_model_map += expectation_from_this_source
-
-            # Now transform from the flat sky projection to HEALPiX
-
-            # Keep track of the overall normalization
-            total_before_interpolation = this_model_map.sum()
-
-            # First divide for the pixel area because we need to interpolate brightness
-            this_model_map = this_model_map / self._flat_sky_projections[i].project_plane_pixel_area
-
-            this_model_map_hpx = self._flat_sky_to_healpix_transform[i](this_model_map,
-                                                                        fill_value=0.0)
-
-            # Now multiply by the pixel area of the new map to go back to flux
-            this_model_map_hpx *= hp.nside2pixarea(data_analysis_bin.nside, degrees=True)
-
-            # Due to the interpolation the new map might have a slightly different total. The difference
-            # is < 1%, but let's fix it anyway
-            total_after_interpolation = this_model_map_hpx.sum()
-
-            renorm = total_before_interpolation / total_after_interpolation
-
-            this_model_map_hpx = this_model_map_hpx * renorm
+            this_model_map_hpx = self._get_expectation(data_analysis_bin, i, n_point_sources, n_ext_sources)
 
             # Now compare with observation
             this_pseudo_log_like = log_likelihood(data_analysis_bin.observation_map.as_partial(),
@@ -347,6 +288,231 @@ class HAWCpyLike(PluginPrototype):
             total_log_like += this_pseudo_log_like - self._log_factorials[i] - self._saturated_model_like_per_maptree[i]
 
         return total_log_like
+
+    def _get_expectation(self, data_analysis_bin, energy_bin_id, n_point_sources, n_ext_sources):
+
+        # Compute the expectation from the model
+
+        this_model_map = None
+
+        for pts_id in range(n_point_sources):
+
+            this_convolved_source = self._convolved_point_sources[pts_id]
+
+            expectation_per_transit = this_convolved_source.get_source_map(energy_bin_id, tag=None)
+
+            expectation_from_this_source = expectation_per_transit * self._maptree.n_transits
+
+            if this_model_map is None:
+
+                # First addition
+
+                this_model_map = expectation_from_this_source
+
+            else:
+
+                this_model_map += expectation_from_this_source
+
+        # Now process extended sources
+        if n_ext_sources > 0:
+
+            this_ext_model_map = None
+
+            for ext_id in range(n_ext_sources):
+
+                this_convolved_source = self._convolved_ext_sources[ext_id]
+
+                expectation_per_transit = this_convolved_source.get_source_map(energy_bin_id)
+
+                if this_ext_model_map is None:
+
+                    # First addition
+
+                    this_ext_model_map = expectation_per_transit
+
+                else:
+
+                    this_ext_model_map += expectation_per_transit
+
+            # Now convolve with the PSF
+            if this_model_map is None:
+                
+                # Only extended sources
+            
+                this_model_map = (self._psf_convolutors[energy_bin_id].extended_source_image(this_ext_model_map) *
+                                  self._maptree.n_transits)
+            
+            else:
+
+                this_model_map += (self._psf_convolutors[energy_bin_id].extended_source_image(this_ext_model_map) *
+                                   self._maptree.n_transits)
+
+
+        # Now transform from the flat sky projection to HEALPiX
+
+        if this_model_map is not None:
+
+            # First divide for the pixel area because we need to interpolate brightness
+            this_model_map = this_model_map / self._flat_sky_projection.project_plane_pixel_area
+
+            this_model_map_hpx = self._flat_sky_to_healpix_transform[energy_bin_id](this_model_map, fill_value=0.0)
+
+            # Now multiply by the pixel area of the new map to go back to flux
+            this_model_map_hpx *= hp.nside2pixarea(data_analysis_bin.nside, degrees=True)
+
+        else:
+
+            # No sources
+
+            this_model_map_hpx = 0.0
+
+        return this_model_map_hpx
+
+    def display_fit(self):
+
+        n_point_sources = self._likelihood_model.get_number_of_point_sources()
+        n_ext_sources = self._likelihood_model.get_number_of_extended_sources()
+
+        # This is the resolution (i.e., the size of one pixel) of the image in arcmin
+        resolution = 3.0
+
+        # The image is going to cover the diameter plus 20% padding
+        xsize = 2.2 * self._roi.data_radius.to("deg").value / (resolution / 60.0)
+
+        n_active_planes = len(self._active_planes)
+
+        fig, subs = plt.subplots(n_active_planes, 2, figsize=(10, n_active_planes * 5))
+
+        active_planes_bins = map(lambda x:self._maptree[x], self._active_planes)
+
+        for i, data_analysis_bin in enumerate(active_planes_bins):
+
+            # Get the center of the projection for this plane
+            this_ra, this_dec = self._roi.ra_dec_center
+
+            this_model_map_hpx = self._get_expectation(data_analysis_bin, i, n_point_sources, n_ext_sources)
+
+            # Make a full healpix map for a second
+            whole_map = SparseHealpix(this_model_map_hpx,
+                                      self._active_pixels[i],
+                                      data_analysis_bin.observation_map.nside).as_dense()
+
+            # Add background (which is in a way "part of the model" since the uncertainties are neglected)
+            background_map = data_analysis_bin.background_map.as_dense()
+            whole_map += background_map
+
+            # Healpix uses longitude between -180 and 180, while R.A. is between 0 and 360. We need to fix that:
+            if this_ra > 180.0:
+
+                longitude = -180 + (this_ra - 180.0)
+
+            else:
+
+                longitude = this_ra
+
+            # Declination is already between -90 and 90
+            latitude = this_dec
+
+            # Select right subplot
+            plt.axes(subs[i][0])
+
+            # Plot model
+            hp.gnomview(whole_map,
+                        title='Energy bin %i' % (i),
+                        rot=(longitude, latitude, 0.0),
+                        xsize=xsize,
+                        reso=resolution,
+                        hold=True,
+                        notext=True)
+
+            # Select right subplot
+            plt.axes(subs[i][1])
+
+            # Plot data
+
+            bkg_subtracted = data_analysis_bin.observation_map.as_dense() - background_map
+            idx = np.isnan(bkg_subtracted)
+            bkg_subtracted[idx] = hp.UNSEEN
+
+            bkg_subtracted = hp.smoothing(bkg_subtracted,
+                                          fwhm=np.deg2rad(1.0),
+                                          lmax=100.0)
+
+            hp.gnomview(bkg_subtracted,
+                        title='Energy bin %i' % (i),
+                        rot=(longitude, latitude, 0.0),
+                        xsize=xsize,
+                        reso=resolution,
+                        hold=True,
+                        notext=True)
+
+        return fig
+
+    def display_stacked_image(self, smoothing=1.0):
+
+        # This is the resolution (i.e., the size of one pixel) of the image in arcmin
+        resolution = 3.0
+
+        # The image is going to cover the diameter plus 20% padding
+        xsize = 2.2 * self._roi.data_radius.to("deg").value / (resolution / 60.0)
+
+        active_planes_bins = map(lambda x: self._maptree[x], self._active_planes)
+
+        # Get the center of the projection for this plane
+        this_ra, this_dec = self._roi.ra_dec_center
+
+        # Healpix uses longitude between -180 and 180, while R.A. is between 0 and 360. We need to fix that:
+        if this_ra > 180.0:
+
+            longitude = -180 + (this_ra - 180.0)
+
+        else:
+
+            longitude = this_ra
+
+        # Declination is already between -90 and 90
+        latitude = this_dec
+
+        total = None
+
+        for i, data_analysis_bin in enumerate(active_planes_bins):
+
+            # Plot data
+            background_map = data_analysis_bin.background_map.as_dense()
+            this_data = data_analysis_bin.observation_map.as_dense() - background_map
+            idx = np.isnan(this_data)
+            this_data[idx] = hp.UNSEEN
+
+            if i == 0:
+
+                total = this_data
+
+            else:
+
+                # Sum only when there is no UNSEEN, so that the UNSEEN pixels will stay UNSEEN
+                total[~idx] += this_data[~idx]
+
+        total_smooth = hp.smoothing(total,
+                                    fwhm=np.deg2rad(smoothing),
+                                    lmax=100.0,
+                                    verbose=False)
+
+        delta_coord = (self._roi.data_radius.to("deg").value * 2.0) / 15.0
+
+        fig, subs = plt.subplots(1, 1, figsize=(5, 5))
+        plt.axes(subs)
+
+        hp.gnomview(total_smooth,
+                    title='Data',
+                    rot=(longitude, latitude, 0.0),
+                    xsize=xsize,
+                    reso=resolution,
+                    hold=True,
+                    notext=True)
+
+        hp.graticule(delta_coord, delta_coord)
+
+        return fig
 
     def inner_fit(self):
         """

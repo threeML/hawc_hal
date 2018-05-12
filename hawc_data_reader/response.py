@@ -15,7 +15,12 @@ from psf_fast import PSFWrapper
 
 class ResponseBin(object):
 
-    def __init__(self, open_ttree, dec_id, analysis_bin_id, log_log_spectrum):
+    def __init__(self, open_ttree, dec_id, analysis_bin_id, log_log_spectrum, min_dec, dec_center, max_dec):
+
+        # Save the dec boundaries
+        self._min_dec = min_dec
+        self._max_dec = max_dec
+        self._dec_center = dec_center
 
         # Compute the labels as used in the response file
         dec_id_label = "dec_%02i" % dec_id
@@ -95,6 +100,15 @@ class ResponseBin(object):
     @property
     def name(self):
         return self._name
+
+    @property
+    def declination_boundaries(self):
+        return (self._min_dec, self._max_dec)
+
+
+    @property
+    def declination_center(self):
+        return self._dec_center
 
     @property
     def psf(self):
@@ -206,9 +220,12 @@ class HAWCResponse(object):
 
                 this_response_bins = []
 
+                min_dec, dec_center, max_dec = self._dec_bins[dec_id]
+
                 for response_bin_id in response_bins_ids:
 
-                    this_response_bin = ResponseBin(f, dec_id, response_bin_id, self._log_log_spectrum)
+                    this_response_bin = ResponseBin(f, dec_id, response_bin_id, self._log_log_spectrum,
+                                                    min_dec, dec_center, max_dec)
 
                     this_response_bins.append(this_response_bin)
 
