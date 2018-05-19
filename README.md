@@ -1,1 +1,1 @@
-# hawc-response-reader
+# The HAWC Highly Accelerated Likelihood (HAL) framework
