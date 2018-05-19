@@ -1,7 +1,7 @@
 from threeML import *
 import numpy as np
 import warnings
-from hawc_hal.HAL import HAWCpyLike
+from hawc_hal.HAL import HAL
 from hawc_hal.region_of_interest import HealpixConeROI
 
 from astropy.wcs import WCS
@@ -71,7 +71,7 @@ class ParallelTSmap(object):
 
         roi = HealpixConeROI(self._roi_radius, ra=ra_c, dec=dec_c)
         
-        self._llh = HAWCpyLike("HAWC", self._mtfile, self._rsfile, roi)
+        self._llh = HAL("HAWC", self._mtfile, self._rsfile, roi)
         self._llh.set_active_measurements(1,9)
         
         # Make a fit with no source to get the likelihood for the null hypothesis

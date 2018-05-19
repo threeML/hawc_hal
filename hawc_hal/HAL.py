@@ -84,7 +84,7 @@ def log_likelihood(observed_counts, expected_bkg_counts, expected_model_counts):
     return np.sum(log_likes)
 
 
-class HAWCpyLike(PluginPrototype):
+class HAL(PluginPrototype):
 
     def __init__(self, name, maptree, response_file, roi, flat_sky_pixels_sizes=0.17):
 
@@ -108,7 +108,7 @@ class HAWCpyLike(PluginPrototype):
 
         # Instance parent class
 
-        super(HAWCpyLike, self).__init__(name, self._nuisance_parameters)
+        super(HAL, self).__init__(name, self._nuisance_parameters)
 
         self._likelihood_model = None
 
