@@ -16,7 +16,9 @@ from astropy.coordinates import UnitSphericalRepresentation
 from astropy.wcs.utils import wcs_to_celestial_frame
 from astropy.wcs import WCS
 
-from special_values import UNSEEN
+from hawc_hal.special_values import UNSEEN
+from hawc_hal.interpolation.fast_linear_interpolator import FastLinearInterpolator
+
 
 ORDER = {}
 ORDER['nearest-neighbor'] = 0
@@ -170,7 +172,7 @@ class FlatSkyToHealpixTransform(object):
     the transformation. This avoids to re-compute the same quantities over and over again.
     """
 
-    def __init__(self, wcs_in, coord_system_out, nside, pixels_id, order='bilinear', nested=False):
+    def __init__(self, wcs_in, coord_system_out, nside, pixels_id, input_shape, order='bilinear', nested=False):
 
         # Look up lon, lat of pixels in output system and convert colatitude theta
         # and longitude phi to longitude and latitude.
@@ -186,7 +188,9 @@ class FlatSkyToHealpixTransform(object):
             lon_in, lat_in = convert_world_coordinates(lon_out, lat_out, (coord_system_out, u.deg, u.deg), wcs_in)
 
         # Look up pixels in input system
-        self._yinds, self._xinds = wcs_in.wcs_world2pix(lon_in, lat_in, 0)
+        yinds, xinds = wcs_in.wcs_world2pix(lon_in, lat_in, 0)
+
+        self._coords = np.array([xinds, yinds])
 
         # Interpolate
 
@@ -195,10 +199,14 @@ class FlatSkyToHealpixTransform(object):
 
         self._order = order
 
+        # self._interpolator = FastLinearInterpolator(input_shape, self._coords.T)
+
     def __call__(self, data, fill_value=UNSEEN):
 
-        healpix_data = map_coordinates(data, [self._xinds, self._yinds],
+        healpix_data = map_coordinates(data, self._coords,
                                         order=self._order,
                                         mode='constant', cval=fill_value)
+
+        # healpix_data = self._interpolator(data)
 
         return healpix_data

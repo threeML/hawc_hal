@@ -1,14 +1,25 @@
 from setuptools import setup
 
 setup(
-    name='hawc_data_reader',
+
+    name='hawc_hal',
+
     version='0.1',
-    packages=['hawc_data_reader'],
-    url='https://github.com/giacomov/hawc_data_reader',
+
+    packages=['hawc_hal',
+              'hawc_hal/healpix_handling',
+              'hawc_hal/interpolation'],
+
+    url='https://github.com/giacomov/hawc_hal',
+
     license='BSD-3.0',
+
     author='Giacomo Vianello',
+
     author_email='giacomov@stanford.edu',
+
     description='Read and handle HAWC data',
+
     install_requires=['numpy',
                       'healpy',
                       'threeml',

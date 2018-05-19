@@ -64,6 +64,7 @@ class ConvolvedPointSource(object):
         # Get current point source position
         # NOTE: this might change if the point source position is free during the fit,
         # that's why it is here
+
         ra_src, dec_src = self._source.position.ra.value, self._source.position.dec.value
 
         if (ra_src, dec_src) != self._last_processed_position:

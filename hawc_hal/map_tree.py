@@ -1,5 +1,4 @@
 import numpy as np
-import healpy as hp
 import root_numpy
 import pandas as pd
 import six
@@ -16,8 +15,7 @@ from threeML.exceptions.custom_exceptions import custom_warnings
 from threeML.io.file_utils import file_existing_and_readable, sanitize_filename
 
 from region_of_interest import HealpixROIBase
-from sparse_healpix import SparseHealpix, DenseHealpix
-from special_values import UNSEEN
+from hawc_hal.healpix_handling.sparse_healpix import SparseHealpix, DenseHealpix
 
 import astropy.units as u
 
@@ -123,7 +121,7 @@ class MapTree(object):
 
             # A transit is defined as 1 day, and totalDuration is in hours
             # Get the number of transit from bin 0 (as LiFF does)
-            
+
             self._n_transits = root_numpy.tree2array(f.Get("BinInfo"), "totalDuration")[0] / 24.0
 
             n_bins = len(self._data_bins_labels)

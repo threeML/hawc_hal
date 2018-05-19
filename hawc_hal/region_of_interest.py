@@ -1,5 +1,5 @@
 import healpy as hp
-from healpix_utils import radec_to_vec
+from hawc_hal.healpix_handling.healpix_utils import radec_to_vec
 
 from astromodels.core.sky_direction import SkyDirection
 

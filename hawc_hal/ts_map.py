@@ -1,8 +1,8 @@
 from threeML import *
 import numpy as np
 import warnings
-from hawc_data_reader.HAWCpyLike import HAWCpyLike
-from hawc_data_reader.region_of_interest import HealpixConeROI
+from hawc_hal.HAL import HAWCpyLike
+from hawc_hal.region_of_interest import HealpixConeROI
 
 from astropy.wcs import WCS
 from astropy.coordinates.angle_utilities import angular_separation

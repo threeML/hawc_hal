@@ -2,7 +2,7 @@
 # from pandas.core.sparse.array import IntIndex
 import numpy as np
 import healpy as hp
-from special_values import UNSEEN
+from hawc_hal.special_values import UNSEEN
 
 
 def _not_implemented():
@@ -86,53 +86,11 @@ class SparseHealpix(HealpixWrapperBase):
 
         return self._partial_map
 
+    def set_new_values(self, new_values):
 
-# class SparseHealpixOld(HealpixWrapperBase):
-#     """
-#     A sparse healpix map, where elements (likely, many elements) are empty. Storing it like this preserves *a lot*
-#     of memory. Use copy=True to copy the array, otherwise the sparse array will only be a view.
-#     """
-#
-#     def __init__(self, healpix_array, copy=True, fill_value=UNSEEN, non_null_elements=None):
-#
-#         if non_null_elements is not None:
-#
-#             # NOTE: non_null_elements contains the actual indexes, it is NOT a boolean mask. In other words,
-#             # non_null_elements.shape != healpix_array.shape unless all pixels are non null (in which case
-#             # there is no point in using a sparse healpix representation)
-#
-#             not_nans = healpix_array[non_null_elements]
-#             index = IntIndex(healpix_array.shape[0], non_null_elements)
-#
-#             self._sparse_map = pd.SparseArray(not_nans, sparse_index=index)
-#
-#         else:
-#
-#             self._sparse_map = pd.SparseArray(healpix_array, kind='block', fill_value=fill_value, copy=copy)
-#
-#         super(SparseHealpixOld, self).__init__(healpix_array, sparse=True)
-#
-#     def as_sparse(self):
-#         """
-#         Returns the sparse representation of the map. Unused pixels have a value of UNSEEN
-#
-#         :return: sparse representation (note: the sparse representation is read-only)
-#         """
-#         return self._sparse_map
-#
-#     def as_dense(self):
-#         """
-#         Returns the dense (i.e., full sky) representation of the map. Note that this means unwrapping the map,
-#         and the memory usage increases a lot.
-#
-#         :return: the dense map, suitable for use with healpy routine (among other uses)
-#         """
-#
-#         return self._sparse_map.to_dense()
-#
-#     def as_partial(self):
-#
-#         return np.array(self.as_sparse())
+        assert new_values.shape == self._partial_map.shape
+
+        self._partial_map[:] = new_values
 
 
 class DenseHealpix(HealpixWrapperBase):
@@ -160,3 +118,9 @@ class DenseHealpix(HealpixWrapperBase):
     def as_partial(self):
 
         return self._dense_map
+
+    def set_new_values(self, new_values):
+
+        assert new_values.shape == self._dense_map.shape
+
+        self._dense_map[:] = new_values

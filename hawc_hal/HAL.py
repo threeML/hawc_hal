@@ -2,17 +2,23 @@ import collections
 import numpy as np
 import healpy as hp
 import astropy.units as u
-from numba import jit, float64
+from numba import jit
 import matplotlib.pyplot as plt
+import copy
+from astropy.convolution import Gaussian2DKernel
+from astropy.convolution import convolve_fft as convolve
 
 from threeML.plugin_prototype import PluginPrototype
 from threeML.plugins.gammaln import logfactorial
+from threeML.parallel import parallel_client
+from threeML.io.progress_bar import progress_bar
 
 from map_tree import map_tree_factory
 from response import hawc_response_factory
 from convolved_source import ConvolvedPointSource, ConvolvedExtendedSource3D, ConvolvedExtendedSource2D
-from partial_image_to_healpix import FlatSkyToHealpixTransform
-from sparse_healpix import SparseHealpix
+from hawc_hal.healpix_handling.partial_image_to_healpix import FlatSkyToHealpixTransform
+from hawc_hal.healpix_handling.sparse_healpix import SparseHealpix
+from hawc_hal.healpix_handling.gnomonic_projection import get_gnomonic_projection
 from psf_fast import PSFConvolutor
 
 
@@ -80,9 +86,6 @@ def log_likelihood(observed_counts, expected_bkg_counts, expected_model_counts):
 
 class HAWCpyLike(PluginPrototype):
 
-    # NOTE: the pre-defined flat_sky_pixels_sizes are the truncation radius for the PSF at the Crab position
-    # divided by 100
-
     def __init__(self, name, maptree, response_file, roi, flat_sky_pixels_sizes=0.17):
 
         # Store ROI
@@ -137,19 +140,20 @@ class HAWCpyLike(PluginPrototype):
                                                                        'icrs',
                                                                        this_nside,
                                                                        this_active_pixels,
+                                                                       (self._flat_sky_projection.npix_width,
+                                                                        self._flat_sky_projection.npix_height),
                                                                        order='bilinear')
 
             self._active_pixels.append(this_active_pixels)
             self._flat_sky_to_healpix_transform.append(this_flat_sky_to_hpx_transform)
 
-        # Setup the PSF convolutors for Extended Sources
-
         self._central_response_bins, dec_bin_id = self._response.get_response_dec_bin(self._roi.ra_dec_center[1])
 
         print("Using PSF from Dec Bin %i for source %s" % (dec_bin_id, self._name))
 
-        self._psf_convolutors = map(lambda response_bin: PSFConvolutor(response_bin.psf, self._flat_sky_projection),
-                                    self._central_response_bins)
+        # This will contain a list of PSF convolutors for extended sources, if there is any in the model
+
+        self._psf_convolutors = None
 
         # Pre-compute the log-factorial factor in the likelihood, so we do not keep to computing it over and over
         # again.
@@ -160,6 +164,19 @@ class HAWCpyLike(PluginPrototype):
         # two likelihood values, which would be affected by numerical precision errors if the two values are
         # too large
         self._saturated_model_like_per_maptree = np.zeros(len(self._maptree))
+
+        # The actual computation is in a method so we can recall it on clone (see the get_simulated_dataset method)
+        self._compute_likelihood_biases()
+
+        # This will save a clone of self for simulations
+        self._clone = None
+
+    def _setup_psf_convolutors(self):
+
+        self._psf_convolutors = map(lambda response_bin: PSFConvolutor(response_bin.psf, self._flat_sky_projection),
+                                    self._central_response_bins)
+
+    def _compute_likelihood_biases(self):
 
         for i, data_analysis_bin in enumerate(self._maptree):
 
@@ -238,23 +255,110 @@ class HAWCpyLike(PluginPrototype):
 
             self._convolved_point_sources.append(this_convolved_point_source)
 
-        # Samewise for point sources
+        # Samewise for extended sources
 
-        for source in self._likelihood_model.extended_sources.values():
+        ext_sources = self._likelihood_model.extended_sources.values()
 
-            if source.spatial_shape.n_dim == 2:
+        if len(ext_sources) > 0:
 
-                this_convolved_ext_source = ConvolvedExtendedSource2D(source,
-                                                                      self._response,
-                                                                      self._flat_sky_projection)
+            # We will need to convolve
+
+            self._setup_psf_convolutors()
+
+            for source in ext_sources:
+
+                if source.spatial_shape.n_dim == 2:
+
+                    this_convolved_ext_source = ConvolvedExtendedSource2D(source,
+                                                                          self._response,
+                                                                          self._flat_sky_projection)
+
+                else:
+
+                    this_convolved_ext_source = ConvolvedExtendedSource3D(source,
+                                                                          self._response,
+                                                                          self._flat_sky_projection)
+
+                self._convolved_ext_sources.append(this_convolved_ext_source)
+
+    def display_spectrum(self):
+
+        n_point_sources = self._likelihood_model.get_number_of_point_sources()
+        n_ext_sources = self._likelihood_model.get_number_of_extended_sources()
+
+        total_counts = np.zeros(len(self._active_planes), dtype=float)
+        total_model = np.zeros_like(total_counts)
+        model_only = np.zeros_like(total_counts)
+        residuals = np.zeros_like(total_counts)
+        net_counts = np.zeros_like(total_counts)
+
+        for i, energy_id in enumerate(self._active_planes):
+
+            data_analysis_bin = self._maptree[energy_id]
+
+            this_model_map_hpx = self._get_expectation(data_analysis_bin, energy_id, n_point_sources, n_ext_sources)
+
+            this_model_tot = np.sum(this_model_map_hpx)
+
+            this_data_tot = np.sum(data_analysis_bin.observation_map.as_partial())
+            this_bkg_tot = np.sum(data_analysis_bin.background_map.as_partial())
+
+            total_counts[i] = this_data_tot
+            net_counts[i] = this_data_tot - this_bkg_tot
+            model_only[i] = this_model_tot
+
+            if this_data_tot >= 50.0:
+
+                # Gaussian limit
+                # Under the null hypothesis the data are distributed as a Gaussian with mu = model and
+                # sigma = sqrt(model)
+                # NOTE: since we neglect the background uncertainty, the background is part of the model
+                this_wh_model = this_model_tot + this_bkg_tot
+                total_model[i] = this_wh_model
+
+                residuals[i] = (this_data_tot - this_wh_model) / np.sqrt(this_wh_model)
 
             else:
 
-                this_convolved_ext_source = ConvolvedExtendedSource3D(source,
-                                                                      self._response,
-                                                                      self._flat_sky_projection)
+                # Low-counts
+                raise NotImplementedError("Low-counts case not implemented yet")
 
-            self._convolved_ext_sources.append(this_convolved_ext_source)
+        fig, subs = plt.subplots(2, 1, gridspec_kw={'height_ratios': [2, 1], 'hspace': 0})
+
+        subs[0].errorbar(self._active_planes, net_counts, yerr=np.sqrt(total_counts),
+                         capsize=0,
+                         color='black', label='Net counts', fmt='.')
+
+        subs[0].plot(self._active_planes, model_only, label='Convolved model')
+
+        subs[0].legend(bbox_to_anchor=(1.0, 1.0), loc="upper right",
+                       numpoints=1)
+
+        # Residuals
+        subs[1].axhline(0, linestyle='--')
+
+        subs[1].errorbar(
+            self._active_planes, residuals,
+            yerr=np.ones(residuals.shape),
+            capsize=0, fmt='.'
+        )
+
+        x_limits = [min(self._active_planes) - 0.5, max(self._active_planes) + 0.5]
+
+        subs[0].set_yscale("log", nonposy='clip')
+        subs[0].set_ylabel("Counts per bin")
+        subs[0].set_xticks([])
+
+        subs[1].set_xlabel("Analysis bin")
+        subs[1].set_ylabel(r"$\frac{{cts - mod - bkg}}{\sqrt{mod + bkg}}$")
+        subs[1].set_xticks(self._active_planes)
+        subs[1].set_xticklabels(self._active_planes)
+
+        subs[0].set_xlim(x_limits)
+        subs[1].set_xlim(x_limits)
+
+        return fig
+
 
     def get_log_like(self):
         """
@@ -288,6 +392,70 @@ class HAWCpyLike(PluginPrototype):
             total_log_like += this_pseudo_log_like - self._log_factorials[i] - self._saturated_model_like_per_maptree[i]
 
         return total_log_like
+
+    def get_simulated_dataset(self, name):
+
+        # First get expectation under the current model and store them, if we didn't do it yet
+
+        if self._clone is None:
+
+            n_point_sources = self._likelihood_model.get_number_of_point_sources()
+            n_ext_sources = self._likelihood_model.get_number_of_extended_sources()
+
+            expectations = []
+
+            for i, data_analysis_bin in enumerate(self._maptree):
+
+                if i not in self._active_planes:
+
+                    expectations.append(None)
+
+                else:
+
+                    expectations.append(self._get_expectation(data_analysis_bin, i,
+                                                              n_point_sources, n_ext_sources) +
+                                        data_analysis_bin.background_map.as_partial())
+
+            if parallel_client.is_parallel_computation_active():
+
+                # Do not clone, as the parallel environment already makes clones
+
+                clone = self
+
+            else:
+
+                clone = copy.deepcopy(self)
+
+            self._clone = (clone, expectations)
+
+        # Substitute the observation and background for each data analysis bin
+        for i, (data_analysis_bin, orig_data_analysis_bin) in enumerate(zip(self._clone[0]._maptree, self._maptree)):
+
+            if i not in self._active_planes:
+
+                continue
+
+            else:
+
+                # Active plane. Generate new data
+                expectation = self._clone[1][i]
+                new_data = np.random.poisson(expectation, size=(1, expectation.shape[0])).flatten()
+
+                # Now generate new background
+                #bkg = orig_data_analysis_bin.background_map.as_partial()
+                #new_bkg = np.random.poisson(bkg, size=(1, bkg.shape[0])).flatten()
+
+                # Substitute data
+                data_analysis_bin.observation_map.set_new_values(new_data)
+                #data_analysis_bin.background_map.set_new_values(new_bkg)
+
+        # Now change name and return
+        self._clone[0]._name = name
+
+        # Recompute biases
+        self._clone[0]._compute_likelihood_biases()
+
+        return self._clone[0]
 
     def _get_expectation(self, data_analysis_bin, energy_bin_id, n_point_sources, n_ext_sources):
 
@@ -368,87 +536,112 @@ class HAWCpyLike(PluginPrototype):
 
         return this_model_map_hpx
 
-    def display_fit(self):
+    @staticmethod
+    def _represent_healpix_map(fig, hpx_map, longitude, latitude, xsize, resolution, smoothing_kernel_sigma):
+
+        proj = get_gnomonic_projection(fig, hpx_map,
+                                       rot=(longitude, latitude, 0.0),
+                                       xsize=xsize,
+                                       reso=resolution)
+
+        if smoothing_kernel_sigma is not None:
+
+            # Get the sigma in pixels
+            sigma = smoothing_kernel_sigma * 60 / resolution
+
+            proj = convolve(list(proj),
+                            Gaussian2DKernel(sigma),
+                            nan_treatment='fill',
+                            preserve_nan=True)
+
+        return proj
+
+    def display_fit(self, smoothing_kernel_sigma=0.1):
 
         n_point_sources = self._likelihood_model.get_number_of_point_sources()
         n_ext_sources = self._likelihood_model.get_number_of_extended_sources()
 
-        # This is the resolution (i.e., the size of one pixel) of the image in arcmin
-        resolution = 3.0
+        # This is the resolution (i.e., the size of one pixel) of the image
+        resolution = 3.0 # arcmin
 
         # The image is going to cover the diameter plus 20% padding
         xsize = 2.2 * self._roi.data_radius.to("deg").value / (resolution / 60.0)
 
         n_active_planes = len(self._active_planes)
 
-        fig, subs = plt.subplots(n_active_planes, 2, figsize=(10, n_active_planes * 5))
+        fig, subs = plt.subplots(n_active_planes, 3, figsize=(8, n_active_planes * 2))
 
-        active_planes_bins = map(lambda x:self._maptree[x], self._active_planes)
+        with progress_bar(len(self._active_planes), title='Smoothing maps') as prog_bar:
 
-        for i, data_analysis_bin in enumerate(active_planes_bins):
+            for i, plane_id in enumerate(self._active_planes):
 
-            # Get the center of the projection for this plane
-            this_ra, this_dec = self._roi.ra_dec_center
+                data_analysis_bin = self._maptree[plane_id]
 
-            this_model_map_hpx = self._get_expectation(data_analysis_bin, i, n_point_sources, n_ext_sources)
+                # Get the center of the projection for this plane
+                this_ra, this_dec = self._roi.ra_dec_center
 
-            # Make a full healpix map for a second
-            whole_map = SparseHealpix(this_model_map_hpx,
-                                      self._active_pixels[i],
-                                      data_analysis_bin.observation_map.nside).as_dense()
+                this_model_map_hpx = self._get_expectation(data_analysis_bin, plane_id, n_point_sources, n_ext_sources)
 
-            # Add background (which is in a way "part of the model" since the uncertainties are neglected)
-            background_map = data_analysis_bin.background_map.as_dense()
-            whole_map += background_map
+                # Make a full healpix map for a second
+                whole_map = SparseHealpix(this_model_map_hpx,
+                                          self._active_pixels[plane_id],
+                                          data_analysis_bin.observation_map.nside).as_dense()
 
-            # Healpix uses longitude between -180 and 180, while R.A. is between 0 and 360. We need to fix that:
-            if this_ra > 180.0:
+                # Healpix uses longitude between -180 and 180, while R.A. is between 0 and 360. We need to fix that:
+                if this_ra > 180.0:
 
-                longitude = -180 + (this_ra - 180.0)
+                    longitude = -180 + (this_ra - 180.0)
 
-            else:
+                else:
 
-                longitude = this_ra
+                    longitude = this_ra
 
-            # Declination is already between -90 and 90
-            latitude = this_dec
+                # Declination is already between -90 and 90
+                latitude = this_dec
 
-            # Select right subplot
-            plt.axes(subs[i][0])
+                # Plot model
 
-            # Plot model
-            hp.gnomview(whole_map,
-                        title='Energy bin %i' % (i),
-                        rot=(longitude, latitude, 0.0),
-                        xsize=xsize,
-                        reso=resolution,
-                        hold=True,
-                        notext=True)
+                proj_m = self._represent_healpix_map(fig, whole_map,
+                                                     longitude, latitude,
+                                                     xsize, resolution, smoothing_kernel_sigma)
 
-            # Select right subplot
-            plt.axes(subs[i][1])
+                subs[i][0].imshow(proj_m, origin='lower')
 
-            # Plot data
+                # Remove numbers from axis
+                subs[i][0].axis('off')
 
-            bkg_subtracted = data_analysis_bin.observation_map.as_dense() - background_map
-            idx = np.isnan(bkg_subtracted)
-            bkg_subtracted[idx] = hp.UNSEEN
+                # Plot data map
+                # Here we removed the background otherwise nothing is visible
+                # Get background (which is in a way "part of the model" since the uncertainties are neglected)
+                background_map = data_analysis_bin.background_map.as_dense()
+                bkg_subtracted = data_analysis_bin.observation_map.as_dense() - background_map
 
-            bkg_subtracted = hp.smoothing(bkg_subtracted,
-                                          fwhm=np.deg2rad(1.0),
-                                          lmax=100.0)
+                proj_d = self._represent_healpix_map(fig, bkg_subtracted,
+                                                     longitude, latitude,
+                                                     xsize, resolution, smoothing_kernel_sigma)
 
-            hp.gnomview(bkg_subtracted,
-                        title='Energy bin %i' % (i),
-                        rot=(longitude, latitude, 0.0),
-                        xsize=xsize,
-                        reso=resolution,
-                        hold=True,
-                        notext=True)
+                subs[i][1].imshow(proj_d, origin='lower')
+
+                # Remove numbers from axis
+                subs[i][1].axis('off')
+
+                # Now residuals
+                res = proj_d - proj_m
+                # proj_res = self._represent_healpix_map(fig, res,
+                #                                        longitude, latitude,
+                #                                        xsize, resolution, smoothing_kernel_sigma)
+                subs[i][2].imshow(res, origin='lower')
+
+                # Remove numbers from axis
+                subs[i][2].axis('off')
+
+                prog_bar.increase()
+
+        fig.set_tight_layout(True)
 
         return fig
 
-    def display_stacked_image(self, smoothing=1.0):
+    def display_stacked_image(self, smoothing_kernel_sigma=0.5):
 
         # This is the resolution (i.e., the size of one pixel) of the image in arcmin
         resolution = 3.0
@@ -481,7 +674,7 @@ class HAWCpyLike(PluginPrototype):
             background_map = data_analysis_bin.background_map.as_dense()
             this_data = data_analysis_bin.observation_map.as_dense() - background_map
             idx = np.isnan(this_data)
-            this_data[idx] = hp.UNSEEN
+            # this_data[idx] = hp.UNSEEN
 
             if i == 0:
 
@@ -492,23 +685,14 @@ class HAWCpyLike(PluginPrototype):
                 # Sum only when there is no UNSEEN, so that the UNSEEN pixels will stay UNSEEN
                 total[~idx] += this_data[~idx]
 
-        total_smooth = hp.smoothing(total,
-                                    fwhm=np.deg2rad(smoothing),
-                                    lmax=100.0,
-                                    verbose=False)
-
         delta_coord = (self._roi.data_radius.to("deg").value * 2.0) / 15.0
 
-        fig, subs = plt.subplots(1, 1, figsize=(5, 5))
-        plt.axes(subs)
+        fig, sub = plt.subplots(1,1)
 
-        hp.gnomview(total_smooth,
-                    title='Data',
-                    rot=(longitude, latitude, 0.0),
-                    xsize=xsize,
-                    reso=resolution,
-                    hold=True,
-                    notext=True)
+        proj = self._represent_healpix_map(fig, total, longitude, latitude, xsize, resolution, smoothing_kernel_sigma)
+
+        sub.imshow(proj, origin='lower')
+        sub.axis('off')
 
         hp.graticule(delta_coord, delta_coord)
 
