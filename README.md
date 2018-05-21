@@ -2,7 +2,7 @@
 
 ## Installation
 
-If you have `conda` installed, it is highly reccomended that you install `numba` through conda like this (simply skip this step if are not running in a `conda` environment):
+If you have `conda` installed, it is highly reccomended that you install `numba` through conda like this (simply skip this step if you are not running in a `conda` environment):
 
 ```bash
 > conda install -c conda-forge numba
