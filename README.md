@@ -3,7 +3,7 @@
 ## Installation
 
 ```bash
-> pip install git+https://github.com/giacomov/hawc_hal.git --upgrade
+> pip install git+https://github.com/giacomov/hawc_hal.git
 ```
 
 ## Example
