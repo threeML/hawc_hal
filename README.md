@@ -2,6 +2,14 @@
 
 ## Installation
 
+If you have `conda` installed, it is highly reccomended that you install `numba` through conda like this (simply skip this step if are not running in a `conda` environment):
+
+```bash
+> conda install -c conda-forge numba
+```
+
+Then:
+
 ```bash
 > pip uninstall hawc_hal -y ; pip install git+https://github.com/giacomov/hawc_hal.git
 ```
