@@ -1,4 +1,4 @@
-# The HAWC Highly Accelerated Likelihood (HAL) framework
+# The HAWC Accelerated Likelihood (HAL) framework
 
 ## Installation
 
