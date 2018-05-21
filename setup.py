@@ -29,5 +29,6 @@ setup(
                       'six',
                       'astropy',
                       'scipy',
-                      'matplotlib']
+                      'matplotlib',
+                      'numba']
 )
