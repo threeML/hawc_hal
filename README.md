@@ -14,7 +14,9 @@ Then:
 > pip uninstall hawc_hal -y ; pip install git+https://github.com/giacomov/hawc_hal.git
 ```
 
-## Example
+## Examples
+
+### Simple analysis
 
 ```python
 from hawc_hal import HAL, HealpixConeROI
@@ -32,6 +34,9 @@ roi = HealpixConeROI(data_radius=data_radius,
                      dec=dec_mkn421)
 
 # Instance the plugin
+
+maptree = ... # This can be either a ROOT or a hdf5 file
+response = ... # This can be either a ROOT or hdf5 file
 
 hawc = HAL("HAWC",
            maptree,
@@ -146,4 +151,32 @@ samples = bs.sample(30, 100, 100)
 fig = bs.corner_plot()
 
 fig.savefig("hal_corner_plot.png")
+```
+
+### Convert ROOT maptree to hdf5 maptree
+
+```python
+from hawc_hal.map_tree import map_tree_factory
+from hawc_hal import HealpixConeROI
+
+root_map_tree = "maptree_1024.root" # path to your ROOT maptree
+
+# Export the entire map tree (full sky)
+m = map_tree_factory(root_map_tree, None)
+m.write("full_sky_maptree.hd5")
+
+# Export only the ROI. This is a file only a few Mb in size
+# that can be provided as dataset to journals, for example
+ra_mkn421, dec_mkn421 = 166.113808, 38.208833
+data_radius = 3.0
+model_radius = 8.0
+
+roi = HealpixConeROI(data_radius=data_radius,
+                     model_radius=model_radius,
+                     ra=ra_mkn421,
+                     dec=dec_mkn421)
+
+m = map_tree_factory(root_map_tree, roi)
+m.write("roi_maptree.hd5")                
+
 ```
