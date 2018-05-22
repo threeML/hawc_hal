@@ -102,3 +102,6 @@ ENV/
 
 # PyCharm
 .idea/
+
+# ROOT files
+.root
