@@ -2,6 +2,7 @@
 # from pandas.core.sparse.array import IntIndex
 import numpy as np
 import healpy as hp
+import pandas as pd
 from hawc_hal.special_values import UNSEEN
 
 
@@ -55,6 +56,15 @@ class HealpixWrapperBase(object):
 
         return _not_implemented()
 
+    def to_pandas(self):
+        """
+        Returns a pandas Series with the dense representation of the data
+
+        :return: pd.Series, type
+        """
+
+        return pd.Series(self.as_partial())
+
 
 class SparseHealpix(HealpixWrapperBase):
 
@@ -93,6 +103,7 @@ class SparseHealpix(HealpixWrapperBase):
         self._partial_map[:] = new_values
 
 
+
 class DenseHealpix(HealpixWrapperBase):
     """
     A dense (fullsky) healpix map. In this case partial and complete are the same map.
@@ -124,3 +135,4 @@ class DenseHealpix(HealpixWrapperBase):
         assert new_values.shape == self._dense_map.shape
 
         self._dense_map[:] = new_values
+

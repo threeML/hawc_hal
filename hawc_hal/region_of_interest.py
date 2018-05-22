@@ -1,6 +1,6 @@
 import healpy as hp
 from hawc_hal.healpix_handling.healpix_utils import radec_to_vec
-
+import pandas as pd
 from astromodels.core.sky_direction import SkyDirection
 
 import astropy.units as u
@@ -42,48 +42,24 @@ class HealpixROIBase(object):
 
         raise NotImplementedError("You need to implement this")
 
-    def active_pixels_for_convolution(self, nside, ordering=_RING):
-        """
-        Returns the non-zero elements, i.e., the pixels selected according to this Region Of Interest to be used
-        for the convolution of extended sources
-
-        :param nside: the NSIDE of the healpix map
-        :param ordering: numbering scheme for Healpix. Either RING or NESTED (default: RING)
-        :return: an array of pixels IDs (in healpix RING numbering scheme)
-        """
-
-        assert ordering in [_RING, _NESTED], "Could not understand ordering %s. Must be %s or %s" % (ordering,
-                                                                                                     _RING,
-                                                                                                     _NESTED)
-
-        return self._active_pixels_for_convolution(nside, ordering)
-
-    # This is supposed to be overridden by child classes
-    def _active_pixels_for_convolution(self, nside, ordering):
-
-        raise NotImplementedError("You need to implement this")
-
-    def coordinates_for_convolution(self, pixel_size):
-        """
-        Returns a flat image and its WCS covering the convolution ROI (slightly larger than the actual ROI to cover
-        leakage from the PSF)
-
-        :param pixel_size: size of the pixel in the WCS image (quantity or float, which is assumed to represent degrees)
-        :param system: the system of the Healpix map, either 'equatorial' or 'galactic' (default: equatorial)
-        :return: (nhpix, nwpix, all RAs, all Decs)
-        """
-
-        pixel_size_rad = _get_radians(pixel_size)
-
-        return self._coordinates_for_convolution(pixel_size_rad)
-
-    def _coordinates_for_convolution(self, pixel_size_rad):
-
-        raise NotImplementedError("You need to implement this")
-
     def display(self):
 
         raise NotImplementedError("You need to implement this")
+
+    def to_dict(self):
+
+        raise NotImplementedError("You need to implement this")
+
+    def from_dict(self, data):
+
+        raise NotImplementedError("You need to implement this")
+
+
+def get_roi_from_dict(dictionary):
+
+    roi_type = dictionary['ROI type']
+
+    return globals()[roi_type].from_dict(dictionary)
 
 
 def _get_radians(my_angle):
@@ -128,13 +104,34 @@ class HealpixConeROI(HealpixROIBase):
         self._data_radius_radians = _get_radians(data_radius)
         self._model_radius_radians = _get_radians(model_radius)
 
-        self._convolution_coordinates_cache = {}
+    def to_dict(self):
+
+        ra, dec = self.ra_dec_center
+
+        s = {'ROI type': type(self).__name__.split(".")[-1],
+             'ra': ra,
+             'dec': dec,
+             'data_radius_deg': np.rad2deg(self._data_radius_radians),
+             'model_radius_deg': np.rad2deg(self._model_radius_radians)}
+
+        return s
+
+    @classmethod
+    def from_dict(cls, data):
+
+        return cls(data['data_radius_deg'], data['model_radius_deg'], ra=data['ra'], dec=data['dec'])
+
+    def __str__(self):
+
+        s = ("%s: Center (R.A., Dec) = (%.3f, %.3f), data radius = %.3f deg, model radius: %.3f deg" %
+              (type(self).__name__, self.ra_dec_center[0], self.ra_dec_center[1],
+               self.data_radius.to(u.deg).value, self.model_radius.to(u.deg).value))
+
+        return s
 
     def display(self):
 
-        print("%s: Center (R.A., Dec) = (%.3f, %.3f), data radius = %.3f deg, model radius: %.3f deg" %
-              (type(self).__name__, self.ra_dec_center[0], self.ra_dec_center[1],
-               self.data_radius.to(u.deg).value, self.model_radius.to(u.deg).value))
+        print(self)
 
     @property
     def ra_dec_center(self):
