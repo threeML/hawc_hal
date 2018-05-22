@@ -57,7 +57,7 @@ def test_complete_analysis(maptree=os.path.join(test_data_path, "maptree_1024.ro
     data = DataList(hawc)
 
     jl = JointLikelihood(model, data, verbose=False)
-
+    jl.set_minimizer("ROOT")
     param_df, like_df = jl.fit()
 
     # See the model in counts space and the residuals

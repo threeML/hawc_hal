@@ -10,10 +10,10 @@ test_data_path = os.environ['HAL_TEST_DATA']
 ra_crab, dec_crab = 83.633083, 22.014500
 
 
-def test_on_point_source(ra=ra_crab, dec=dec_crab, liff=False):
-
-    data_radius = 5.0
-    model_radius = 10.0
+def test_on_point_source(ra=ra_crab, dec=dec_crab, liff=False,
+                         maptree=os.path.join(test_data_path, "maptree_1024.root"),
+                         response=os.path.join(test_data_path, "response.root"),
+                         data_radius=5.0, model_radius=10.0):
 
     if not liff:
 
@@ -24,8 +24,8 @@ def test_on_point_source(ra=ra_crab, dec=dec_crab, liff=False):
 
         # This is a 3ML plugin
         hawc = HAL("HAWC",
-                   os.path.join(test_data_path, "maptree_1024.root"),
-                   os.path.join(test_data_path, "response.root"),
+                   maptree,
+                   response,
                    roi)
 
     else:
@@ -84,6 +84,8 @@ def test_on_point_source(ra=ra_crab, dec=dec_crab, liff=False):
     param_df, like_df = jl.fit()
 
     print("Fit time: %s" % (time.time() - beg))
+
+    return param_df, like_df
 
 if __name__ == "__main__":
 
