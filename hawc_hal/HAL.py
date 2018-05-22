@@ -441,13 +441,8 @@ class HAL(PluginPrototype):
                 expectation = self._clone[1][i]
                 new_data = np.random.poisson(expectation, size=(1, expectation.shape[0])).flatten()
 
-                # Now generate new background
-                #bkg = orig_data_analysis_bin.background_map.as_partial()
-                #new_bkg = np.random.poisson(bkg, size=(1, bkg.shape[0])).flatten()
-
                 # Substitute data
                 data_analysis_bin.observation_map.set_new_values(new_data)
-                #data_analysis_bin.background_map.set_new_values(new_bkg)
 
         # Now change name and return
         self._clone[0]._name = name
@@ -469,7 +464,7 @@ class HAL(PluginPrototype):
 
             expectation_per_transit = this_convolved_source.get_source_map(energy_bin_id, tag=None)
 
-            expectation_from_this_source = expectation_per_transit * self._maptree.n_transits
+            expectation_from_this_source = expectation_per_transit * data_analysis_bin.n_transits
 
             if this_model_map is None:
 
@@ -508,12 +503,12 @@ class HAL(PluginPrototype):
                 # Only extended sources
             
                 this_model_map = (self._psf_convolutors[energy_bin_id].extended_source_image(this_ext_model_map) *
-                                  self._maptree.n_transits)
+                                  data_analysis_bin.n_transits)
             
             else:
 
                 this_model_map += (self._psf_convolutors[energy_bin_id].extended_source_image(this_ext_model_map) *
-                                   self._maptree.n_transits)
+                                   data_analysis_bin.n_transits)
 
 
         # Now transform from the flat sky projection to HEALPiX
