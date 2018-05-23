@@ -1,9 +1,9 @@
 import numpy as np
 import root_numpy
 import pandas as pd
-import healpy as hp
 import six
 import os
+import re
 from serialize import Serialization
 
 import ROOT
@@ -54,24 +54,22 @@ class DataAnalysisBin(object):
 
         self._n_transits = n_transits
 
-    def to_hdf(self, serializer):
+    def to_pandas(self):
 
         # Make a dataframe
-        df = pd.DataFrame.from_items((('observation', self._observation_hpx_map.to_pandas()),
-                                      ('background', self._background_hpx_map.to_pandas())))
+        df = pd.DataFrame.from_dict({'observation': self._observation_hpx_map.to_pandas(),
+                                     'background': self._background_hpx_map.to_pandas()})
 
         if self._active_pixels_ids is not None:
             # We are saving only a subset
             df.set_index(self._active_pixels_ids, inplace=True)
 
-        # Add bin_ in front of the name otherwise pandas will complain that the name is not a valid python identifier,
-        # if the name is only numbers
+        # Some metadata
+        meta = {'scheme': 0 if self._scheme == 'RING' else 1,
+                'n_transits': self._n_transits,
+                'nside': self._nside}
 
-        serializer.store_pandas_object("bin_%s" % self._name,
-                                       df,
-                                       scheme=self._scheme,
-                                       n_transits=self._n_transits,
-                                       nside=self._nside)
+        return df, meta
 
     @property
     def name(self):
@@ -138,95 +136,86 @@ class MapTree(object):
     @classmethod
     def from_hdf5(cls, map_tree_file, roi):
 
+        # Read the data frames contained in the file
         with Serialization(map_tree_file) as serializer:
 
-            # Read all data
+            analysis_bins_df, _ = serializer.retrieve_pandas_object('/analysis_bins')
+            meta_df, _ = serializer.retrieve_pandas_object('/analysis_bins_meta')
+            _, roi_meta = serializer.retrieve_pandas_object('/ROI')
 
-            data_analysis_bins = []
-            data_bins_labels = []
+        # Let's see if the file contains the definition of an ROI
+        if len(roi_meta) > 0:
 
-            # Get the ROI from the file (if any)
-            if '/ROI' in serializer.keys:
+            # Yes. Let's build it
+            file_roi = get_roi_from_dict(roi_meta)
 
-                _, meta = serializer.retrieve_pandas_object('/ROI')
+            # Now let's check that the ROI the user has provided (if any) is compatible with the one contained
+            # in the file (i.e., either they are the same, or the user-provided one is smaller)
+            if roi is not None:
 
-                file_roi = get_roi_from_dict(meta)
+                # Let's test with a nside=1024 (the highest we will use in practice)
+                active_pixels_file = file_roi.active_pixels(1024)
+                active_pixels_user = roi.active_pixels(1024)
+
+                # This verifies that active_pixels_file is a superset (or equal) to the user-provided set
+                assert set(active_pixels_file) >= set(active_pixels_user), \
+                    "The ROI you provided (%s) is not a subset " \
+                    "of the one contained in the file (%s)" % (roi, file_roi)
 
             else:
 
-                # Full sky map tree
+                # The user has provided no ROI, but the file contains one. Let's issue a warning
+                custom_warnings.warn("You did not provide any ROI but the map tree %s contains "
+                                     "only data within the ROI %s. "
+                                     "Only those will be used." % (map_tree_file, file_roi))
 
-                file_roi = None
+                # Make a copy of the file ROI and use it as if the user provided that one
+                roi = get_roi_from_dict(file_roi.to_dict())
 
-            # Keep also track the bin with the highest NSIDE (note that normally all bins will have the same, but we
-            # might relax this in the future). This will be used later on to check the provided ROI against the file ROI
+        # Get the name of the analysis bins
 
-            highest_nside = 0
+        bin_names = analysis_bins_df.index.levels[0]
 
-            # NOTE: we assume that the bins are written in order in the file
-            for key in serializer.keys:
+        # Loop over them and build a DataAnalysisBin instance for each one
 
-                if key.find("/bin_") == 0:
+        data_analysis_bins = []
 
-                    # Remove the "bin_" part
-                    label = key[5:]
-                    data_bins_labels.append(label)
+        for bin_name in bin_names:
 
-                    # A data analysis bin
-                    df, meta = serializer.retrieve_pandas_object(key)
+            this_df = analysis_bins_df.loc[bin_name]
+            this_meta = meta_df.loc[bin_name]
 
-                    if roi is not None:
+            if roi is not None:
 
-                        # Reading a specific ROI
-                        active_pixels_user = roi.active_pixels(meta['nside'])
+                # Get the active pixels for this plane
+                active_pixels_user = roi.active_pixels(this_meta['nside'])
 
-                        if file_roi is not None:
-                            # Make sure the ROI provided by the user and the ROI in the file are compatible
-                            # (i.e., either they are the same, or the user-provided one is smaller)
-                            active_pixels_file = file_roi.active_pixels(meta['nside'])
+                # Read only the pixels that the user wants
+                observation_hpx_map = SparseHealpix(this_df.loc[active_pixels_user, 'observation'].values,
+                                                    active_pixels_user, this_meta['nside'])
+                background_hpx_map = SparseHealpix(this_df.loc[active_pixels_user, 'background'].values,
+                                                   active_pixels_user, this_meta['nside'])
 
-                            assert set(active_pixels_file) == set(df.index)
+            else:
 
-                            # This verifies that active_pixels_file is a superset (or equal) to the user-provided set
-                            assert set(active_pixels_file) >= set(active_pixels_user), \
-                                "The ROI you provided (%s) is not a subset " \
-                                "of the one contained in the file (%s)" % (roi, file_roi)
+                # Full sky
+                observation_hpx_map = DenseHealpix(this_df.loc[:, 'observation'].values)
+                background_hpx_map = DenseHealpix(this_df.loc[:, 'background'].values)
 
-                        # Read only the pixels desired by the user
-                        observation_hpx_map = SparseHealpix(df.loc[active_pixels_user, 'observation'].values,
-                                                            active_pixels_user, meta['nside'])
-                        background_hpx_map = SparseHealpix(df.loc[active_pixels_user, 'background'].values,
-                                                           active_pixels_user, meta['nside'])
+                # This signals the DataAnalysisBin that we are dealing with a full sky map
+                active_pixels_user = None
 
-                    else:
+            # Let's now build the instance
+            this_bin = DataAnalysisBin(bin_name,
+                                       observation_hpx_map=observation_hpx_map,
+                                       background_hpx_map=background_hpx_map,
+                                       active_pixels_ids=active_pixels_user,
+                                       n_transits=this_meta['n_transits'],
+                                       scheme='RING' if this_meta['scheme'] == 0 else 'NEST')
 
-                        # Trying to read the entire sky
-                        #
-                        observation_hpx_map = DenseHealpix(df.loc[:, 'observation'].values)
-                        background_hpx_map = DenseHealpix(df.loc[:, 'background'].values)
+            data_analysis_bins.append(this_bin)
 
-                        # This signals the DataAnalysisBin that we are dealing with a full sky map
-                        active_pixels_user = None
-
-                    this_bin = DataAnalysisBin(label,
-                                               observation_hpx_map=observation_hpx_map,
-                                               background_hpx_map=background_hpx_map,
-                                               active_pixels_ids=active_pixels_user,
-                                               n_transits=meta['n_transits'],
-                                               scheme=meta['scheme'])
-
-                    data_analysis_bins.append(this_bin)
-
-                    if this_bin.nside > highest_nside:
-
-                        highest_nside = this_bin.nside
-
-                else:
-
-                    # The only other type of key should be the definition of ROI (which we read already)
-                    assert key == '/ROI', "Extraneous key in HDF response (%s)" % key
-
-            return cls(data_bins_labels, data_analysis_bins, roi)
+        return cls(bin_names.values, data_analysis_bins, roi)
 
     @classmethod
     def from_root_file(cls, map_tree_file, roi):
@@ -483,24 +472,46 @@ class MapTree(object):
         """
         Export the tree to a HDF5 file.
 
-        NOTE: if an ROI has been applied, only the data within the ROI will be saved. Actually, a sparse representation
-        of the full map will be saved with only the active pixels having a value different than np.nan.
+        NOTE: if an ROI has been applied, only the data within the ROI will be saved.
 
         :param filename: output filename. Use an extension .hd5 or .hdf5 to ensure proper handling by downstream
         software
         :return: None
         """
 
-        with Serialization(filename) as serializer:
+        # Make a dataframe with the ordered list of bin names
+        # bin_names = map(lambda x:x.name, self._data_analysis_bins)
 
-            # Write all data analysis bins
-            for analysis_bin in self._data_analysis_bins:
+        # Create a dataframe with a multi-index, with the energy bin name as first level and the HEALPIX pixel ID
+        # as the second level
+        multi_index_keys = []
+        dfs = []
+        all_metas = []
 
-                analysis_bin.to_hdf(serializer)
+        for analysis_bin in self._data_analysis_bins:
+
+            multi_index_keys.append(analysis_bin.name)
+
+            this_df, this_meta = analysis_bin.to_pandas()
+
+            dfs.append(this_df)
+            all_metas.append(pd.Series(this_meta))
+
+        analysis_bins_df = pd.concat(dfs, axis=0, keys=multi_index_keys)
+        meta_df = pd.concat(all_metas, axis=1, keys=multi_index_keys).T
+
+        with Serialization(filename, mode='w') as serializer:
+
+            serializer.store_pandas_object('/analysis_bins', analysis_bins_df)
+            serializer.store_pandas_object('/analysis_bins_meta', meta_df)
 
             # Write the ROI
             if self._roi is not None:
 
-                serializer.store_pandas_object('ROI', pd.Series(), **self._roi.to_dict())
+                serializer.store_pandas_object('/ROI', pd.Series(), **self._roi.to_dict())
+
+            else:
+
+                serializer.store_pandas_object('/ROI', pd.Series())
 
 

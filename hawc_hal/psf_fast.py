@@ -1,14 +1,11 @@
-from matplotlib.colors import LogNorm
-import matplotlib.pyplot as plt
-
 import numpy as np
+import pandas as pd
 from numpy.fft import rfftn, irfftn
 from scipy.signal import fftconvolve
 from numba import jit, float64
 import collections
 import scipy.optimize
 import scipy.interpolate
-from tf1_wrapper import TF1Wrapper
 import ROOT
 ROOT.SetMemoryPolicy( ROOT.kMemoryStrict )
 
@@ -44,17 +41,12 @@ def sphere_dist(ra1, dec1, ra2, dec2):
     return dists * rad2deg
 
 
-class PSFWrapper(TF1Wrapper):
+class PSFWrapper(object):
 
-    def __init__(self, tf1_instance):
+    def __init__(self, xs, ys):
 
-        super(PSFWrapper, self).__init__(tf1_instance)
-
-        # Make interpolation
-        xs = np.logspace(-3, np.log10(30), 1000)
-        ys = np.array(map(lambda x:self._tf1.Eval(x), xs), float)
-
-        assert np.all(np.isfinite(ys))
+        self._xs = xs
+        self._ys = ys
 
         self._tf1_interpolated = scipy.interpolate.InterpolatedUnivariateSpline(xs, ys, k=2, ext=1)
 
@@ -72,7 +64,39 @@ class PSFWrapper(TF1Wrapper):
 
         assert self._kernel_radius <= self._truncation_radius
 
-        #print("Psf: %s, R_t = %.3f, R_k = %.3f" % (tf1_instance.GetName(), self._truncation_radius, self._kernel_radius))
+    @property
+    def xs(self):
+        """
+        X of the interpolation data
+        """
+        return self._xs
+
+    @property
+    def ys(self):
+        """
+        Y of the interpolation data
+        """
+        return self._ys
+
+    def to_pandas(self):
+
+        return pd.DataFrame.from_items((('xs', self._xs), ('ys', self._ys)))
+
+    @classmethod
+    def from_pandas(cls, df):
+
+        return cls(df.loc[:, 'xs'], df.loc[:, 'ys'])
+
+    @classmethod
+    def from_TF1(cls, tf1_instance):
+
+        # Make interpolation
+        xs = np.logspace(-3, np.log10(30), 1000)
+        ys = np.array(map(lambda x:tf1_instance.Eval(x), xs), float)
+
+        assert np.all(np.isfinite(ys))
+
+        return cls(xs, ys)
 
     def find_eef_radius(self, fraction):
 
@@ -83,6 +107,10 @@ class PSFWrapper(TF1Wrapper):
         assert status.converged, "Brenq did not converged"
 
         return radius
+
+    def integral(self, a, b):
+
+        return self._tf1_interpolated.integral(a, b)
 
     @property
     def truncation_radius(self):
@@ -99,19 +127,19 @@ class PSFWrapper(TF1Wrapper):
 
 class PSFInterpolator(object):
 
-    def __init__(self, tf1_wrapper, flat_sky_proj):
+    def __init__(self, psf_wrapper, flat_sky_proj):
 
-        self._tf1 = tf1_wrapper  # type: PSFWrapper
+        self._psf = psf_wrapper  # type: PSFWrapper
 
         self._flat_sky_p = flat_sky_proj
 
         # Now decide the bin size for the interpolation according to the truncation radius
-        binsize = self._tf1.truncation_radius * 2 / flat_sky_proj.npix_height
+        binsize = self._psf.truncation_radius * 2 / flat_sky_proj.npix_height
 
         # Let's interpolate. We want to interpolate the density as a function of the radius
 
         # Decide a bunch of radii bins
-        interp_r = np.arange(0, self._tf1.truncation_radius * np.sqrt(2), binsize)
+        interp_r = np.arange(0, self._psf.truncation_radius * np.sqrt(2), binsize)
 
         # Get the centers of the bins
         self._interp_x = (interp_r[1:] + interp_r[:-1]) / 2.0
@@ -123,12 +151,12 @@ class PSFInterpolator(object):
 
         pixel_area = flat_sky_proj.project_plane_pixel_area  # square degrees
 
-        renorm = pixel_area / self._tf1.total_integral
+        renorm = pixel_area / self._psf.total_integral
 
         # Compute the density
 
-        self._interp_y = np.array(map(lambda (a, b): self._tf1.integral(a, b) / (np.pi * (b ** 2 - a ** 2)) * renorm,
-                                zip(interp_r[:-1], interp_r[1:])))
+        self._interp_y = np.array(map(lambda (a, b): self._psf.integral(a, b) / (np.pi * (b ** 2 - a ** 2)) * renorm,
+                                      zip(interp_r[:-1], interp_r[1:])))
 
         # This will contain cached source images
         self._point_source_images = collections.OrderedDict()
