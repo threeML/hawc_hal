@@ -15,7 +15,7 @@ class Serialization(object):
 
         if self._compress:
 
-            self._store = HDFStore(self._filename, complib='blosc', complevel=9, mode=self._mode)
+            self._store = HDFStore(self._filename, complib='blosc:zstd', complevel=9, mode=self._mode)
 
         else:
 
