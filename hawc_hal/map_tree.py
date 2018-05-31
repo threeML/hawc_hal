@@ -6,8 +6,14 @@ import os
 import socket
 from serialize import Serialization
 
-import ROOT
-ROOT.SetMemoryPolicy( ROOT.kMemoryStrict )
+try:
+
+    import ROOT
+    ROOT.SetMemoryPolicy( ROOT.kMemoryStrict )
+
+except ImportError:
+
+    pass
 
 
 from threeML.io.cern_root_utils.io_utils import open_ROOT_file

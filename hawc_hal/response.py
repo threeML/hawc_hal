@@ -1,14 +1,17 @@
 import numpy as np
 import pandas as pd
-import re
 import os
 from serialize import Serialization
 
-import ROOT
+try:
 
-ROOT.SetMemoryPolicy(ROOT.kMemoryStrict)
+    import ROOT
 
-import root_numpy
+    ROOT.SetMemoryPolicy(ROOT.kMemoryStrict)
+
+except ImportError:
+
+    pass
 
 from threeML.io.cern_root_utils.io_utils import get_list_of_keys, open_ROOT_file
 from threeML.io.cern_root_utils.tobject_to_numpy import tree_to_ndarray

@@ -25,7 +25,6 @@ setup(
                       'threeml',
                       'pandas',
                       'healpy',
-                      'root_numpy',
                       'six',
                       'astropy',
                       'scipy',

@@ -6,13 +6,10 @@ from numba import jit, float64
 import collections
 import scipy.optimize
 import scipy.interpolate
-import ROOT
-ROOT.SetMemoryPolicy( ROOT.kMemoryStrict )
 
 
 # A fast way to compute angular distances
 @jit(float64[:](float64, float64, float64[:], float64[:]), nopython=True)
-
 def sphere_dist(ra1, dec1, ra2, dec2):
     """
     Compute angular distance using the Haversine formula. Use this one when you know you will never ask for points at
