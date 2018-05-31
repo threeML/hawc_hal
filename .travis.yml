@@ -1,25 +1,26 @@
 language: generic
-
-matrix:
-  include:
-
-    - os: linux
-
-    - os: osx
-      osx_image: xcode6.4
+os:
+- linux
+- osx
+osx_image: xcode6.4
+dist: trusty
+sudo: false
 
 env:
   - MPLBACKEND='Agg' OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 NUMEXPR_NUM_THREADS=1 HAL_TEST_DATA=${TRAVIS_BUILD_DIR}/hawc_hal/tests/data PATH="${HOME}/miniconda/bin:${PATH}"
 
 cache:
-
+  directories:
+    - $HOME/download
+    - $HOME/miniconda
   timeout: 1000
 
-  directories:
+before_cache:
+- if ! [[ $TRAVIS_TAG ]]; then rm -rf $HOME/miniconda/conda-bld; fi
+- rm -rf $HOME/miniconda/locks $HOME/miniconda/pkgs $HOME/miniconda/var $HOME/miniconda/conda-meta/history
 
-    - $HOME/miniconda
 
-install:
+before_install:
   - echo "listing home"
   - ls $HOME
   - echo "end of listing"
@@ -54,8 +55,6 @@ install:
             conda config --set always_yes yes --set changeps1 no
             conda update -q conda
             conda create -q -n test-environment -c conda-forge -c threeml python=2.7 root5 numba numpy scipy astropy healpy threeml
-            source activate test-environment
-            pip install root_numpy
 
         else
 
@@ -65,12 +64,15 @@ install:
             echo "INSTALLATION CACHE FOUND. REUSING"
             echo "##################################"
 
-            source activate test-environment
             conda update -c conda-forge -c threeml threeml astromodels
 
         fi
 
+install:
   - conda info -a
+  - source activate test-environment
+  - hash -r
+  - pip install root_numpy
   - pip install .
 
 script:
