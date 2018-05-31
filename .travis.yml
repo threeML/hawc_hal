@@ -1,19 +1,55 @@
-sudo: required
+language: generic
 
-language: python
-python:
-  - "2.7"
+cache:
 
-os:
-  - linux
-  - osx
+  directories:
+
+    - $HOME/miniconda
+
+before_cache:
+
+  - conda clean -y -a
+  - pip uninstall hawc_hal -y
 
 install:
-  - pip install .
-  - pip install git+https://github.com/giacomov/3ML.git
-  - pip install git+https://github.com/giacomov/astromodels.git --upgrade
+  - sudo apt-get update
+  - |
 
-# command to run tests
+        if [ ! -d "$HOME/miniconda" ]; then
+
+            # Rebuilding the cache
+
+            echo "########################################"
+            echo "INSTALLATION CACHE NOT FOUND. REBUILDING"
+            echo "########################################"
+
+            wget https://repo.continuum.io/miniconda/Miniconda2-latest-Linux-x86_64.sh -O miniconda.sh
+            bash miniconda.sh -b -p $HOME/miniconda
+            export PATH="$HOME/miniconda/bin:$PATH"
+            hash -r
+            conda config --set always_yes yes --set changeps1 no
+            conda update -q conda
+            conda create -q -n test-environment -c conda-forge python=2.7 root5 numba numpy scipy astropy healpy threeml
+            source activate test-environment
+            pip install root_numpy
+
+        else
+
+            # Using cache
+
+            echo "##################################"
+            echo "INSTALLATION CACHE FOUND. REUSING"
+            echo "##################################"
+
+            export PATH="$HOME/miniconda/bin:$PATH"
+            source activate test-environment
+            conda update -c conda-forge -c threeml threeml astromodels
+
+        fi
+
+  - conda info -a
+  - pip install .
+
 script:
   - export HAL_TEST_DATA=$TRAVIS_BUILD_DIR/hawc_hal/tests/data
   - pytest -vv
