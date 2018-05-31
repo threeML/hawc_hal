@@ -51,7 +51,7 @@ install:
             hash -r
             conda config --set always_yes yes --set changeps1 no
             conda update -q conda
-            conda create -q -n test-environment -c conda-forge python=2.7 root5 numba numpy scipy astropy healpy threeml
+            conda create -q -n test-environment -c conda-forge -c threeml python=2.7 root5 numba numpy scipy astropy healpy threeml
             source activate test-environment
             pip install root_numpy
 
