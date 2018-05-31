@@ -17,7 +17,9 @@ before_cache:
   - pip uninstall hawc_hal -y
 
 install:
-  - sudo apt-get update
+  - echo "listing home"
+  - ls $HOME
+  - echo "end of listing"
   - |
 
         if [ ! -d "$HOME/miniconda" ]; then
