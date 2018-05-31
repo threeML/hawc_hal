@@ -73,5 +73,9 @@ install:
   - pip install .
 
 script:
+  - export MPLBACKEND='Agg'
+  - export OMP_NUM_THREADS=1
+  - export MKL_NUM_THREADS=1
+  - export NUMEXPR_NUM_THREADS=1
   - export HAL_TEST_DATA=$TRAVIS_BUILD_DIR/hawc_hal/tests/data
   - pytest -vv
