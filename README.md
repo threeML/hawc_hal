@@ -1,3 +1,5 @@
+[![Build Status](https://travis-ci.org/giacomov/hawc_hal.svg?branch=master)](https://travis-ci.org/giacomov/hawc_hal)
+
 # The HAWC Accelerated Likelihood (HAL) framework
 
 ## Installation
