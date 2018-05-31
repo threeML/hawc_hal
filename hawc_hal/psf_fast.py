@@ -10,7 +10,7 @@ import scipy.interpolate
 
 # A fast way to compute angular distances
 @jit(float64[:](float64, float64, float64[:], float64[:]), nopython=True)
-def sphere_dist(ra1, dec1, ra2, dec2):
+def sphere_dist(ra1, dec1, ra2, dec2):  # pragma: no cover
     """
     Compute angular distance using the Haversine formula. Use this one when you know you will never ask for points at
     their antipodes. If this is not the case, use the angular_distance function which is slower, but works also for
@@ -267,13 +267,13 @@ class PSFConvolutor(object):
     def kernel(self):
         return self._kernel
 
+    # def extended_source_image(self, ideal_image):
+    #
+    #     conv = fftconvolve(ideal_image, self._kernel, mode='same')
+    #
+    #     return conv
+
     def extended_source_image(self, ideal_image):
-
-        conv = fftconvolve(ideal_image, self._kernel, mode='same')
-
-        return conv
-
-    def extended_source_image_(self, ideal_image):
 
         # Convolve
 

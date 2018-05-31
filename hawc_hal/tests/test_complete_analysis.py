@@ -25,6 +25,9 @@ def test_complete_analysis(roi,
     # Display information about the data loaded and the ROI
     hawc.display()
 
+    # Get the likelihood value for the saturated model
+    hawc.get_saturated_model_likelihood()
+
     # Look at the data
     fig = hawc.display_stacked_image(smoothing_kernel_sigma=0.17)
     # Save to file
@@ -34,6 +37,10 @@ def test_complete_analysis(roi,
 
     jl = JointLikelihood(point_source_model, data, verbose=False)
     param_df, like_df = jl.fit()
+
+    # Generate a simulated dataset and write it to disk
+    sim = hawc.get_simulated_dataset("HAWCsim")
+    sim.write("sim_resp.hd5", "sim_maptree.hd5")
 
     # See the model in counts space and the residuals
     fig = hawc.display_spectrum()

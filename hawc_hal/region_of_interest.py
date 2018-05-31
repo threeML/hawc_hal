@@ -38,19 +38,19 @@ class HealpixROIBase(object):
         return self._active_pixels(nside, ordering)
 
     # This is supposed to be overridden by child classes
-    def _active_pixels(self, nside, ordering):
+    def _active_pixels(self, nside, ordering):  # pragma: no cover
 
         raise NotImplementedError("You need to implement this")
 
-    def display(self):
+    def display(self):  # pragma: no cover
 
         raise NotImplementedError("You need to implement this")
 
-    def to_dict(self):
+    def to_dict(self):  # pragma: no cover
 
         raise NotImplementedError("You need to implement this")
 
-    def from_dict(self, data):
+    def from_dict(self, data):  # pragma: no cover
 
         raise NotImplementedError("You need to implement this")
 

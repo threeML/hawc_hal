@@ -17,7 +17,7 @@ from astropy.wcs.utils import wcs_to_celestial_frame
 from astropy.wcs import WCS
 
 from hawc_hal.special_values import UNSEEN
-from hawc_hal.interpolation.fast_linear_interpolator import FastLinearInterpolatorIrregularGrid
+# from hawc_hal.interpolation.fast_linear_interpolator import FastLinearInterpolatorIrregularGrid
 from hawc_hal.interpolation.fast_linear_interpolator import  FastBilinearInterpolation
 
 
@@ -81,23 +81,24 @@ def convert_world_coordinates(lon_in, lat_in, wcs_in, wcs_out):
         The output longitude and latitude
     """
 
-    if isinstance(wcs_in, WCS):
-        # Extract the celestial component of the WCS in (lon, lat) order
-        wcs_in = wcs_in.celestial
-        frame_in = wcs_to_celestial_frame(wcs_in)
-        lon_in_unit = u.Unit(wcs_in.wcs.cunit[0])
-        lat_in_unit = u.Unit(wcs_in.wcs.cunit[1])
-    else:
-        frame_in, lon_in_unit, lat_in_unit = wcs_in
+    # if isinstance(wcs_in, WCS):
+    #     # Extract the celestial component of the WCS in (lon, lat) order
+    #     wcs_in = wcs_in.celestial
+    #     frame_in = wcs_to_celestial_frame(wcs_in)
+    #     lon_in_unit = u.Unit(wcs_in.wcs.cunit[0])
+    #     lat_in_unit = u.Unit(wcs_in.wcs.cunit[1])
+    # else:
 
-    if isinstance(wcs_out, WCS):
-        # Extract the celestial component of the WCS in (lon, lat) order
-        wcs_out = wcs_out.celestial
-        frame_out = wcs_to_celestial_frame(wcs_out)
-        lon_out_unit = u.Unit(wcs_out.wcs.cunit[0])
-        lat_out_unit = u.Unit(wcs_out.wcs.cunit[1])
-    else:
-        frame_out, lon_out_unit, lat_out_unit = wcs_out
+    frame_in, lon_in_unit, lat_in_unit = wcs_in
+
+    # if isinstance(wcs_out, WCS):
+    # Extract the celestial component of the WCS in (lon, lat) order
+    wcs_out = wcs_out.celestial
+    frame_out = wcs_to_celestial_frame(wcs_out)
+    lon_out_unit = u.Unit(wcs_out.wcs.cunit[0])
+    lat_out_unit = u.Unit(wcs_out.wcs.cunit[1])
+    # else:
+    #     frame_out, lon_out_unit, lat_out_unit = wcs_out
 
     data = UnitSphericalRepresentation(lon_in * lon_in_unit,
                                        lat_in * lat_in_unit)
@@ -111,57 +112,57 @@ def convert_world_coordinates(lon_in, lat_in, wcs_in, wcs_out):
     return lon_out, lat_out
 
 
-def image_to_healpix(data, wcs_in, coord_system_out,
-                     nside, pixels_id, order='bilinear', nested=False,
-                     fill_value=UNSEEN, pixels_to_be_zeroed=None, full=False):
-
-    npix = hp.nside2npix(nside)
-
-    # Look up lon, lat of pixels in output system and convert colatitude theta
-    # and longitude phi to longitude and latitude.
-    theta, phi = hp.pix2ang(nside, pixels_id, nested)
-
-    lon_out = np.degrees(phi)
-    lat_out = 90. - np.degrees(theta)
-
-    # Convert between celestial coordinates
-    coord_system_out = parse_coord_system(coord_system_out)
-
-    with np.errstate(invalid='ignore'):
-        lon_in, lat_in = convert_world_coordinates(lon_out, lat_out, (coord_system_out, u.deg, u.deg), wcs_in)
-
-    # Look up pixels in input system
-    yinds, xinds = wcs_in.wcs_world2pix(lon_in, lat_in, 0)
-
-    # Interpolate
-
-    if isinstance(order, six.string_types):
-        order = ORDER[order]
-
-    healpix_data_ = map_coordinates(data, [xinds, yinds],
-                                    order=order,
-                                    mode='constant', cval=fill_value)
-
-    if not full:
-
-        # Return partial map
-        return healpix_data_
-
-    else:
-
-        # Return full healpix map
-
-        healpix_data = np.full(npix, fill_value)
-
-        healpix_data[pixels_id] = healpix_data_
-
-        if pixels_to_be_zeroed is not None:
-
-            healpix_data[pixels_to_be_zeroed] = np.where(np.isnan(healpix_data[pixels_to_be_zeroed]),
-                                                         0.0,
-                                                         healpix_data[pixels_to_be_zeroed])
-
-        return healpix_data
+# def image_to_healpix(data, wcs_in, coord_system_out,
+#                      nside, pixels_id, order='bilinear', nested=False,
+#                      fill_value=UNSEEN, pixels_to_be_zeroed=None, full=False):
+#
+#     npix = hp.nside2npix(nside)
+#
+#     # Look up lon, lat of pixels in output system and convert colatitude theta
+#     # and longitude phi to longitude and latitude.
+#     theta, phi = hp.pix2ang(nside, pixels_id, nested)
+#
+#     lon_out = np.degrees(phi)
+#     lat_out = 90. - np.degrees(theta)
+#
+#     # Convert between celestial coordinates
+#     coord_system_out = parse_coord_system(coord_system_out)
+#
+#     with np.errstate(invalid='ignore'):
+#         lon_in, lat_in = convert_world_coordinates(lon_out, lat_out, (coord_system_out, u.deg, u.deg), wcs_in)
+#
+#     # Look up pixels in input system
+#     yinds, xinds = wcs_in.wcs_world2pix(lon_in, lat_in, 0)
+#
+#     # Interpolate
+#
+#     if isinstance(order, six.string_types):
+#         order = ORDER[order]
+#
+#     healpix_data_ = map_coordinates(data, [xinds, yinds],
+#                                     order=order,
+#                                     mode='constant', cval=fill_value)
+#
+#     if not full:
+#
+#         # Return partial map
+#         return healpix_data_
+#
+#     else:
+#
+#         # Return full healpix map
+#
+#         healpix_data = np.full(npix, fill_value)
+#
+#         healpix_data[pixels_id] = healpix_data_
+#
+#         if pixels_to_be_zeroed is not None:
+#
+#             healpix_data[pixels_to_be_zeroed] = np.where(np.isnan(healpix_data[pixels_to_be_zeroed]),
+#                                                          0.0,
+#                                                          healpix_data[pixels_to_be_zeroed])
+#
+#         return healpix_data
 
 
 class FlatSkyToHealpixTransform(object):

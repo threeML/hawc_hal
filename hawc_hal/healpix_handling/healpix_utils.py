@@ -18,11 +18,11 @@ def radec_to_vec(ra, dec):
     return vec
 
 
-def pixid_to_radec(nside, pixid, nest=False):
-
-    theta, phi = hp.pix2ang(nside, pixid, nest=nest, lonlat=False)
-
-    ra = np.rad2deg(phi)
-    dec = np.rad2deg(0.5 * np.pi - theta)
-
-    return ra, dec
+# def pixid_to_radec(nside, pixid, nest=False):
+#
+#     theta, phi = hp.pix2ang(nside, pixid, nest=nest, lonlat=False)
+#
+#     ra = np.rad2deg(phi)
+#     dec = np.rad2deg(0.5 * np.pi - theta)
+#
+#     return ra, dec

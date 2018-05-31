@@ -63,7 +63,7 @@ class ConvolvedSourcesContainer(object):
 # then expected_model_counts is 0.0
 @jit(["float64(float64[:], float64[:], float64[:])", "float64(float64[:], float64[:], float64)"],
      nopython=True, parallel=False)
-def log_likelihood(observed_counts, expected_bkg_counts, expected_model_counts):
+def log_likelihood(observed_counts, expected_bkg_counts, expected_model_counts):  # pragma: no cover
     """
     Poisson log-likelihood minus log factorial minus bias. The bias migth be needed to keep the numerical value
     of the likelihood small enough so that there aren't numerical problems when computing differences between two

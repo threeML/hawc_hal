@@ -73,10 +73,14 @@ install:
   - conda info -a
   - source activate test-environment
   - hash -r
+  - pip install codecov
   - pip install root_numpy
   - pip install .
 
 script:
-  - pytest -vv
+  - cd hawc_hal/tests ; pytest -vv --cov=hawc_hal
   - conda clean -y -a
   - pip uninstall hawc_hal -y
+
+after_success:
+  - codecov
