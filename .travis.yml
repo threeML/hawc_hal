@@ -23,7 +23,18 @@ install:
             echo "INSTALLATION CACHE NOT FOUND. REBUILDING"
             echo "########################################"
 
-            wget https://repo.continuum.io/miniconda/Miniconda2-latest-Linux-x86_64.sh -O miniconda.sh
+            # Install Miniconda appropriate for the system (Mac or Linux)
+
+            if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then
+
+                wget https://repo.continuum.io/miniconda/Miniconda2-latest-Linux-x86_64.sh -O miniconda.sh
+
+            else
+
+              wget https://repo.continuum.io/miniconda/Miniconda2-latest-MacOSX-x86_64.sh -O miniconda.sh
+
+            # Install miniconda and all the packages
+            
             bash miniconda.sh -b -p $HOME/miniconda
             export PATH="$HOME/miniconda/bin:$PATH"
             hash -r
