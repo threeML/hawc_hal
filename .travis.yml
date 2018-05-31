@@ -24,6 +24,8 @@ install:
 
         if [ ! -d "$HOME/miniconda/envs/test-environment" ]; then
 
+            rm -rf $HOME/miniconda
+
             # Rebuilding the cache
 
             echo "########################################"
