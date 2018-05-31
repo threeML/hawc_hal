@@ -1,5 +1,4 @@
 import numpy as np
-import root_numpy
 import pandas as pd
 import six
 import os
@@ -10,6 +9,8 @@ try:
 
     import ROOT
     ROOT.SetMemoryPolicy( ROOT.kMemoryStrict )
+
+    import root_numpy
 
 except ImportError:
 
