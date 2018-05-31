@@ -14,4 +14,6 @@ install:
   - pip install git+https://github.com/giacomov/astromodels.git --upgrade
 
 # command to run tests
-script: pytest -vv
+script:
+  - export HAL_TEST_DATA=$TRAVIS_BUILD_DIR/hawc_hal/tests/data
+  - pytest -vv
