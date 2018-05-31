@@ -1,10 +1,15 @@
 language: generic
 
-os:
-    - linux
-    - osx
-osx_image: xcode6.4
+matrix:
+  include:
 
+    - os: linux
+      env: CACHE_NAME=hawc_hal_cache_linux
+
+    - os: osx
+      osx_image: xcode6.4
+      env: CACHE_NAME=hawc_hal_cache_osx
+      
 cache:
 
   directories:
