@@ -22,7 +22,7 @@ install:
   - echo "end of listing"
   - |
 
-        if [ ! -d "$HOME/miniconda" ]; then
+        if [ ! -d "$HOME/miniconda/envs/test-environment" ]; then
 
             # Rebuilding the cache
 
