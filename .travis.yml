@@ -65,14 +65,13 @@ before_install:
             echo "INSTALLATION CACHE FOUND. REUSING"
             echo "##################################"
 
-            conda update -c conda-forge -c threeml threeml astromodels
-
         fi
 
 install:
   - conda info -a
   - source activate test-environment
   - hash -r
+  - conda update -c conda-forge -c threeml threeml astromodels
   - pip install codecov
   - pip install root_numpy
   - pip install .
