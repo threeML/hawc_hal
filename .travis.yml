@@ -4,22 +4,20 @@ matrix:
   include:
 
     - os: linux
-      env: CACHE_NAME=hawc_hal_cache_linux
 
     - os: osx
       osx_image: xcode6.4
-      env: CACHE_NAME=hawc_hal_cache_osx
-      
+
+env:
+  - MPLBACKEND='Agg' OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 NUMEXPR_NUM_THREADS=1 HAL_TEST_DATA=${TRAVIS_BUILD_DIR}/hawc_hal/tests/data PATH="${HOME}/miniconda/bin:${PATH}"
+
 cache:
+
+  timeout: 1000
 
   directories:
 
     - $HOME/miniconda
-
-before_cache:
-
-  - conda clean -y -a
-  - pip uninstall hawc_hal -y
 
 install:
   - echo "listing home"
@@ -52,7 +50,6 @@ install:
             # Install miniconda and all the packages
 
             bash miniconda.sh -b -p $HOME/miniconda
-            export PATH="$HOME/miniconda/bin:$PATH"
             hash -r
             conda config --set always_yes yes --set changeps1 no
             conda update -q conda
@@ -68,7 +65,6 @@ install:
             echo "INSTALLATION CACHE FOUND. REUSING"
             echo "##################################"
 
-            export PATH="$HOME/miniconda/bin:$PATH"
             source activate test-environment
             conda update -c conda-forge -c threeml threeml astromodels
 
@@ -78,9 +74,6 @@ install:
   - pip install .
 
 script:
-  - export MPLBACKEND='Agg'
-  - export OMP_NUM_THREADS=1
-  - export MKL_NUM_THREADS=1
-  - export NUMEXPR_NUM_THREADS=1
-  - export HAL_TEST_DATA=$TRAVIS_BUILD_DIR/hawc_hal/tests/data
   - pytest -vv
+  - conda clean -y -a
+  - pip uninstall hawc_hal -y
