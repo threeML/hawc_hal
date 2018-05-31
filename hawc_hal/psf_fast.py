@@ -12,11 +12,12 @@ ROOT.SetMemoryPolicy( ROOT.kMemoryStrict )
 
 # A fast way to compute angular distances
 @jit(float64[:](float64, float64, float64[:], float64[:]), nopython=True)
+
 def sphere_dist(ra1, dec1, ra2, dec2):
     """
-    Haversine formula for angular distance on a sphere: more stable at poles.
-    This version uses arctan instead of arcsin and thus does better with sign
-    conventions.
+    Compute angular distance using the Haversine formula. Use this one when you know you will never ask for points at
+    their antipodes. If this is not the case, use the angular_distance function which is slower, but works also for
+    antipodes.
 
     :param ra1: first RA (deg)
     :param dec1: first Dec (deg)
@@ -29,16 +30,17 @@ def sphere_dist(ra1, dec1, ra2, dec2):
     deg2rad = 0.017453292519943295
     rad2deg = 57.29577951308232
 
-    ra1 = ra1 * deg2rad
-    ra2 = ra2 * deg2rad
-    dec1 = dec1 * deg2rad
-    dec2 = dec2 * deg2rad
+    lon1 = ra1 * deg2rad
+    lat1 = dec1 * deg2rad
+    lon2 = ra2 * deg2rad
+    lat2 = dec2 * deg2rad
+    dlon = lon2 - lon1
+    dlat = lat2 - lat1
 
-    numerator = np.sin((dec2 - dec1) / 2) ** 2 + np.cos(dec1) * np.cos(dec2) * np.sin((ra2 - ra1) / 2) ** 2
+    a = np.sin(dlat/2.0)**2 + np.cos(lat1) * np.cos(lat2) * np.sin(dlon /2.0)**2
+    c = 2 * np.arcsin(np.sqrt(a))
 
-    dists = 2 * np.arctan2(numerator ** 0.5, (1 - numerator) ** 0.5)
-
-    return dists * rad2deg
+    return c * rad2deg
 
 
 class PSFWrapper(object):
@@ -48,7 +50,7 @@ class PSFWrapper(object):
         self._xs = xs
         self._ys = ys
 
-        self._tf1_interpolated = scipy.interpolate.InterpolatedUnivariateSpline(xs, ys, k=2, ext=1)
+        self._tf1_interpolated = scipy.interpolate.InterpolatedUnivariateSpline(xs, ys, k=2, ext='raise')
 
         # Memorize the total integral (will use it for normalization)
 
@@ -57,10 +59,10 @@ class PSFWrapper(object):
         # Now compute the truncation radius, which is a very conservative measurement
         # of the size of the PSF
 
-        self._truncation_radius = self.find_eef_radius(0.999)
+        self._truncation_radius = self.find_eef_radius(0.9999)
 
         # Let's also compute another measurement more appropriate for convolution
-        self._kernel_radius = self.find_eef_radius(0.99)
+        self._kernel_radius = self.find_eef_radius(0.999)
 
         assert self._kernel_radius <= self._truncation_radius
 
@@ -78,9 +80,29 @@ class PSFWrapper(object):
         """
         return self._ys
 
+    def combine_with_other_psf(self, other_psf, w1, w2):
+        """
+        Return a PSF which is the linear interpolation between this one and the other one provided
+
+        :param other_psf: another psf
+        :param w1: weight for self (i.e., this PSF)
+        :param w2: weight for the other psf
+        :return: another PSF instance
+        """
+
+        # We assume that the XS are the same
+        assert np.allclose(self.xs, other_psf.xs)
+
+        # Weight the ys
+        new_ys = w1 * self.ys + w2 * other_psf.ys
+
+        return PSFWrapper(self.xs, new_ys)
+
     def to_pandas(self):
 
-        return pd.DataFrame.from_items((('xs', self._xs), ('ys', self._ys)))
+        items = (('xs', self._xs), ('ys', self._ys))
+
+        return pd.DataFrame.from_dict(dict(items))
 
     @classmethod
     def from_pandas(cls, df):
@@ -104,7 +126,7 @@ class PSFWrapper(object):
 
         radius, status = scipy.optimize.brentq(f, 0.005, 30, full_output = True)
 
-        assert status.converged, "Brenq did not converged"
+        assert status.converged, "Brentq did not converged"
 
         return radius
 
@@ -170,7 +192,7 @@ class PSFInterpolator(object):
         densities = np.interp(angular_distances, self._interp_x, self._interp_y)
 
         # Reshape to required shape
-        point_source_img_ait = densities.reshape((self._flat_sky_p.npix_height, self._flat_sky_p.npix_width))
+        point_source_img_ait = densities.reshape((self._flat_sky_p.npix_height, self._flat_sky_p.npix_width)).T
 
         return point_source_img_ait
 
@@ -202,35 +224,6 @@ class PSFInterpolator(object):
 
         return point_source_img_ait
 
-    # def plot(self, ra=0.0, dec=0.0):
-    #
-    #     point_source_img_ait, target_wcs, interp_x, interp_y, _ = _get_point_source_image_aitoff(self._psf,
-    #                                                                                              ra, dec,
-    #                                                                                              'icrs')
-    #
-    #     fig = plt.figure()
-    #
-    #     sub0 = plt.subplot(211)
-    #
-    #     sub0.plot(interp_x, interp_y)
-    #     sub0.set_xlabel("Radius (deg)")
-    #     sub0.set_ylabel("Density")
-    #     sub0.set_yscale("log")
-    #
-    #     sub1 = plt.subplot(212, projection=target_wcs)
-    #
-    #     print("Min: %s" % point_source_img_ait.min())
-    #     print("Max: %s" % point_source_img_ait.max())
-    #
-    #     sub1.imshow(point_source_img_ait, norm=LogNorm())
-    #
-    #     sub1.coords.grid(color='white')
-    #     sub1.coords.frame.set_color('none')
-    #
-    #     plt.tight_layout()
-    #
-    #     return fig, target_wcs
-
 
 class PSFConvolutor(object):
 
@@ -260,14 +253,6 @@ class PSFConvolutor(object):
 
         # Renormalize to exactly 1
         self._kernel = self._kernel / self._kernel.sum()
-        #
-        # import matplotlib.pyplot as plt
-        #
-        # fig = plt.figure()
-        #
-        # plt.imshow(self._kernel, interpolation='none')
-        #
-        # fig.savefig("kernel_%s.png" % self._psf.name)
 
         self._expected_shape = (flat_sky_proj.npix_height, flat_sky_proj.npix_width)
 
@@ -300,13 +285,6 @@ class PSFConvolutor(object):
         ret = irfftn(rfftn(ideal_image, self._fshape) * self._psf_fft, self._fshape)[self._fslice].copy()
 
         conv = _centered(ret, self._expected_shape)
-        #
-        # fig, sub = plt.subplots(1,1)
-        #
-        # #sub[0].imshow(ideal_image, interpolation='none', cmap='gist_heat')
-        # sub.imshow(conv, interpolation='none', cmap='gist_heat')
-        #
-        # fig.savefig("convolution.png")
 
         return conv
 

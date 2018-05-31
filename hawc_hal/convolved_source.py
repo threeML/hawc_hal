@@ -2,7 +2,6 @@ import numpy as np
 from astromodels import PointSource, use_astromodels_memoization
 from threeML.exceptions.custom_exceptions import custom_warnings
 from psf_fast import PSFInterpolator
-from astromodels.utils.angular_distance import angular_distance_fast
 
 
 def _select_with_wrap_around(arr, start, stop, wrap=(360, 0)):
@@ -53,11 +52,19 @@ class ConvolvedPointSource(object):
 
     def _update_dec_bins(self, dec_src):
 
-        self._response_energy_bins, _ = self._response.get_response_dec_bin(dec_src)
+        if abs(dec_src - self._last_processed_position[1]) > 0.1:
 
-        # Setup the PSF interpolators
-        self._psf_interpolators = map(lambda response_bin: PSFInterpolator(response_bin.psf, self._flat_sky_projection),
-                                      self._response_energy_bins)
+            # Source moved by more than 0.1 deg, let's recompute the response and the PSF
+            self._response_energy_bins = self._response.get_response_dec_bin(dec_src, interpolate=True)
+
+            # Setup the PSF interpolators
+            self._psf_interpolators = map(lambda response_bin: PSFInterpolator(response_bin.psf,
+                                                                               self._flat_sky_projection),
+                                          self._response_energy_bins)
+
+        # for i, psf_i in enumerate(self._psf_interpolators):
+        #
+        #     print("PSF %i: %.3f, %.3f" % (i, psf_i._psf.truncation_radius, psf_i._psf.kernel_radius))
 
     def get_source_map(self, response_bin_id, tag=None):
 
@@ -84,9 +91,13 @@ class ConvolvedPointSource(object):
         this_map = psf_interpolator.point_source_image(ra_src, dec_src)
 
         # Check that the point source is contained in the ROI, if not print a warning
-        if not np.isclose(this_map.sum(), 1.0, rtol=1e-2):
+        map_sum = this_map.sum()
+        if not np.isclose(map_sum, 1.0, rtol=1e-2):
 
-            custom_warnings.warn("PSF for source %s is not entirely contained in ROI" % self._name)
+            custom_warnings.warn("PSF for source %s is not entirely contained "
+                                 "in ROI for response bin %s. Fraction is %.2f instead of 1.0" % (self._name,
+                                                                                                  response_bin_id,
+                                                                                                  map_sum))
 
         # Compute the fluxes from the spectral function at the same energies as the simulated function
         energy_centers_keV = response_energy_bin.sim_energy_bin_centers * 1e9  # astromodels expects energies in keV
@@ -152,9 +163,9 @@ class ConvolvedExtendedSource(object):
 
         dec_center = (lat_start + lat_stop) / 2.0
         #
-        self._central_response_bins, dec_bin_id = response.get_response_dec_bin(dec_center)
+        self._central_response_bins = response.get_response_dec_bin(dec_center, interpolate=False)
 
-        print("Central bin is bin %s at Declination = %.3f" % (dec_bin_id, dec_center))
+        print("Central bin is bin at Declination = %.3f" % dec_center)
 
         # Take note of the pixels within the flat sky projection that actually need to be computed. If the extended
         # source is significantly smaller than the flat sky projection, this gains a substantial amount of time

@@ -3,7 +3,7 @@ import root_numpy
 import pandas as pd
 import six
 import os
-import re
+import socket
 from serialize import Serialization
 
 import ROOT
@@ -397,7 +397,9 @@ class MapTree(object):
 
             # Get copy of the subset
             # We need to create a dumb TFile to silence a lot of warnings from ROOT
-            dumb_tfile = ROOT.TFile("__test.root", "RECREATE")
+            # Get a filename for this process
+            dumb_tfile_name = "__dumb_tfile_%s_%s.root" % (os.getpid(), socket.gethostname())
+            dumb_tfile = ROOT.TFile(dumb_tfile_name, "RECREATE")
             new_tree = ttree_instance.CopyTree("")
 
             # Actually read it from disk
@@ -407,7 +409,7 @@ class MapTree(object):
             ttree_instance.SetEntryList(0)
 
             dumb_tfile.Close()
-            os.remove("__test.root")
+            os.remove(dumb_tfile_name)
 
         else:
 

@@ -32,7 +32,7 @@ class ResponseBin(object):
         self._sim_energy_bin_centers = sim_energy_bin_centers
         self._sim_differential_photon_fluxes = sim_differential_photon_fluxes
         self._sim_signal_events_per_bin = sim_signal_events_per_bin
-        self._psf = psf
+        self._psf = psf  # type: PSFWrapper
 
     @classmethod
     def from_ttree(cls, open_ttree, dec_id, analysis_bin_id, log_log_spectrum, min_dec, dec_center, max_dec):
@@ -127,23 +127,56 @@ class ResponseBin(object):
                 }
 
         # Now make a dataframe containing the elements of the simulation
-        df = pd.DataFrame.from_items((('sim_energy_bin_centers', pd.Series(self.sim_energy_bin_centers)),
-                                      ('sim_differential_photon_fluxes',
-                                       pd.Series(self.sim_differential_photon_fluxes)),
-                                      ('sim_signal_events_per_bin', pd.Series(self.sim_signal_events_per_bin))))
+        items = (
+            ('sim_energy_bin_centers', pd.Series(self.sim_energy_bin_centers)),
+            ('sim_differential_photon_fluxes', pd.Series(self.sim_differential_photon_fluxes)),
+            ('sim_signal_events_per_bin', pd.Series(self.sim_signal_events_per_bin))
+        )
+
+        df = pd.DataFrame.from_dict(dict(items))
 
         return df, meta, self.psf.to_pandas()
 
-        # # Add bin_ in front of the name otherwise pandas will complain that the name is not a valid python identifier,
-        # # if the name is only numbers
-        #
-        # serializer.store_pandas_object("%s%s" % (root_key, self._name),
-        #                                df,
-        #                                **meta)
-        #
-        # # Store the PSF
-        # serializer.store_pandas_object("%s%s_psf" % (root_key, self._name),
-        #                                self.psf.to_pandas())
+    def combine_with_weights(self, other_response_bin, dec_center, w1, w2):
+        """
+        Produce another response bin which is the weighted sum of this one and the other one passed.
+
+        :param other_response_bin:
+        :param w1:
+        :param w2:
+        :return:
+        """
+
+        assert np.isclose(w1+w2, 1.0), "Weights are not properly normalized"
+
+        new_name = "interpolated_%s" % self._name
+
+        # Use np.nan as declination boundaries to indicate that this is actually interpolated
+        min_dec, max_dec = np.nan, np.nan
+
+        n_sim_signal_events = w1 * self._sim_n_sig_events + w2 * other_response_bin._sim_n_sig_events
+        n_sim_bkg_events = w1 * self._sim_n_bg_events + w2 * other_response_bin._sim_n_bg_events
+
+        # We assume that the bin centers are the same
+        assert np.allclose(self._sim_energy_bin_centers, other_response_bin._sim_energy_bin_centers)
+
+        sim_differential_photon_fluxes = w1 * self._sim_differential_photon_fluxes + \
+                                         w2 * other_response_bin._sim_differential_photon_fluxes
+
+        sim_signal_events_per_bin = w1 * self._sim_signal_events_per_bin + \
+                                    w2 * other_response_bin._sim_signal_events_per_bin
+
+        # Now interpolate the psf
+        new_psf = self._psf.combine_with_other_psf(other_response_bin._psf, w1, w2)
+
+        new_response_bin = ResponseBin(new_name, min_dec, max_dec, dec_center,
+                                       n_sim_signal_events, n_sim_bkg_events,
+                                       self._sim_energy_bin_centers,
+                                       sim_differential_photon_fluxes,
+                                       sim_signal_events_per_bin,
+                                       new_psf)
+
+        return new_response_bin
 
     @property
     def name(self):
@@ -245,63 +278,63 @@ class HAWCResponse(object):
             effarea_dfs, _ = serializer.retrieve_pandas_object('/effective_area')
             psf_dfs, _ = serializer.retrieve_pandas_object('/psf')
 
-            declination_centers = effarea_dfs.index.levels[0]
-            energy_bins = effarea_dfs.index.levels[1]
+        declination_centers = effarea_dfs.index.levels[0]
+        energy_bins = effarea_dfs.index.levels[1]
 
-            min_decs = []
-            max_decs = []
+        min_decs = []
+        max_decs = []
 
-            for dec_center in declination_centers:
+        for dec_center in declination_centers:
 
-                these_response_bins = []
+            these_response_bins = []
 
-                for i, energy_bin in enumerate(energy_bins):
+            for i, energy_bin in enumerate(energy_bins):
 
-                    these_meta = meta_dfs.loc[dec_center, energy_bin]
+                these_meta = meta_dfs.loc[dec_center, energy_bin]
 
-                    min_dec = these_meta['min_dec']
-                    max_dec = these_meta['max_dec']
-                    dec_center_ = these_meta['declination_center']
+                min_dec = these_meta['min_dec']
+                max_dec = these_meta['max_dec']
+                dec_center_ = these_meta['declination_center']
 
-                    assert dec_center_ == dec_center, "Response is corrupted"
+                assert dec_center_ == dec_center, "Response is corrupted"
 
-                    # If this is the first energy bin, let's store the minimum and maximum dec of this bin
-                    if i == 0:
+                # If this is the first energy bin, let's store the minimum and maximum dec of this bin
+                if i == 0:
 
-                        min_decs.append(min_dec)
-                        max_decs.append(max_dec)
+                    min_decs.append(min_dec)
+                    max_decs.append(max_dec)
 
-                    else:
+                else:
 
-                        # Check that the minimum and maximum declination for this bin are the same as for
-                        # the first energy bin
-                        assert min_dec == min_decs[-1], "Response is corrupted"
-                        assert max_dec == max_decs[-1], "Response is corrupted"
+                    # Check that the minimum and maximum declination for this bin are the same as for
+                    # the first energy bin
+                    assert min_dec == min_decs[-1], "Response is corrupted"
+                    assert max_dec == max_decs[-1], "Response is corrupted"
 
-                    sim_n_sig_events = these_meta['n_sim_signal_events']
-                    sim_n_bg_events = these_meta['n_sim_bkg_events']
+                sim_n_sig_events = these_meta['n_sim_signal_events']
+                sim_n_bg_events = these_meta['n_sim_bkg_events']
 
-                    this_effarea_df = effarea_dfs.loc[dec_center, energy_bin]
+                this_effarea_df = effarea_dfs.loc[dec_center, energy_bin]
 
-                    sim_energy_bin_centers = this_effarea_df.loc[:, 'sim_energy_bin_centers'].values
-                    sim_differential_photon_fluxes = this_effarea_df.loc[:, 'sim_differential_photon_fluxes'].values
-                    sim_signal_events_per_bin = this_effarea_df.loc[:, 'sim_signal_events_per_bin'].values
+                sim_energy_bin_centers = this_effarea_df.loc[:, 'sim_energy_bin_centers'].values
+                sim_differential_photon_fluxes = this_effarea_df.loc[:, 'sim_differential_photon_fluxes'].values
+                sim_signal_events_per_bin = this_effarea_df.loc[:, 'sim_signal_events_per_bin'].values
 
-                    this_psf = PSFWrapper.from_pandas(psf_dfs.loc[dec_center, energy_bin])
+                this_psf = PSFWrapper.from_pandas(psf_dfs.loc[dec_center, energy_bin])
 
-                    this_response_bin = ResponseBin(energy_bin, min_dec, max_dec, dec_center,
-                                                    sim_n_sig_events, sim_n_bg_events,
-                                                    sim_energy_bin_centers, sim_differential_photon_fluxes,
-                                                    sim_signal_events_per_bin,
-                                                    this_psf)
+                this_response_bin = ResponseBin(energy_bin, min_dec, max_dec, dec_center,
+                                                sim_n_sig_events, sim_n_bg_events,
+                                                sim_energy_bin_centers, sim_differential_photon_fluxes,
+                                                sim_signal_events_per_bin,
+                                                this_psf)
 
-                    these_response_bins.append(this_response_bin)
+                these_response_bins.append(this_response_bin)
 
-                # Store the response bins for this declination bin
+            # Store the response bins for this declination bin
 
-                response_bins[dec_center] = these_response_bins
+            response_bins[dec_center] = these_response_bins
 
-            dec_bins = zip(min_decs, declination_centers, max_decs)
+        dec_bins = zip(min_decs, declination_centers, max_decs)
 
         return cls(response_file_name, dec_bins, response_bins)
 
@@ -371,16 +404,59 @@ class HAWCResponse(object):
 
         return instance
 
-    def get_response_dec_bin(self, dec):
+    def get_response_dec_bin(self, dec, interpolate=False):
+        """
+        Get the responses for the provided declination bin, optionally interpolating the PSF
 
-        # Find the closest dec bin_name. We iterate over all the dec bins because we don't want to assume
-        # that the bins are ordered by Dec in the file (and the operation is very cheap anyway,
-        # since the dec bins are few)
+        :param dec: the declination where the response is desired at
+        :param interpolate: whether to interpolate or not the PSF between the two closes reponse bins
+        :return:
+        """
 
+        # Sort declination bins by distance to the provided declination
         dec_bins_keys = self._response_bins.keys()
-        closest_dec_id = min(range(len(dec_bins_keys)), key=lambda i: abs(dec_bins_keys[i] - dec))
+        dec_bins_by_distance = sorted(dec_bins_keys, key=lambda x: abs(x - dec))
 
-        return self._response_bins[dec_bins_keys[closest_dec_id]], closest_dec_id
+        if not interpolate:
+
+            # Find the closest dec bin_name. We iterate over all the dec bins because we don't want to assume
+            # that the bins are ordered by Dec in the file (and the operation is very cheap anyway,
+            # since the dec bins are few)
+
+            closest_dec_key = dec_bins_by_distance[0]
+
+            return self._response_bins[closest_dec_key]
+
+        else:
+
+            # Find the two closest responses
+            dec_bin_one, dec_bin_two = dec_bins_by_distance[:2]
+
+            # Let's handle the special case where the requested dec is exactly on a response bin
+            if abs(dec_bin_one - dec) < 0.01:
+
+                # Do not interpolate
+                return self._response_bins[dec_bin_one]
+
+            energy_bins_one = self._response_bins[dec_bin_one]
+            energy_bins_two = self._response_bins[dec_bin_two]
+
+            # Now linearly interpolate between them
+
+            # Compute the weights according to the distance to the source
+            w1 = (dec - dec_bin_two) / (dec_bin_one - dec_bin_two)
+            w2 = (dec - dec_bin_one) / (dec_bin_two - dec_bin_one)
+
+            new_responses = []
+
+            for i in range(len(energy_bins_one)):
+
+                this_new_response = energy_bins_one[i].combine_with_weights(energy_bins_two[i], dec, w1, w2)
+
+                new_responses.append(this_new_response)
+
+            return new_responses
+
 
     @property
     def dec_bins(self):
@@ -423,10 +499,10 @@ class HAWCResponse(object):
         psf_dfs = []
         all_metas = []
 
-        # Write all data analysis bins
-        for dec_id, dec_center in enumerate(center_decs):
+        # Loop over all the dec bins (making sure that they are in order)
+        for dec_center in sorted(center_decs):
 
-            for i, response_bin in enumerate(self._response_bins[dec_center]):
+            for response_bin in self._response_bins[dec_center]:
 
                 this_effarea_df, this_meta, this_psf_df = response_bin.to_pandas()
 

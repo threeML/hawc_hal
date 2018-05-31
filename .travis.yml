@@ -1,0 +1,17 @@
+sudo: required
+
+language: python
+python:
+  - "2.7"
+
+os:
+  - linux
+  - osx
+
+install:
+  - pip install .
+  - pip install git+https://github.com/giacomov/3ML.git
+  - pip install git+https://github.com/giacomov/astromodels.git --upgrade
+
+# command to run tests
+script: pytest -vv

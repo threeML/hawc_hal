@@ -1,23 +1,41 @@
 from hawc_hal import HAL, HealpixConeROI
-import ROOT
 
-ROOT.PyConfig.IgnoreCommandLineOptions = True
+try:
 
-from astromodels import *
+    import ROOT
 
-# This disable momentarily the printing of warnings, which you might get
-# if you don't have the Fermi ST or other software installed
-with warnings.catch_warnings():
-    warnings.simplefilter("ignore")
+    ROOT.PyConfig.IgnoreCommandLineOptions = True
 
-    from threeML import *
+except ImportError:
 
-# Make sure that the HAWC plugin is available
+    pass
 
-assert is_plugin_available("HAWCLike"), "HAWCLike is not available. Check your configuration"
+from threeML import *
+import argparse
+from collections import namedtuple
+
+
+def test_geminga_paper(geminga_maptree, geminga_response):
+
+    Args_fake = namedtuple('args', 'mtfile,rsfile,startBin,stopBin,RA,Dec,uratio,delta,ROI,output,plugin')
+
+    args = Args_fake(geminga_maptree, geminga_response, 1, 9, 98.5, 17.76, 1.12, 0.3333, 0, 'output.txt', 'new')
+
+    param, like_df, TS = go(args)
+
+    # Geminga...rdiff0                                    5.400 +/- 0.6              deg
+    # Geminga.spectrum.main.Powerlaw.K      (1.40 -0.17 +0.20) x 10^-23  1 / (cm2 keV s)
+    # Geminga.spectrum.main.Powerlaw.index              -2.340 +/- 0.07
+    # B0656.spectrum.main.Powerlaw.K           (6.0 -1.3 +1.7) x 10^-24  1 / (cm2 keV s)
+    # B0656.spectrum.main.Powerlaw.index                -2.140 +/- 0.17
+
+    assert np.allclose(param.loc[:, 'value'].values,
+                       [5.38278446e+00, 1.40122099e-23, -2.34261469e+00, 5.98438658e-24, -2.13846297e+00],
+                       rtol=5e-2)
 
 
 def go(args):
+
     spectrum = Powerlaw()
     shape = Continuous_injection_diffusion_legacy()
 
@@ -192,11 +210,11 @@ def go(args):
     jl = JointLikelihood(lm, datalist, verbose=True)
 
     try:
-        jl.set_minimizer("ROOT")
-        _, like_df = jl.fit(compute_covariance=True)
+        jl.set_minimizer("minuit")
+        param, like_df = jl.fit(compute_covariance=False)
     except AttributeError:
         jl.set_minimizer("minuit")
-        _, like_df = jl.fit()
+        param, like_df = jl.fit(compute_covariance=False)
 
     # Print the TS, significance, and fit parameters, and then plot stuff
     print("\nTest statistic:")
@@ -232,17 +250,16 @@ def go(args):
         for l in fixedpars:
             f.write("%s\n" % l)
 
+    return param, like_df, TS
+
 
 if __name__ == "__main__":
-    import argparse
 
     p = argparse.ArgumentParser(description="Example spectral fit with LiFF")
     p.add_argument("-m", "--maptreefile", dest="mtfile",
                    help="LiFF MapTree ROOT file", default="./maptree.root")
     p.add_argument("-r", "--responsefile", dest="rsfile",
                    help="LiFF detector response ROOT file", default="./response.root")
-    p.add_argument("-n", "--ntransit", dest="ntransit", default=1, type=float,
-                   help="Number of transits to use")
     p.add_argument("--startBin", dest="startBin", default=1, type=int,
                    help="Starting analysis bin [0..9]")
     p.add_argument("--stopBin", dest="stopBin", default=9, type=int,

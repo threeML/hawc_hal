@@ -13,6 +13,8 @@ from threeML.plugins.gammaln import logfactorial
 from threeML.parallel import parallel_client
 from threeML.io.progress_bar import progress_bar
 
+from astromodels import Parameter
+
 from map_tree import map_tree_factory
 from response import hawc_response_factory
 from convolved_source import ConvolvedPointSource, ConvolvedExtendedSource3D, ConvolvedExtendedSource2D
@@ -102,9 +104,15 @@ class HAL(PluginPrototype):
         # Make sure that the response_file and the map tree are aligned
         assert len(self._maptree) == self._response.n_energy_planes, "Response and map tree are not aligned"
 
-        # No nuisance parameters at the moment
-
+        # Use a renormalization of the background as nuisance parameter
+        # NOTE: it is fixed to 1.0 unless the user explicitly sets it free (experimental)
         self._nuisance_parameters = collections.OrderedDict()
+        self._nuisance_parameters['%s_bkg_renorm' % name] = Parameter('%s_bkg_renorm' % name, 1.0,
+                                                                      min_value=0.5, max_value=1.5,
+                                                                      delta=0.01,
+                                                                      desc="Renormalization for background map",
+                                                                      free=False,
+                                                                      is_normalization=False)
 
         # Instance parent class
 
@@ -147,10 +155,6 @@ class HAL(PluginPrototype):
             self._active_pixels.append(this_active_pixels)
             self._flat_sky_to_healpix_transform.append(this_flat_sky_to_hpx_transform)
 
-        self._central_response_bins, dec_bin_id = self._response.get_response_dec_bin(self._roi.ra_dec_center[1])
-
-        print("Using PSF from Dec Bin %i for source %s" % (dec_bin_id, self._name))
-
         # This will contain a list of PSF convolutors for extended sources, if there is any in the model
 
         self._psf_convolutors = None
@@ -173,8 +177,10 @@ class HAL(PluginPrototype):
 
     def _setup_psf_convolutors(self):
 
+        central_response_bins = self._response.get_response_dec_bin(self._roi.ra_dec_center[1])
+
         self._psf_convolutors = map(lambda response_bin: PSFConvolutor(response_bin.psf, self._flat_sky_projection),
-                                    self._central_response_bins)
+                                    central_response_bins)
 
     def _compute_likelihood_biases(self):
 
@@ -385,13 +391,27 @@ class HAL(PluginPrototype):
             this_model_map_hpx = self._get_expectation(data_analysis_bin, i, n_point_sources, n_ext_sources)
 
             # Now compare with observation
+            bkg_renorm = self._nuisance_parameters.values()[0].value
+
             this_pseudo_log_like = log_likelihood(data_analysis_bin.observation_map.as_partial(),
-                                                  data_analysis_bin.background_map.as_partial(),
+                                                  data_analysis_bin.background_map.as_partial() * bkg_renorm,
                                                   this_model_map_hpx)
 
             total_log_like += this_pseudo_log_like - self._log_factorials[i] - self._saturated_model_like_per_maptree[i]
 
         return total_log_like
+
+    def write(self, response_file_name, map_tree_file_name):
+        """
+        Write this dataset to disk in HDF format.
+
+        :param response_file_name: filename for the response
+        :param map_tree_file_name: filename for the map tree
+        :return: None
+        """
+
+        self._maptree.write(map_tree_file_name)
+        self._response.write(response_file_name)
 
     def get_simulated_dataset(self, name):
 
@@ -446,6 +466,10 @@ class HAL(PluginPrototype):
 
         # Now change name and return
         self._clone[0]._name = name
+        # Adjust the name of the nuisance parameter
+        old_name = self._clone[0]._nuisance_parameters.keys()[0]
+        new_name = old_name.replace(self.name, name)
+        self._clone[0]._nuisance_parameters[new_name] = self._clone[0]._nuisance_parameters.pop(old_name)
 
         # Recompute biases
         self._clone[0]._compute_likelihood_biases()

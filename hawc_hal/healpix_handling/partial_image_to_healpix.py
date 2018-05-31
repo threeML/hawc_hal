@@ -17,7 +17,8 @@ from astropy.wcs.utils import wcs_to_celestial_frame
 from astropy.wcs import WCS
 
 from hawc_hal.special_values import UNSEEN
-from hawc_hal.interpolation.fast_linear_interpolator import FastLinearInterpolator
+from hawc_hal.interpolation.fast_linear_interpolator import FastLinearInterpolatorIrregularGrid
+from hawc_hal.interpolation.fast_linear_interpolator import  FastBilinearInterpolation
 
 
 ORDER = {}
@@ -190,7 +191,7 @@ class FlatSkyToHealpixTransform(object):
         # Look up pixels in input system
         yinds, xinds = wcs_in.wcs_world2pix(lon_in, lat_in, 0)
 
-        self._coords = np.array([xinds, yinds])
+        self._coords = [xinds, yinds]
 
         # Interpolate
 
@@ -199,14 +200,15 @@ class FlatSkyToHealpixTransform(object):
 
         self._order = order
 
-        # self._interpolator = FastLinearInterpolator(input_shape, self._coords.T)
+        #self._interpolator = FastLinearInterpolatorIrregularGrid(input_shape, np.asarray(self._coords).T)
+        self._interpolator = FastBilinearInterpolation(input_shape, self._coords)
 
     def __call__(self, data, fill_value=UNSEEN):
 
-        healpix_data = map_coordinates(data, self._coords,
-                                        order=self._order,
-                                        mode='constant', cval=fill_value)
+        # healpix_data = map_coordinates(data, self._coords,
+        #                                 order=self._order,
+        #                                 mode='constant', cval=fill_value)
 
-        # healpix_data = self._interpolator(data)
+        healpix_data = self._interpolator(data)
 
         return healpix_data
