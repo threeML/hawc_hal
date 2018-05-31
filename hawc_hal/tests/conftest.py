@@ -45,7 +45,7 @@ def fit_point_source(roi,
 
     beg = time.time()
 
-    jl.set_minimizer("ROOT")
+    # jl.set_minimizer("ROOT")
 
     param_df, like_df = jl.fit()
 

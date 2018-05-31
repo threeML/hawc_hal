@@ -8,6 +8,9 @@ from serialize import Serialization
 try:
 
     import ROOT
+    from threeML.io.cern_root_utils.io_utils import open_ROOT_file
+    from threeML.io.cern_root_utils.tobject_to_numpy import tree_to_ndarray
+
     ROOT.SetMemoryPolicy( ROOT.kMemoryStrict )
 
     import root_numpy
@@ -16,9 +19,6 @@ except ImportError:
 
     pass
 
-
-from threeML.io.cern_root_utils.io_utils import open_ROOT_file
-from threeML.io.cern_root_utils.tobject_to_numpy import tree_to_ndarray
 from threeML.io.rich_display import display
 from threeML.exceptions.custom_exceptions import custom_warnings
 from threeML.io.file_utils import file_existing_and_readable, sanitize_filename

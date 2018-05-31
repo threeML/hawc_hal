@@ -33,7 +33,6 @@ def test_complete_analysis(roi,
     data = DataList(hawc)
 
     jl = JointLikelihood(point_source_model, data, verbose=False)
-    jl.set_minimizer("ROOT")
     param_df, like_df = jl.fit()
 
     # See the model in counts space and the residuals
