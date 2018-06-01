@@ -1,65 +1,12 @@
+import numpy as np
+import astropy.units as u
 import healpy as hp
-from hawc_hal.healpix_handling.healpix_utils import radec_to_vec
-import pandas as pd
+from healpix_roi_base import HealpixROIBase, _RING, _NESTED
+
 from astromodels.core.sky_direction import SkyDirection
 
-import astropy.units as u
-import numpy as np
-
-from flat_sky_projection import FlatSkyProjection
-
-_EQUATORIAL = 'equatorial'
-_GALACTIC = 'galactic'
-_RING = 'RING'
-_NESTED = 'NESTED'
-
-
-class HealpixROIBase(object):
-
-    def active_pixels(self, nside, system=_EQUATORIAL, ordering=_RING):
-        """
-        Returns the non-zero elements, i.e., the pixels selected according to this Region Of Interest
-
-        :param nside: the NSIDE of the healpix map
-        :param system: the system of the Healpix map, either 'equatorial' or 'galactic' (default: equatorial)
-        :param ordering: numbering scheme for Healpix. Either RING or NESTED (default: RING)
-        :return: an array of pixels IDs (in healpix RING numbering scheme)
-        """
-
-        # Let's transform to lower case (so Equatorial will work, as well as EQuaTorial, or whatever)
-        system = system.lower()
-
-        assert system == _EQUATORIAL, "%s reference system not supported" % system
-
-        assert ordering in [_RING, _NESTED], "Could not understand ordering %s. Must be %s or %s" % (ordering,
-                                                                                                     _RING,
-                                                                                                     _NESTED)
-
-        return self._active_pixels(nside, ordering)
-
-    # This is supposed to be overridden by child classes
-    def _active_pixels(self, nside, ordering):  # pragma: no cover
-
-        raise NotImplementedError("You need to implement this")
-
-    def display(self):  # pragma: no cover
-
-        raise NotImplementedError("You need to implement this")
-
-    def to_dict(self):  # pragma: no cover
-
-        raise NotImplementedError("You need to implement this")
-
-    def from_dict(self, data):  # pragma: no cover
-
-        raise NotImplementedError("You need to implement this")
-
-
-def get_roi_from_dict(dictionary):
-
-    roi_type = dictionary['ROI type']
-
-    return globals()[roi_type].from_dict(dictionary)
+from ..healpix_handling import radec_to_vec
+from ..flat_sky_projection import FlatSkyProjection
 
 
 def _get_radians(my_angle):
@@ -185,5 +132,4 @@ class HealpixConeROI(HealpixROIBase):
         flat_sky_proj = FlatSkyProjection(ra, dec, pixel_size_deg, npix_per_side, npix_per_side)
 
         return flat_sky_proj
-
 

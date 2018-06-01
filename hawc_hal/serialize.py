@@ -17,7 +17,7 @@ class Serialization(object):
 
             self._store = HDFStore(self._filename, complib='blosc:lz4', complevel=9, mode=self._mode)
 
-        else:
+        else:  # pragma: no cover
 
             self._store = HDFStore(self._filename, mode=self._mode)
 

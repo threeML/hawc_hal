@@ -1,12 +1,10 @@
-# import pandas as pd
-# from pandas.core.sparse.array import IntIndex
 import numpy as np
 import healpy as hp
 import pandas as pd
-from hawc_hal.special_values import UNSEEN
+from ..special_values import UNSEEN
 
 
-def _not_implemented():
+def _not_implemented():  # pragma: no cover
 
     raise RuntimeError("You cannot use the base class. Use the derived classes.")
 
@@ -48,11 +46,11 @@ class HealpixWrapperBase(object):
         """
         return self._pixel_area
 
-    def as_dense(self):
+    def as_dense(self):  # pragma: no cover
 
         return _not_implemented()
 
-    def as_partial(self):
+    def as_partial(self):  # pragma: no cover
 
         return _not_implemented()
 

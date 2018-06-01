@@ -7,7 +7,7 @@ dist: trusty
 sudo: false
 
 env:
-  - MPLBACKEND='Agg' OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 NUMEXPR_NUM_THREADS=1 HAL_TEST_DATA=${TRAVIS_BUILD_DIR}/hawc_hal/tests/data PATH="${HOME}/miniconda/bin:${PATH}"
+  - MPLBACKEND='Agg' OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 NUMEXPR_NUM_THREADS=1 PATH="${HOME}/miniconda/bin:${PATH}"
 
 cache:
   directories:

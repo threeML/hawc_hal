@@ -84,9 +84,6 @@ class FlatSkyProjection(object):
         # Pre-compute pixel area
         self._pixel_area= proj_plane_pixel_area(self._wcs)
 
-        # Pre-compute unique id
-        self._uid = "%s%s%s%s%s" % (self._ra_center, self._dec_center, self._pixel_size_deg, npix_height, npix_width)
-
     @property
     def ras(self):
         return self._ras
@@ -123,11 +120,3 @@ class FlatSkyProjection(object):
     def project_plane_pixel_area(self):
         return self._pixel_area
 
-    @property
-    def unique_identifier(self):
-        """
-        This is useful if you want to avoid making the same projection over and over again.
-
-        :return:
-        """
-        return self._uid

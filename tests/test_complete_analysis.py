@@ -1,9 +1,6 @@
-from hawc_hal import HAL, HealpixConeROI
+from hawc_hal import HAL
 import matplotlib.pyplot as plt
 from threeML import *
-import argparse
-
-test_data_path = os.environ['HAL_TEST_DATA']
 
 
 def test_complete_analysis(roi,
@@ -96,8 +93,8 @@ def test_complete_analysis(roi,
     # pts.position.dec(2.214 + / - 0.00025) x
     # 10
 
-    a, b, cc, fig = jl.get_contours(point_source_model.pts.position.dec, 22.14, 22.16, 10,
-                                    point_source_model.pts.position.ra, 83.60, 83.65, 10)
+    a, b, cc, fig = jl.get_contours(point_source_model.pts.position.dec, 22.13, 22.1525, 10,
+                                    point_source_model.pts.position.ra, 83.615, 83.635, 10)
 
     plt.plot([ra], [dec], 'x')
     fig.savefig("hal_src_localization.png")
@@ -126,13 +123,3 @@ def test_complete_analysis(roi,
 
     fig.savefig("hal_corner_plot.png")
 
-if __name__ == "__main__":
-
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--maptree", help="Path to maptree", type=str,
-                        default=os.path.join(test_data_path, "maptree_1024.root"))
-    parser.add_argument("--response", help="Path to response", type=str,
-                        default=os.path.join(test_data_path, "response.root"))
-    args = parser.parse_args()
-
-    test_complete_analysis(maptree=args.maptree, response=args.response)

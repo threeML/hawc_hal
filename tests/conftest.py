@@ -1,8 +1,13 @@
 import pytest
 from hawc_hal import HealpixConeROI
 from threeML import *
+import os
 from hawc_hal import HAL
 import time
+
+
+# Get data path
+test_data_path = os.path.join(os.path.abspath(os.path.dirname(__file__)), 'data')
 
 
 def fit_point_source(roi,
@@ -145,15 +150,11 @@ def geminga_roi():
 @pytest.fixture(scope="session", autouse=True)
 def geminga_maptree():
 
-    test_data_path = os.environ['HAL_TEST_DATA']
-
     return os.path.join(test_data_path, 'geminga_maptree.root')
 
 
 @pytest.fixture(scope="session", autouse=True)
 def geminga_response():
-
-    test_data_path = os.environ['HAL_TEST_DATA']
 
     return os.path.join(test_data_path, 'geminga_response.root')
 
@@ -161,15 +162,11 @@ def geminga_response():
 @pytest.fixture(scope="session", autouse=True)
 def maptree():
 
-    test_data_path = os.environ['HAL_TEST_DATA']
-
     return os.path.join(test_data_path, 'zebra_simulated_source_mt_roi.hd5')
 
 
 @pytest.fixture(scope="session", autouse=True)
 def response():
-
-    test_data_path = os.environ['HAL_TEST_DATA']
 
     return os.path.join(test_data_path, 'detector_response.root')
 

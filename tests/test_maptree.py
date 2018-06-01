@@ -1,4 +1,4 @@
-from hawc_hal.map_tree import map_tree_factory
+from hawc_hal.maptree.map_tree import map_tree_factory
 from hawc_hal import HealpixConeROI
 import os
 import pytest

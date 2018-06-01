@@ -1,9 +1,6 @@
 from hawc_hal import HealpixConeROI
 from conftest import fit_point_source
-import os
 import argparse
-
-test_data_path = os.environ['HAL_TEST_DATA']
 
 
 def test_on_point_source(roi,

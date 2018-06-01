@@ -7,8 +7,13 @@ setup(
     version='0.1',
 
     packages=['hawc_hal',
+              'hawc_hal/convolved_source',
               'hawc_hal/healpix_handling',
-              'hawc_hal/interpolation'],
+              'hawc_hal/interpolation',
+              'hawc_hal/response',
+              'hawc_hal/maptree',
+              'hawc_hal/psf_fast',
+              'hawc_hal/region_of_interest'],
 
     url='https://github.com/giacomov/hawc_hal',
 
@@ -23,6 +28,7 @@ setup(
     install_requires=['numpy',
                       'healpy',
                       'threeml',
+                      'astromodels',
                       'pandas',
                       'healpy',
                       'six',

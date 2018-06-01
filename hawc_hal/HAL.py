@@ -1,8 +1,6 @@
 import collections
 import numpy as np
 import healpy as hp
-import astropy.units as u
-from numba import jit
 import matplotlib.pyplot as plt
 import copy
 from astropy.convolution import Gaussian2DKernel
@@ -15,75 +13,16 @@ from threeML.io.progress_bar import progress_bar
 
 from astromodels import Parameter
 
-from map_tree import map_tree_factory
+from maptree import map_tree_factory
 from response import hawc_response_factory
-from convolved_source import ConvolvedPointSource, ConvolvedExtendedSource3D, ConvolvedExtendedSource2D
-from hawc_hal.healpix_handling.partial_image_to_healpix import FlatSkyToHealpixTransform
-from hawc_hal.healpix_handling.sparse_healpix import SparseHealpix
-from hawc_hal.healpix_handling.gnomonic_projection import get_gnomonic_projection
+from convolved_source import ConvolvedPointSource, \
+    ConvolvedExtendedSource3D, ConvolvedExtendedSource2D, ConvolvedSourcesContainer
+from healpix_handling import FlatSkyToHealpixTransform
+from healpix_handling import SparseHealpix
+from healpix_handling import get_gnomonic_projection
 from psf_fast import PSFConvolutor
+from log_likelihood import log_likelihood
 
-
-class ConvolvedSourcesContainer(object):
-    def __init__(self):
-
-        self._cache = []
-
-    def reset(self):
-
-        self._cache = []
-
-    def __getitem__(self, item):
-
-        return self._cache[item]
-
-    def append(self, convolved_point_source):
-
-        self._cache.append(convolved_point_source)
-
-    @property
-    def n_sources_in_cache(self):
-
-        return len(self._cache)
-
-    @property
-    def size(self):
-
-        size = 0 * u.byte
-
-        for convolved_point_source in self._cache:
-
-            for point_source_map in convolved_point_source.source_maps:
-                size += point_source_map.nbytes * u.byte
-
-        return size.to(u.megabyte)
-
-
-# This function has two signatures in numba because if there are no sources in the likelihood model,
-# then expected_model_counts is 0.0
-@jit(["float64(float64[:], float64[:], float64[:])", "float64(float64[:], float64[:], float64)"],
-     nopython=True, parallel=False)
-def log_likelihood(observed_counts, expected_bkg_counts, expected_model_counts):  # pragma: no cover
-    """
-    Poisson log-likelihood minus log factorial minus bias. The bias migth be needed to keep the numerical value
-    of the likelihood small enough so that there aren't numerical problems when computing differences between two
-    likelihood values.
-
-    :param observed_counts:
-    :param expected_bkg_counts:
-    :param expected_model_counts:
-    :param bias:
-    :return:
-    """
-
-    predicted_counts = expected_bkg_counts + expected_model_counts
-
-    # Remember: because of how the DataAnalysisBin in map_tree.py initializes the maps,
-    # observed_counts > 0 everywhere
-
-    log_likes = observed_counts * np.log(predicted_counts) - predicted_counts
-
-    return np.sum(log_likes)
 
 
 class HAL(PluginPrototype):
@@ -364,7 +303,6 @@ class HAL(PluginPrototype):
         subs[1].set_xlim(x_limits)
 
         return fig
-
 
     def get_log_like(self):
         """
