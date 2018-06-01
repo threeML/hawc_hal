@@ -68,6 +68,7 @@ before_install:
         fi
 
 install:
+  - conda config --set always_yes yes --set changeps1 no
   - conda info -a
   - source activate test-environment
   - hash -r
