@@ -22,7 +22,7 @@ from healpix_handling import SparseHealpix
 from healpix_handling import get_gnomonic_projection
 from psf_fast import PSFConvolutor
 from log_likelihood import log_likelihood
-
+from util import ra_to_longitude
 
 
 class HAL(PluginPrototype):
@@ -522,7 +522,7 @@ class HAL(PluginPrototype):
         resolution = 3.0 # arcmin
 
         # The image is going to cover the diameter plus 20% padding
-        xsize = 2.2 * self._roi.data_radius.to("deg").value / (resolution / 60.0)
+        xsize = self._get_optimal_xsize(resolution)
 
         n_active_planes = len(self._active_planes)
 
@@ -545,13 +545,7 @@ class HAL(PluginPrototype):
                                           data_analysis_bin.observation_map.nside).as_dense()
 
                 # Healpix uses longitude between -180 and 180, while R.A. is between 0 and 360. We need to fix that:
-                if this_ra > 180.0:
-
-                    longitude = -180 + (this_ra - 180.0)
-
-                else:
-
-                    longitude = this_ra
+                longitude = ra_to_longitude(this_ra)
 
                 # Declination is already between -90 and 90
                 latitude = this_dec
@@ -598,13 +592,17 @@ class HAL(PluginPrototype):
 
         return fig
 
+    def _get_optimal_xsize(self, resolution):
+
+        return 2.2 * self._roi.data_radius.to("deg").value / (resolution / 60.0)
+
     def display_stacked_image(self, smoothing_kernel_sigma=0.5):
 
         # This is the resolution (i.e., the size of one pixel) of the image in arcmin
         resolution = 3.0
 
         # The image is going to cover the diameter plus 20% padding
-        xsize = 2.2 * self._roi.data_radius.to("deg").value / (resolution / 60.0)
+        xsize = self._get_optimal_xsize(resolution)
 
         active_planes_bins = map(lambda x: self._maptree[x], self._active_planes)
 
@@ -612,13 +610,7 @@ class HAL(PluginPrototype):
         this_ra, this_dec = self._roi.ra_dec_center
 
         # Healpix uses longitude between -180 and 180, while R.A. is between 0 and 360. We need to fix that:
-        if this_ra > 180.0:
-
-            longitude = -180 + (this_ra - 180.0)
-
-        else:
-
-            longitude = this_ra
+        longitude = ra_to_longitude(this_ra)
 
         # Declination is already between -90 and 90
         latitude = this_dec

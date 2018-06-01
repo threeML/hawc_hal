@@ -29,3 +29,16 @@ def cartesian(arrays, out=None):
             out[j*m:(j+1)*m, 1:] = out[0:m, 1:]
 
     return out
+
+
+def ra_to_longitude(ra):
+
+    if ra > 180.0:
+
+        longitude = -180 + (ra - 180.0)
+
+    else:
+
+        longitude = ra
+
+    return longitude
