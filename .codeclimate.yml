@@ -33,6 +33,10 @@ checks:
     config:
       threshold: # language-specific defaults. an override will affect all languages.
 
+exclude_patterns:
+- "hawc_hal/obsolete/"
+- "tests/"
+
 plugins:
   sonar-python:
     enabled: true
