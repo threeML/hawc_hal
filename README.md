@@ -1,4 +1,6 @@
 [![Build Status](https://travis-ci.org/giacomov/hawc_hal.svg?branch=master)](https://travis-ci.org/giacomov/hawc_hal)
+[![codecov](https://codecov.io/gh/giacomov/hawc_hal/branch/master/graph/badge.svg)](https://codecov.io/gh/giacomov/hawc_hal)
+[![Maintainability](https://api.codeclimate.com/v1/badges/7a1c8e60a5cde4275292/maintainability)](https://codeclimate.com/github/giacomov/hawc_hal/maintainability)
 
 # The HAWC Accelerated Likelihood (HAL) framework
 
