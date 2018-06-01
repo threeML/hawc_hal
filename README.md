@@ -56,6 +56,12 @@ fig = hawc.display_stacked_image(smoothing_kernel_sigma=0.17)
 # Save to file
 fig.savefig("hal_mkn421_stacked_image.png")
 
+# If you want, you can save the data *within this ROI* and the response
+# in hd5 files that can be used again with HAL
+# (this is useful if you want to publish only the ROI you
+# used for a given paper)
+hawc.write("my_response.hd5", "my_maptree.hd5")
+
 # Define model as usual
 spectrum = Log_parabola()
 source = PointSource("mkn421", ra=ra_mkn421, dec=dec_mkn421, spectral_shape=spectrum)
