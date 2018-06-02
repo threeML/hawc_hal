@@ -37,6 +37,9 @@ if __name__ == "__main__":
     parser.add_argument("--dec_roi", help="Dec of center of ROI", type=float, default=def_dec_roi)
     parser.add_argument("--data_radius", help="Radius of the data ROI", type=float, default=def_drad)
     parser.add_argument("--model_radius", help="Radius of the model ROI", type=float, default=def_mrad)
+    parser.add_argument("--maptree", help="Maptree", type=str, default=maptree())
+    parser.add_argument("--response", help="Response", type=str, default=response())
+
     args = parser.parse_args()
 
     roi = HealpixConeROI(data_radius=args.data_radius,
@@ -48,6 +51,6 @@ if __name__ == "__main__":
 
     test_on_point_source(roi,
                          liff=args.liff,
-                         point_source_model=point_source_model(roi),
-                         maptree=maptree(),
-                         response=response())
+                         point_source_model=pts_model,
+                         maptree=args.maptree,
+                         response=args.response)

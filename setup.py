@@ -4,7 +4,7 @@ setup(
 
     name='hawc_hal',
 
-    version='0.1',
+    version='1.0',
 
     packages=['hawc_hal',
               'hawc_hal/convolved_source',
@@ -25,7 +25,7 @@ setup(
 
     description='Read and handle HAWC data',
 
-    install_requires=['numpy',
+    install_requires=['numpy >=1.14',
                       'healpy',
                       'threeml',
                       'astromodels',

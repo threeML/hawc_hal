@@ -172,9 +172,7 @@ def response():
 
 
 @pytest.fixture(scope="function", autouse=True)
-def point_source_model():
-
-    ra, dec = 83.6279, 22.14
+def point_source_model(ra=83.6279, dec=22.14):
 
     spectrum = Cutoff_powerlaw()
 
