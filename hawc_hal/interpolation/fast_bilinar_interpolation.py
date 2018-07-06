@@ -84,7 +84,9 @@ class FastBilinearInterpolation(object):
 
     def __call__(self, data):
 
-        return _apply_bilinar_interpolation(self._bs, self._flat_points, data)
+        res = _apply_bilinar_interpolation(self._bs, self._flat_points, data)
+
+        return res
 
 
 @jit("float64[:](float64[:, :], int64[:], float64[:, :])", nopython=True)

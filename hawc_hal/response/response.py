@@ -1,21 +1,12 @@
 import numpy as np
 import pandas as pd
 import os
+import collections
+
 from ..serialize import Serialization
 
-try:
-
-    import ROOT
-    from threeML.io.cern_root_utils.io_utils import get_list_of_keys, open_ROOT_file
-    from threeML.io.cern_root_utils.tobject_to_numpy import tree_to_ndarray
-
-    ROOT.SetMemoryPolicy(ROOT.kMemoryStrict)
-
-except ImportError:  # pragma: no cover
-
-    pass
-
 from threeML.io.file_utils import file_existing_and_readable, sanitize_filename
+from threeML.exceptions.custom_exceptions import custom_warnings
 
 from ..psf_fast import PSFWrapper
 from response_bin import ResponseBin
@@ -76,7 +67,7 @@ class HAWCResponse(object):
     @classmethod
     def from_hdf5(cls, response_file_name):
 
-        response_bins = {}
+        response_bins = collections.OrderedDict()
 
         with Serialization(response_file_name, mode='r') as serializer:
 
@@ -122,7 +113,9 @@ class HAWCResponse(object):
 
                 this_effarea_df = effarea_dfs.loc[dec_center, energy_bin]
 
+                sim_energy_bin_low = this_effarea_df.loc[:, 'sim_energy_bin_low'].values
                 sim_energy_bin_centers = this_effarea_df.loc[:, 'sim_energy_bin_centers'].values
+                sim_energy_bin_hi = this_effarea_df.loc[:, 'sim_energy_bin_hi'].values
                 sim_differential_photon_fluxes = this_effarea_df.loc[:, 'sim_differential_photon_fluxes'].values
                 sim_signal_events_per_bin = this_effarea_df.loc[:, 'sim_signal_events_per_bin'].values
 
@@ -130,7 +123,10 @@ class HAWCResponse(object):
 
                 this_response_bin = ResponseBin(energy_bin, min_dec, max_dec, dec_center,
                                                 sim_n_sig_events, sim_n_bg_events,
-                                                sim_energy_bin_centers, sim_differential_photon_fluxes,
+                                                sim_energy_bin_low,
+                                                sim_energy_bin_centers,
+                                                sim_energy_bin_hi,
+                                                sim_differential_photon_fluxes,
                                                 sim_signal_events_per_bin,
                                                 this_psf)
 
@@ -146,6 +142,8 @@ class HAWCResponse(object):
 
     @classmethod
     def from_root_file(cls, response_file_name):
+
+        from ..root_handler import open_ROOT_file, get_list_of_keys, tree_to_ndarray
 
         # Make sure file is readable
 
@@ -182,16 +180,36 @@ class HAWCResponse(object):
             dec_bins = zip(dec_bins_lower_edge, dec_bins_center, dec_bins_upper_edge)
 
             # Read in the ids of the response bins ("analysis bins" in LiFF jargon)
-            response_bins_ids = tree_to_ndarray(f.Get("AnalysisBins"), "id")  # type: np.ndarray
+            try:
 
-            # Now we create a list of ResponseBin instances for each dec bin_name
-            response_bins = {}
+                response_bins_ids = tree_to_ndarray(f.Get("AnalysisBins"), "id")  # type: np.ndarray
+
+            except ValueError:
+
+                # Some old response files (or energy responses) have no "id" branch
+                custom_warnings.warn("Response %s has no AnalysisBins 'id' branch. "
+                                     "Will try with default names" % response_file_name)
+
+                response_bins_ids = None
+
+            # Now we create a dictionary of ResponseBin instances for each dec bin_name
+            response_bins = collections.OrderedDict()
 
             for dec_id in range(len(dec_bins)):
 
                 this_response_bins = []
 
                 min_dec, dec_center, max_dec = dec_bins[dec_id]
+
+                # If we couldn't get the reponse_bins_ids above, let's use the default names
+                if response_bins_ids is None:
+
+                    # Default are just integers. let's read how many nHit bins are from the first dec bin
+                    dec_id_label = "dec_%02i" % dec_id
+
+                    n_energy_bins = f.Get(dec_id_label).GetNkeys()
+
+                    response_bins_ids = range(n_energy_bins)
 
                 for response_bin_id in response_bins_ids:
 
@@ -215,7 +233,7 @@ class HAWCResponse(object):
         Get the responses for the provided declination bin, optionally interpolating the PSF
 
         :param dec: the declination where the response is desired at
-        :param interpolate: whether to interpolate or not the PSF between the two closes reponse bins
+        :param interpolate: whether to interpolate or not the PSF between the two closes response bins
         :return:
         """
 

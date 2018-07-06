@@ -1,7 +1,13 @@
 import numpy as np
 
 
-def cartesian(arrays, out=None):
+def cartesian(arrays):
+    return np.dstack(
+        np.meshgrid(*arrays, indexing='ij')
+        ).reshape(-1, len(arrays))
+
+
+def cartesian_(arrays, out=None):
     """
     Generate a cartesian product of input arrays.
     """
@@ -22,7 +28,7 @@ def cartesian(arrays, out=None):
 
     if arrays[1:]:
 
-        cartesian(arrays[1:], out=out[0:m, 1:])
+        cartesian_(arrays[1:], out=out[0:m, 1:])
 
         for j in range(1, arrays[0].size):
 

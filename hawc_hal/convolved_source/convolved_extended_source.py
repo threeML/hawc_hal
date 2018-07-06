@@ -8,7 +8,7 @@ def _select_with_wrap_around(arr, start, stop, wrap=(360, 0)):
     if start > stop:
 
         # This can happen if for instance lon_start = 280 and lon_stop = 10, which means we
-        # should keep between 280 and 360 and then between 360 to 10
+        # should keep between 280 and 360 and then between 0 to 10
         idx = ((arr >= stop) & (arr <= wrap[0])) | ((arr >= wrap[1]) & (arr <= start))
 
     else:

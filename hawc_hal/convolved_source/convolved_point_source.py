@@ -1,8 +1,9 @@
 import numpy as np
+import os
 
 from astromodels import PointSource
 from ..psf_fast import PSFInterpolator
-
+from ..interpolation.log_log_interpolation import LogLogInterpolator
 
 from threeML.exceptions.custom_exceptions import custom_warnings
 
@@ -47,11 +48,7 @@ class ConvolvedPointSource(object):
                                                                                self._flat_sky_projection),
                                           self._response_energy_bins)
 
-        # for i, psf_i in enumerate(self._psf_interpolators):
-        #
-        #     print("PSF %i: %.3f, %.3f" % (i, psf_i._psf.truncation_radius, psf_i._psf.kernel_radius))
-
-    def get_source_map(self, response_bin_id, tag=None):
+    def get_source_map(self, response_bin_id, tag=None, integrate=False):
 
         # Get current point source position
         # NOTE: this might change if the point source position is free during the fit,
@@ -75,14 +72,16 @@ class ConvolvedPointSource(object):
         # is very fast
         this_map = psf_interpolator.point_source_image(ra_src, dec_src)
 
-        # Check that the point source is contained in the ROI, if not print a warning
+        # Check that the point source image is entirely contained in the ROI, if not print a warning
         map_sum = this_map.sum()
+
         if not np.isclose(map_sum, 1.0, rtol=1e-2):
 
             custom_warnings.warn("PSF for source %s is not entirely contained "
-                                 "in ROI for response bin %s. Fraction is %.2f instead of 1.0" % (self._name,
-                                                                                                  response_bin_id,
-                                                                                                  map_sum))
+                                 "in ROI for response bin %s. Fraction is %.2f instead of 1.0. "
+                                 "Consider enlarging your model ROI." % (self._name,
+                                                                         response_bin_id,
+                                                                         map_sum))
 
         # Compute the fluxes from the spectral function at the same energies as the simulated function
         energy_centers_keV = response_energy_bin.sim_energy_bin_centers * 1e9  # astromodels expects energies in keV
@@ -92,11 +91,37 @@ class ConvolvedPointSource(object):
 
         source_diff_spectrum = self._source(energy_centers_keV, tag=tag)
 
-        # Transform from keV^-1 cm^-2 s^-1 to TeV^-1 cm^-2 s^-1
-        source_diff_spectrum *= 1e9
+        # This provide a way to force the use of integration, for testing
+        if os.environ.get("HAL_INTEGRATE_POINT_SOURCE", '').lower() == 'yes':  # pragma: no cover
 
-        # Re-weight the detected counts
-        scale = source_diff_spectrum / response_energy_bin.sim_differential_photon_fluxes
+            integrate = True
+
+        if integrate:  # pragma: no cover
+
+            # Slower approach, where we integrate the spectra of both the simulation and the source
+            # It is off by default because it is slower and it doesn't provide any improvement in accuracy
+            # according to my simulations (GV)
+
+            interp_spectrum = LogLogInterpolator(response_energy_bin.sim_energy_bin_centers,
+                                                 source_diff_spectrum * 1e9,
+                                                 k=2)
+
+            interp_sim_spectrum = LogLogInterpolator(response_energy_bin.sim_energy_bin_centers,
+                                                     response_energy_bin.sim_differential_photon_fluxes,
+                                                     k=2)
+
+            src_spectrum = [interp_spectrum.integral(a, b) for (a, b) in zip(response_energy_bin.sim_energy_bin_low,
+                                                                             response_energy_bin.sim_energy_bin_hi)]
+
+            sim_spectrum = [interp_sim_spectrum.integral(a, b) for (a, b) in zip(response_energy_bin.sim_energy_bin_low,
+                                                                                 response_energy_bin.sim_energy_bin_hi)]
+
+            scale = np.array(src_spectrum) / np.array(sim_spectrum)
+
+        else:
+
+            # Transform from keV^-1 cm^-2 s^-1 to TeV^-1 cm^-2 s^-1 and re-weight the detected counts
+            scale = source_diff_spectrum / response_energy_bin.sim_differential_photon_fluxes * 1e9
 
         # Now return the map multiplied by the scale factor
         return np.sum(scale * response_energy_bin.sim_signal_events_per_bin) * this_map

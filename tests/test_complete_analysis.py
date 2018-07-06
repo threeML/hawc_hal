@@ -100,8 +100,10 @@ def test_complete_analysis(roi,
     fig.savefig("hal_src_localization.png")
 
     # Of course we can also do a Bayesian analysis the usual way
-    # NOTE: here the position is still free, so we are going to obtain marginals about that
-    # as well
+
+    point_source_model.pts.position.ra.free = False
+    point_source_model.pts.position.dec.free = False
+
     # For this quick example, let's use a uniform prior for all parameters
     for parameter in point_source_model.parameters.values():
 

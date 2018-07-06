@@ -32,6 +32,10 @@ class HAL(PluginPrototype):
         # Store ROI
         self._roi = roi
 
+        # Set up the flat-sky projection
+
+        self._flat_sky_projection = roi.get_flat_sky_projection(flat_sky_pixels_sizes)
+
         # Read map tree (data)
 
         self._maptree = map_tree_factory(maptree, roi=roi)
@@ -65,12 +69,10 @@ class HAL(PluginPrototype):
         self._convolved_ext_sources = ConvolvedSourcesContainer()
 
         # By default all energy/nHit bins are used
-        self._all_planes = range(len(self._maptree))
-        self._active_planes = range(len(self._maptree))
+        self._all_planes = list(self._maptree.analysis_bins_labels)
 
-        # Set up the flat-sky projection
-
-        self._flat_sky_projection = roi.get_flat_sky_projection(flat_sky_pixels_sizes)
+        # The active planes list always contains the list of *indexes* of the active planes
+        self._active_planes_idx = range(len(self._maptree))
 
         # Set up the transformations from the flat-sky projection to Healpix, as well as the list of active pixels
         # (one for each energy/nHit bin). We make a separate transformation because different energy bins might have
@@ -132,7 +134,7 @@ class HAL(PluginPrototype):
             obs = data_analysis_bin.observation_map.as_partial()
             bkg = data_analysis_bin.background_map.as_partial()
 
-            sat_model = np.maximum(obs - bkg, 1e-30).astype(np.float64)
+            sat_model = np.clip(obs - bkg, 1e-50, None).astype(np.float64)
 
             self._saturated_model_like_per_maptree[i] = log_likelihood(obs, bkg, sat_model) - this_log_factorial
 
@@ -144,11 +146,45 @@ class HAL(PluginPrototype):
         """
         return np.sum(self._saturated_model_like_per_maptree)
 
-    def set_active_measurements(self, bin_id_min, bin_id_max):
+    def set_active_measurements(self, bin_id_min=None, bin_id_max=None, bin_list=None):
 
-        assert bin_id_min in self._all_planes and bin_id_max in self._all_planes, "Illegal bin_name numbers"
+        # Check for legal input
+        if bin_id_min is not None:
 
-        self._active_planes = range(bin_id_min, bin_id_max + 1)
+            assert bin_id_max is not None, "If you provide a minimum bin, you also need to provide a maximum bin"
+
+            # Make sure they are strings
+            bin_id_min = str(bin_id_min)
+            bin_id_max = str(bin_id_max)
+
+            assert bin_id_min in self._all_planes and bin_id_max in self._all_planes, "Illegal bin_names"
+
+            assert bin_list is None, "You can either provide a minimum and maximum bin, or a bin list, but not both"
+
+            idx1 = self._all_planes.index(bin_id_min)
+            idx2 = self._all_planes.index(bin_id_max)
+
+            self._active_planes_idx = range(idx1, idx2 + 1)
+
+        else:
+
+            assert bin_id_max is None, "If you provide a maximum bin, you also need to provide a minimum bin"
+
+            assert bin_list is not None
+
+            self._active_planes_idx = []
+
+            for this_bin in bin_list:
+
+                try:
+
+                    this_idx = self._all_planes.index(str(this_bin))
+
+                except ValueError:
+
+                    raise ValueError("Bin %s it not contained in this response" % this_bin)
+
+                self._active_planes_idx.append(this_idx)
 
     def display(self):
 
@@ -179,7 +215,7 @@ class HAL(PluginPrototype):
         print("")
         print("Active energy/nHit planes: ")
         print("---------------------------\n")
-        print(self._active_planes)
+        print(self._active_planes_idx)
 
     def set_model(self, likelihood_model_instance):
         """
@@ -231,13 +267,13 @@ class HAL(PluginPrototype):
         n_point_sources = self._likelihood_model.get_number_of_point_sources()
         n_ext_sources = self._likelihood_model.get_number_of_extended_sources()
 
-        total_counts = np.zeros(len(self._active_planes), dtype=float)
+        total_counts = np.zeros(len(self._active_planes_idx), dtype=float)
         total_model = np.zeros_like(total_counts)
         model_only = np.zeros_like(total_counts)
         residuals = np.zeros_like(total_counts)
         net_counts = np.zeros_like(total_counts)
 
-        for i, energy_id in enumerate(self._active_planes):
+        for i, energy_id in enumerate(self._active_planes_idx):
 
             data_analysis_bin = self._maptree[energy_id]
 
@@ -270,11 +306,11 @@ class HAL(PluginPrototype):
 
         fig, subs = plt.subplots(2, 1, gridspec_kw={'height_ratios': [2, 1], 'hspace': 0})
 
-        subs[0].errorbar(self._active_planes, net_counts, yerr=np.sqrt(total_counts),
+        subs[0].errorbar(self._active_planes_idx, net_counts, yerr=np.sqrt(total_counts),
                          capsize=0,
                          color='black', label='Net counts', fmt='.')
 
-        subs[0].plot(self._active_planes, model_only, label='Convolved model')
+        subs[0].plot(self._active_planes_idx, model_only, label='Convolved model')
 
         subs[0].legend(bbox_to_anchor=(1.0, 1.0), loc="upper right",
                        numpoints=1)
@@ -283,12 +319,12 @@ class HAL(PluginPrototype):
         subs[1].axhline(0, linestyle='--')
 
         subs[1].errorbar(
-            self._active_planes, residuals,
+            self._active_planes_idx, residuals,
             yerr=np.ones(residuals.shape),
             capsize=0, fmt='.'
         )
 
-        x_limits = [min(self._active_planes) - 0.5, max(self._active_planes) + 0.5]
+        x_limits = [min(self._active_planes_idx) - 0.5, max(self._active_planes_idx) + 0.5]
 
         subs[0].set_yscale("log", nonposy='clip')
         subs[0].set_ylabel("Counts per bin")
@@ -296,8 +332,8 @@ class HAL(PluginPrototype):
 
         subs[1].set_xlabel("Analysis bin")
         subs[1].set_ylabel(r"$\frac{{cts - mod - bkg}}{\sqrt{mod + bkg}}$")
-        subs[1].set_xticks(self._active_planes)
-        subs[1].set_xticklabels(self._active_planes)
+        subs[1].set_xticks(self._active_planes_idx)
+        subs[1].set_xticklabels(self._active_planes_idx)
 
         subs[0].set_xlim(x_limits)
         subs[1].set_xlim(x_limits)
@@ -323,7 +359,7 @@ class HAL(PluginPrototype):
 
         for i, data_analysis_bin in enumerate(self._maptree):
 
-            if i not in self._active_planes:
+            if i not in self._active_planes_idx:
                 continue
 
             this_model_map_hpx = self._get_expectation(data_analysis_bin, i, n_point_sources, n_ext_sources)
@@ -331,8 +367,11 @@ class HAL(PluginPrototype):
             # Now compare with observation
             bkg_renorm = self._nuisance_parameters.values()[0].value
 
-            this_pseudo_log_like = log_likelihood(data_analysis_bin.observation_map.as_partial(),
-                                                  data_analysis_bin.background_map.as_partial() * bkg_renorm,
+            obs = data_analysis_bin.observation_map.as_partial()  # type: np.array
+            bkg = data_analysis_bin.background_map.as_partial() * bkg_renorm  # type: np.array
+
+            this_pseudo_log_like = log_likelihood(obs,
+                                                  bkg,
                                                   this_model_map_hpx)
 
             total_log_like += this_pseudo_log_like - self._log_factorials[i] - self._saturated_model_like_per_maptree[i]
@@ -364,7 +403,7 @@ class HAL(PluginPrototype):
 
             for i, data_analysis_bin in enumerate(self._maptree):
 
-                if i not in self._active_planes:
+                if i not in self._active_planes_idx:
 
                     expectations.append(None)
 
@@ -389,7 +428,7 @@ class HAL(PluginPrototype):
         # Substitute the observation and background for each data analysis bin
         for i, (data_analysis_bin, orig_data_analysis_bin) in enumerate(zip(self._clone[0]._maptree, self._maptree)):
 
-            if i not in self._active_planes:
+            if i not in self._active_planes_idx:
 
                 continue
 
@@ -524,13 +563,13 @@ class HAL(PluginPrototype):
         # The image is going to cover the diameter plus 20% padding
         xsize = self._get_optimal_xsize(resolution)
 
-        n_active_planes = len(self._active_planes)
+        n_active_planes = len(self._active_planes_idx)
 
         fig, subs = plt.subplots(n_active_planes, 3, figsize=(8, n_active_planes * 2))
 
-        with progress_bar(len(self._active_planes), title='Smoothing maps') as prog_bar:
+        with progress_bar(len(self._active_planes_idx), title='Smoothing maps') as prog_bar:
 
-            for i, plane_id in enumerate(self._active_planes):
+            for i, plane_id in enumerate(self._active_planes_idx):
 
                 data_analysis_bin = self._maptree[plane_id]
 
@@ -604,7 +643,7 @@ class HAL(PluginPrototype):
         # The image is going to cover the diameter plus 20% padding
         xsize = self._get_optimal_xsize(resolution)
 
-        active_planes_bins = map(lambda x: self._maptree[x], self._active_planes)
+        active_planes_bins = map(lambda x: self._maptree[x], self._active_planes_idx)
 
         # Get the center of the projection for this plane
         this_ra, this_dec = self._roi.ra_dec_center

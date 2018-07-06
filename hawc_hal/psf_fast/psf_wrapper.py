@@ -3,19 +3,28 @@ import scipy.interpolate
 import scipy.optimize
 import pandas as pd
 
+_INTEGRAL_OUTER_RADIUS = 15.0
+
+
+class InvalidPSFError(ValueError):
+
+    pass
+
 
 class PSFWrapper(object):
 
-    def __init__(self, xs, ys):
+    def __init__(self, xs, ys, brightness_interp_x=None, brightness_interp_y=None):
 
         self._xs = xs
         self._ys = ys
 
-        self._tf1_interpolated = scipy.interpolate.InterpolatedUnivariateSpline(xs, ys, k=2, ext='raise')
+        self._psf_interpolated = scipy.interpolate.InterpolatedUnivariateSpline(xs, ys, k=2,
+                                                                                ext='raise',
+                                                                                check_finite=True)
 
         # Memorize the total integral (will use it for normalization)
 
-        self._total_integral = self._tf1_interpolated.integral(0, 30)
+        self._total_integral = self._psf_interpolated.integral(self._xs[0], _INTEGRAL_OUTER_RADIUS)
 
         # Now compute the truncation radius, which is a very conservative measurement
         # of the size of the PSF
@@ -26,6 +35,54 @@ class PSFWrapper(object):
         self._kernel_radius = self.find_eef_radius(0.999)
 
         assert self._kernel_radius <= self._truncation_radius
+        assert self._truncation_radius <= _INTEGRAL_OUTER_RADIUS
+
+        # Prepare brightness interpolation
+
+        if brightness_interp_x is None:
+
+            brightness_interp_x, brightness_interp_y = self._prepare_brightness_interpolation_points()
+
+        self._brightness_interp_x = brightness_interp_x
+        self._brightness_interp_y = brightness_interp_y
+
+        self._brightness_interpolation = scipy.interpolate.InterpolatedUnivariateSpline(brightness_interp_x,
+                                                                                        brightness_interp_y,
+                                                                                        k=2,
+                                                                                        ext='zeros',
+                                                                                        check_finite=True)
+
+    def _prepare_brightness_interpolation_points(self):
+
+        # Get the centers of the bins
+        interp_x = (self._xs[1:] + self._xs[:-1]) / 2.0
+
+        # Compute the density
+
+        interp_y = np.array(map(lambda (a, b): self.integral(a, b) / (np.pi * (b ** 2 - a ** 2)) / self._total_integral,
+                                zip(self._xs[:-1], self._xs[1:])))
+
+        # Add zero at r=0 and at r = _INTEGRAL_OUTER_RADIUS so that the extrapolated values will be correct
+        interp_x = np.append(interp_x, [_INTEGRAL_OUTER_RADIUS])
+        interp_y = np.append(interp_y, [0.0])
+        interp_x = np.insert(interp_x, 0, 0.0)
+        interp_y = np.insert(interp_y, 0, 0.0)
+
+        return interp_x, interp_y
+
+    def find_eef_radius(self, fraction):
+
+        f = lambda r: fraction - self.integral(1e-4, r) / self._total_integral
+
+        radius, status = scipy.optimize.brentq(f, 0.005, _INTEGRAL_OUTER_RADIUS, full_output = True)
+
+        assert status.converged, "Brentq did not converged"
+
+        return radius
+
+    def brightness(self, r):
+
+        return self._brightness_interpolation(r)
 
     @property
     def xs(self):
@@ -51,13 +108,15 @@ class PSFWrapper(object):
         :return: another PSF instance
         """
 
-        # We assume that the XS are the same
-        assert np.allclose(self.xs, other_psf.xs)
-
         # Weight the ys
         new_ys = w1 * self.ys + w2 * other_psf.ys
 
-        return PSFWrapper(self.xs, new_ys)
+        # Also weight the brightness interpolation points
+        new_br_interp_y = w1 * self._brightness_interp_y + w2 * other_psf._brightness_interp_y
+
+        return PSFWrapper(self.xs, new_ys,
+                          brightness_interp_x=self._brightness_interp_x,
+                          brightness_interp_y=new_br_interp_y)
 
     def to_pandas(self):
 
@@ -68,32 +127,34 @@ class PSFWrapper(object):
     @classmethod
     def from_pandas(cls, df):
 
-        return cls(df.loc[:, 'xs'], df.loc[:, 'ys'])
+        return cls(df.loc[:, 'xs'].values, df.loc[:, 'ys'].values)
 
     @classmethod
     def from_TF1(cls, tf1_instance):
 
+        # Annoyingly, some PSFs for some Dec bins (at large Zenith angles) have
+        # zero or negative integrals, i.e., they are useless. Return an unusable PSF
+        # object in that case
+        if tf1_instance.Integral(0, _INTEGRAL_OUTER_RADIUS) <= 0.0:
+
+            return InvalidPSF()
+
         # Make interpolation
-        xs = np.logspace(-3, np.log10(30), 1000)
+        xs = np.logspace(-3, np.log10(_INTEGRAL_OUTER_RADIUS), 500)
         ys = np.array(map(lambda x:tf1_instance.Eval(x), xs), float)
 
+        assert np.all(np.isfinite(xs))
         assert np.all(np.isfinite(ys))
 
-        return cls(xs, ys)
+        instance = cls(xs, ys)
 
-    def find_eef_radius(self, fraction):
+        instance._tf1 = tf1_instance.Clone()
 
-        f = lambda r: fraction - self._tf1_interpolated.integral(1e-4, r) / self._total_integral
-
-        radius, status = scipy.optimize.brentq(f, 0.005, 30, full_output = True)
-
-        assert status.converged, "Brentq did not converged"
-
-        return radius
+        return instance
 
     def integral(self, a, b):
 
-        return self._tf1_interpolated.integral(a, b)
+        return self._psf_interpolated.integral(a, b)
 
     @property
     def truncation_radius(self):
@@ -106,3 +167,12 @@ class PSFWrapper(object):
     @property
     def kernel_radius(self):
         return self._kernel_radius
+
+
+# This is a class that, whatever you try to use it for, will raise an exception.
+# This is to make sure that we never use an invalid PSF without knowing it
+class InvalidPSF(object):
+
+    def __getattribute__(self, item):
+
+        raise InvalidPSFError("Trying to use an invalid PSF")

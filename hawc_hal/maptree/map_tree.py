@@ -29,10 +29,10 @@ def map_tree_factory(map_tree_file, roi):
 
 class MapTree(object):
 
-    def __init__(self, data_bins_labels, data_analysis_bins, roi):
+    def __init__(self, analysis_bins_labels, analysis_bins, roi):
 
-        self._data_bins_labels = data_bins_labels
-        self._data_analysis_bins = data_analysis_bins
+        self._analysis_bins_labels = analysis_bins_labels
+        self._analysis_bins = analysis_bins
         self._roi = roi
 
     @classmethod
@@ -67,7 +67,7 @@ class MapTree(object):
         :return: analysis bin_name iterator
         """
 
-        for analysis_bin in self._data_analysis_bins:
+        for analysis_bin in self._analysis_bins:
 
             yield analysis_bin
 
@@ -89,7 +89,7 @@ class MapTree(object):
 
             try:
 
-                id = self._data_bins_labels.index(item)
+                id = self._analysis_bins_labels.index(item)
 
             except ValueError:
 
@@ -97,13 +97,13 @@ class MapTree(object):
 
             else:
 
-                return self._data_analysis_bins[id]
+                return self._analysis_bins[id]
 
         else:
 
             try:
 
-                return self._data_analysis_bins[item]
+                return self._analysis_bins[item]
 
             except IndexError:
 
@@ -111,19 +111,24 @@ class MapTree(object):
 
     def __len__(self):
 
-        return len(self._data_analysis_bins)
+        return len(self._analysis_bins)
+
+    @property
+    def analysis_bins_labels(self):
+
+        return self._analysis_bins_labels
 
     def display(self):
 
         df = pd.DataFrame()
 
-        df['Bin'] = self._data_bins_labels
-        df['Nside'] = map(lambda x:x.nside, self._data_analysis_bins)
-        df['Scheme'] = map(lambda x:x.scheme, self._data_analysis_bins)
+        df['Bin'] = self._analysis_bins_labels
+        df['Nside'] = map(lambda x:x.nside, self._analysis_bins)
+        df['Scheme'] = map(lambda x:x.scheme, self._analysis_bins)
 
         # Compute observed counts, background counts, how many pixels we have in the ROI and
         # the sky area they cover
-        n_bins = len(self._data_bins_labels)
+        n_bins = len(self._analysis_bins_labels)
 
         obs_counts = np.zeros(n_bins)
         bkg_counts = np.zeros_like(obs_counts)
@@ -132,7 +137,7 @@ class MapTree(object):
 
         size = 0
 
-        for i, analysis_bin in enumerate(self._data_analysis_bins):
+        for i, analysis_bin in enumerate(self._analysis_bins):
 
             sparse_obs = analysis_bin.observation_map.as_partial()
             sparse_bkg = analysis_bin.background_map.as_partial()
@@ -153,7 +158,7 @@ class MapTree(object):
 
         display(df)
 
-        print("This Map Tree contains %.3f transits in the first bin" % self._data_analysis_bins[0].n_transits)
+        print("This Map Tree contains %.3f transits in the first bin" % self._analysis_bins[0].n_transits)
         print("Total data size: %.2f Mb" % (size * u.byte).to(u.megabyte).value)
 
     def write(self, filename):
@@ -168,7 +173,7 @@ class MapTree(object):
         """
 
         # Make a dataframe with the ordered list of bin names
-        # bin_names = map(lambda x:x.name, self._data_analysis_bins)
+        # bin_names = map(lambda x:x.name, self._analysis_bins)
 
         # Create a dataframe with a multi-index, with the energy bin name as first level and the HEALPIX pixel ID
         # as the second level
@@ -176,7 +181,7 @@ class MapTree(object):
         dfs = []
         all_metas = []
 
-        for analysis_bin in self._data_analysis_bins:
+        for analysis_bin in self._analysis_bins:
 
             multi_index_keys.append(analysis_bin.name)
 

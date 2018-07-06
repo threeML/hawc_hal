@@ -1,4 +1,4 @@
-from hawc_hal.healpix_handling.partial_image_to_healpix import _parse_coord_system, _convert_world_coordinates, ORDER
+from hawc_hal.healpix_handling.flat_sky_to_healpix import _parse_coord_system, _convert_world_coordinates, ORDER
 from hawc_hal.special_values import UNSEEN
 import healpy as hp
 import numpy as np

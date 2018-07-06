@@ -13,7 +13,8 @@ setup(
               'hawc_hal/response',
               'hawc_hal/maptree',
               'hawc_hal/psf_fast',
-              'hawc_hal/region_of_interest'],
+              'hawc_hal/region_of_interest',
+              'hawc_hal/convenience_functions'],
 
     url='https://github.com/giacomov/hawc_hal',
 

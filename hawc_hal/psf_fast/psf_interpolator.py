@@ -1,40 +1,28 @@
 import numpy as np
 import collections
-from sphere_dist import sphere_dist
+
+
+def _divide_in_blocks(arr, nrows, ncols):
+    """
+    Return an array of shape (n, nrows, ncols) where
+    n * nrows * ncols = arr.size
+
+    If arr is a 2D array, the returned array should look like n subblocks with
+    each subblock preserving the "physical" layout of arr.
+    """
+    h, w = arr.shape
+    return (arr.reshape(h // nrows, nrows, -1, ncols)
+            .swapaxes(1, 2)
+            .reshape(-1, nrows, ncols))
 
 
 class PSFInterpolator(object):
 
     def __init__(self, psf_wrapper, flat_sky_proj):
 
-        self._psf = psf_wrapper  # type: PSFWrapper
+        self._psf = psf_wrapper
 
         self._flat_sky_p = flat_sky_proj
-
-        # Now decide the bin size for the interpolation according to the truncation radius
-        binsize = self._psf.truncation_radius * 2 / flat_sky_proj.npix_height
-
-        # Let's interpolate. We want to interpolate the density as a function of the radius
-
-        # Decide a bunch of radii bins
-        interp_r = np.arange(0, self._psf.truncation_radius * np.sqrt(2), binsize)
-
-        # Get the centers of the bins
-        self._interp_x = (interp_r[1:] + interp_r[:-1]) / 2.0
-
-        # To get the density we need to get the integral of the profile divided by the area of the circle between
-        # radius a and b and the number of counts
-
-        # Let's compute the pixel area and the overall normalization we will need to apply
-
-        pixel_area = flat_sky_proj.project_plane_pixel_area  # square degrees
-
-        renorm = pixel_area / self._psf.total_integral
-
-        # Compute the density
-
-        self._interp_y = np.array(map(lambda (a, b): self._psf.integral(a, b) / (np.pi * (b ** 2 - a ** 2)) * renorm,
-                                      zip(interp_r[:-1], interp_r[1:])))
 
         # This will contain cached source images
         self._point_source_images = collections.OrderedDict()
@@ -43,9 +31,49 @@ class PSFInterpolator(object):
 
         # Get the density for the required (RA, Dec) points by interpolating the density profile
 
-        angular_distances = sphere_dist(ra, dec, self._flat_sky_p.ras, self._flat_sky_p.decs)
+        # First let's compute the core of the PSF, i.e., the central area with a radius of 0.5 deg,
+        # using a small pixel size
 
-        densities = np.interp(angular_distances, self._interp_x, self._interp_y)
+        # We use the oversampled version of the flat sky projection to make sure we compute an integral
+        # with the right pixelization
+
+        oversampled = self._flat_sky_p.oversampled
+        oversample_factor = self._flat_sky_p.oversample_factor
+
+        # Find bounding box for a faster selection
+
+        angular_distances_core, core_idx = oversampled.get_spherical_distances_from(ra, dec, cutout_radius=5.0)
+
+        core_densities = np.zeros(oversampled.ras.shape)
+
+        core_densities[core_idx] = self._psf.brightness(angular_distances_core) * oversampled.project_plane_pixel_area
+
+        # Now downsample by summing every "oversample_factor" pixels
+
+        blocks = _divide_in_blocks(core_densities.reshape((oversampled.npix_height, oversampled.npix_width)),
+                                       oversample_factor,
+                                       oversample_factor)
+
+        densities = blocks.flatten().reshape([-1, oversample_factor**2]).sum(axis=1)  # type: np.ndarray
+
+        assert densities.shape[0] == (self._flat_sky_p.npix_height * self._flat_sky_p.npix_width)
+
+        # Now that we have a "densities" array with the right (not oversampled) resolution,
+        # let's update the elements outside the core, which are still zero
+        angular_distances_, within_outer_radius = self._flat_sky_p.get_spherical_distances_from(ra, dec,
+                                                                                                cutout_radius=10.0)
+
+        # Make a vector with the same shape of "densities" (effectively a padding of what we just computed)
+        angular_distances = np.zeros_like(densities)
+        angular_distances[within_outer_radius] = angular_distances_
+
+        to_be_updated = (densities == 0)
+        idx = (within_outer_radius & to_be_updated)
+        densities[idx] = self._psf.brightness(angular_distances[idx]) * self._flat_sky_p.project_plane_pixel_area
+
+        # NOTE: we check that the point source image is properly normalized in the convolved point source class.
+        # There we know which source we are talking about and for which bin, so we can print a more helpful
+        # help message
 
         # Reshape to required shape
         point_source_img_ait = densities.reshape((self._flat_sky_p.npix_height, self._flat_sky_p.npix_width)).T
@@ -74,7 +102,6 @@ class PSFInterpolator(object):
             if len(self._point_source_images) > 20:
 
                 while len(self._point_source_images) > 10:
-
                     # FIFO removal (the oldest calls are removed first)
                     self._point_source_images.popitem(last=False)
 
