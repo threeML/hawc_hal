@@ -1,4 +1,4 @@
-from ..psf_fast import PSFWrapper, InvalidPSF
+from ..psf_fast import PSFWrapper, InvalidPSF, InvalidPSFError
 import numpy as np
 import pandas as pd
 
@@ -160,8 +160,11 @@ class ResponseBin(object):
         sim_signal_events_per_bin = w1 * self._sim_signal_events_per_bin + \
                                     w2 * other_response_bin._sim_signal_events_per_bin
 
-        # Now interpolate the psf
-        new_psf = self._psf.combine_with_other_psf(other_response_bin._psf, w1, w2)
+        # Now interpolate the psf, if none is invalid
+        try:
+            new_psf = self._psf.combine_with_other_psf(other_response_bin._psf, w1, w2)
+        except InvalidPSFError:
+            new_psf = InvalidPSF()
 
         new_response_bin = ResponseBin(new_name, min_dec, max_dec, dec_center,
                                        n_sim_signal_events, n_sim_bkg_events,

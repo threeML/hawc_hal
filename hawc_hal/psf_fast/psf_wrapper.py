@@ -108,6 +108,9 @@ class PSFWrapper(object):
         :return: another PSF instance
         """
 
+        if isinstance(self, InvalidPSF) or isinstance(other_psf, InvalidPSF):
+            return PSFWrapper(InvalidPSF)
+
         # Weight the ys
         new_ys = w1 * self.ys + w2 * other_psf.ys
 

@@ -83,7 +83,7 @@ class HAWCResponse(object):
 
         for dec_center in declination_centers:
 
-            these_response_bins = []
+            these_response_bins = collections.OrderedDict()
 
             for i, energy_bin in enumerate(energy_bins):
 
@@ -130,7 +130,7 @@ class HAWCResponse(object):
                                                 sim_signal_events_per_bin,
                                                 this_psf)
 
-                these_response_bins.append(this_response_bin)
+                these_response_bins[energy_bin] = this_response_bin
 
             # Store the response bins for this declination bin
 
@@ -203,7 +203,7 @@ class HAWCResponse(object):
 
             for dec_id in range(len(dec_bins)):
 
-                this_response_bins = []
+                this_response_bins = collections.OrderedDict()
 
                 min_dec, dec_center, max_dec = dec_bins[dec_id]
 
@@ -222,7 +222,7 @@ class HAWCResponse(object):
                     this_response_bin = ResponseBin.from_ttree(f, dec_id, response_bin_id, log_log_spectrum,
                                                                min_dec, dec_center, max_dec)
 
-                    this_response_bins.append(this_response_bin)
+                    this_response_bins[response_bin_id] = this_response_bin
 
                 response_bins[dec_bins[dec_id][1]] = this_response_bins
 
@@ -242,6 +242,7 @@ class HAWCResponse(object):
         :param interpolate: whether to interpolate or not the PSF between the two closes response bins
         :return:
         """
+
 
         # Sort declination bins by distance to the provided declination
         dec_bins_keys = self._response_bins.keys()
@@ -277,13 +278,13 @@ class HAWCResponse(object):
             w1 = (dec - dec_bin_two) / (dec_bin_one - dec_bin_two)
             w2 = (dec - dec_bin_one) / (dec_bin_two - dec_bin_one)
 
-            new_responses = []
+            new_responses = collections.OrderedDict()
 
-            for i in range(len(energy_bins_one)):
+            for bin_id in energy_bins_one:
 
-                this_new_response = energy_bins_one[i].combine_with_weights(energy_bins_two[i], dec, w1, w2)
+                this_new_response = energy_bins_one[bin_id].combine_with_weights(energy_bins_two[bin_id], dec, w1, w2)
 
-                new_responses.append(this_new_response)
+                new_responses[bin_id] = this_new_response
 
             return new_responses
 

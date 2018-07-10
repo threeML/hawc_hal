@@ -67,7 +67,7 @@ class MapTree(object):
         :return: analysis bin_name iterator
         """
 
-        for analysis_bin in self._analysis_bins:
+        for analysis_bin in self._analysis_bins_labels:
 
             yield analysis_bin
 

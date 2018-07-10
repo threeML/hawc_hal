@@ -45,7 +45,7 @@ class HAL(PluginPrototype):
         self._response = hawc_response_factory(response_file)
 
         # Make sure that the response_file and the map tree are aligned
-        assert len(self._maptree) == self._response.n_energy_planes, "Response and map tree are not aligned"
+        # assert len(self._maptree) == self._response.n_energy_planes, "Response and map tree are not aligned"
 
         # Use a renormalization of the background as nuisance parameter
         # NOTE: it is fixed to 1.0 unless the user explicitly sets it free (experimental)
@@ -68,20 +68,21 @@ class HAL(PluginPrototype):
         # and this one for extended sources
         self._convolved_ext_sources = ConvolvedSourcesContainer()
 
-        # By default all energy/nHit bins are used
+        # All energy/nHit bins are loaded in memory
         self._all_planes = list(self._maptree.analysis_bins_labels)
 
         # The active planes list always contains the list of *indexes* of the active planes
-        self._active_planes_idx = range(len(self._maptree))
+        self._active_planes = None
 
         # Set up the transformations from the flat-sky projection to Healpix, as well as the list of active pixels
         # (one for each energy/nHit bin). We make a separate transformation because different energy bins might have
         # different nsides
-        self._active_pixels = []
-        self._flat_sky_to_healpix_transform = []
+        self._active_pixels = collections.OrderedDict()
+        self._flat_sky_to_healpix_transform = collections.OrderedDict()
 
-        for i, this_maptree in enumerate(self._maptree):
+        for bin_id in self._maptree:
 
+            this_maptree = self._maptree[bin_id]
             this_nside = this_maptree.nside
             this_active_pixels = roi.active_pixels(this_nside)
 
@@ -93,8 +94,8 @@ class HAL(PluginPrototype):
                                                                         self._flat_sky_projection.npix_height),
                                                                        order='bilinear')
 
-            self._active_pixels.append(this_active_pixels)
-            self._flat_sky_to_healpix_transform.append(this_flat_sky_to_hpx_transform)
+            self._active_pixels[bin_id] = this_active_pixels
+            self._flat_sky_to_healpix_transform[bin_id] = this_flat_sky_to_hpx_transform
 
         # This will contain a list of PSF convolutors for extended sources, if there is any in the model
 
@@ -102,13 +103,13 @@ class HAL(PluginPrototype):
 
         # Pre-compute the log-factorial factor in the likelihood, so we do not keep to computing it over and over
         # again.
-        self._log_factorials = np.zeros(len(self._maptree))
+        self._log_factorials = collections.OrderedDict()
 
         # We also apply a bias so that the numerical value of the log-likelihood stays small. This helps when
         # fitting with algorithms like MINUIT because the convergence criterium involves the difference between
         # two likelihood values, which would be affected by numerical precision errors if the two values are
         # too large
-        self._saturated_model_like_per_maptree = np.zeros(len(self._maptree))
+        self._saturated_model_like_per_maptree = collections.OrderedDict()
 
         # The actual computation is in a method so we can recall it on clone (see the get_simulated_dataset method)
         self._compute_likelihood_biases()
@@ -125,10 +126,12 @@ class HAL(PluginPrototype):
 
     def _compute_likelihood_biases(self):
 
-        for i, data_analysis_bin in enumerate(self._maptree):
+        for bin_label in self._maptree:
+
+            data_analysis_bin = self._maptree[bin_label]
 
             this_log_factorial = np.sum(logfactorial(data_analysis_bin.observation_map.as_partial()))
-            self._log_factorials[i] = this_log_factorial
+            self._log_factorials[bin_label] = this_log_factorial
 
             # As bias we use the likelihood value for the saturated model
             obs = data_analysis_bin.observation_map.as_partial()
@@ -136,7 +139,7 @@ class HAL(PluginPrototype):
 
             sat_model = np.clip(obs - bkg, 1e-50, None).astype(np.float64)
 
-            self._saturated_model_like_per_maptree[i] = log_likelihood(obs, bkg, sat_model) - this_log_factorial
+            self._saturated_model_like_per_maptree[bin_label] = log_likelihood(obs, bkg, sat_model) - this_log_factorial
 
     def get_saturated_model_likelihood(self):
         """
@@ -144,7 +147,7 @@ class HAL(PluginPrototype):
 
         :return:
         """
-        return np.sum(self._saturated_model_like_per_maptree)
+        return sum(self._saturated_model_like_per_maptree.values())
 
     def set_active_measurements(self, bin_id_min=None, bin_id_max=None, bin_list=None):
 
@@ -157,14 +160,14 @@ class HAL(PluginPrototype):
             bin_id_min = str(bin_id_min)
             bin_id_max = str(bin_id_max)
 
-            assert bin_id_min in self._all_planes and bin_id_max in self._all_planes, "Illegal bin_names"
+            self._active_planes = []
+            for this_bin in range(idx1, idx2 + 1):
+                this_bin = str(this_bin)
+                if not this_bin in self._all_planes:
 
-            assert bin_list is None, "You can either provide a minimum and maximum bin, or a bin list, but not both"
+                    raise ValueError("Bin %s it not contained in this response" % this_bin)
 
-            idx1 = self._all_planes.index(bin_id_min)
-            idx2 = self._all_planes.index(bin_id_max)
-
-            self._active_planes_idx = range(idx1, idx2 + 1)
+                self._active_planes.append(this_bin)
 
         else:
 
@@ -172,19 +175,15 @@ class HAL(PluginPrototype):
 
             assert bin_list is not None
 
-            self._active_planes_idx = []
+            self._active_planes = []
 
             for this_bin in bin_list:
 
-                try:
-
-                    this_idx = self._all_planes.index(str(this_bin))
-
-                except ValueError:
+                if not this_bin in self._all_planes:
 
                     raise ValueError("Bin %s it not contained in this response" % this_bin)
 
-                self._active_planes_idx.append(this_idx)
+                self._active_planes.append(this_bin)
 
     def display(self):
 
@@ -215,7 +214,7 @@ class HAL(PluginPrototype):
         print("")
         print("Active energy/nHit planes: ")
         print("---------------------------\n")
-        print(self._active_planes_idx)
+        print(self._active_planes)
 
     def set_model(self, likelihood_model_instance):
         """
@@ -267,13 +266,13 @@ class HAL(PluginPrototype):
         n_point_sources = self._likelihood_model.get_number_of_point_sources()
         n_ext_sources = self._likelihood_model.get_number_of_extended_sources()
 
-        total_counts = np.zeros(len(self._active_planes_idx), dtype=float)
+        total_counts = np.zeros(len(self._active_planes), dtype=float)
         total_model = np.zeros_like(total_counts)
         model_only = np.zeros_like(total_counts)
         residuals = np.zeros_like(total_counts)
         net_counts = np.zeros_like(total_counts)
 
-        for i, energy_id in enumerate(self._active_planes_idx):
+        for i, energy_id in enumerate(self._active_planes):
 
             data_analysis_bin = self._maptree[energy_id]
 
@@ -306,11 +305,11 @@ class HAL(PluginPrototype):
 
         fig, subs = plt.subplots(2, 1, gridspec_kw={'height_ratios': [2, 1], 'hspace': 0})
 
-        subs[0].errorbar(self._active_planes_idx, net_counts, yerr=np.sqrt(total_counts),
+        subs[0].errorbar(self._active_planes, net_counts, yerr=np.sqrt(total_counts),
                          capsize=0,
                          color='black', label='Net counts', fmt='.')
 
-        subs[0].plot(self._active_planes_idx, model_only, label='Convolved model')
+        subs[0].plot(self._active_planes, model_only, label='Convolved model')
 
         subs[0].legend(bbox_to_anchor=(1.0, 1.0), loc="upper right",
                        numpoints=1)
@@ -319,12 +318,12 @@ class HAL(PluginPrototype):
         subs[1].axhline(0, linestyle='--')
 
         subs[1].errorbar(
-            self._active_planes_idx, residuals,
+            self._active_planes, residuals,
             yerr=np.ones(residuals.shape),
             capsize=0, fmt='.'
         )
 
-        x_limits = [min(self._active_planes_idx) - 0.5, max(self._active_planes_idx) + 0.5]
+        # x_limits = [min(self._active_planes_idx) - 0.5, max(self._active_planes_idx) + 0.5]
 
         subs[0].set_yscale("log", nonposy='clip')
         subs[0].set_ylabel("Counts per bin")
@@ -332,11 +331,11 @@ class HAL(PluginPrototype):
 
         subs[1].set_xlabel("Analysis bin")
         subs[1].set_ylabel(r"$\frac{{cts - mod - bkg}}{\sqrt{mod + bkg}}$")
-        subs[1].set_xticks(self._active_planes_idx)
-        subs[1].set_xticklabels(self._active_planes_idx)
+        subs[1].set_xticks(self._active_planes)
+        subs[1].set_xticklabels(self._active_planes)
 
-        subs[0].set_xlim(x_limits)
-        subs[1].set_xlim(x_limits)
+        # subs[0].set_xlim(x_limits)
+        # subs[1].set_xlim(x_limits)
 
         return fig
 
@@ -357,12 +356,11 @@ class HAL(PluginPrototype):
         # This will hold the total log-likelihood
         total_log_like = 0
 
-        for i, data_analysis_bin in enumerate(self._maptree):
+        for bin_id in self._active_planes:
 
-            if i not in self._active_planes_idx:
-                continue
+            data_analysis_bin = self._maptree[bin_id] # Should crash if not there
 
-            this_model_map_hpx = self._get_expectation(data_analysis_bin, i, n_point_sources, n_ext_sources)
+            this_model_map_hpx = self._get_expectation(data_analysis_bin, bin_id, n_point_sources, n_ext_sources)
 
             # Now compare with observation
             bkg_renorm = self._nuisance_parameters.values()[0].value
@@ -374,7 +372,7 @@ class HAL(PluginPrototype):
                                                   bkg,
                                                   this_model_map_hpx)
 
-            total_log_like += this_pseudo_log_like - self._log_factorials[i] - self._saturated_model_like_per_maptree[i]
+            total_log_like += this_pseudo_log_like - self._log_factorials[bin_id] - self._saturated_model_like_per_maptree[bin_id]
 
         return total_log_like
 
@@ -403,7 +401,7 @@ class HAL(PluginPrototype):
 
             for i, data_analysis_bin in enumerate(self._maptree):
 
-                if i not in self._active_planes_idx:
+                if i not in self._active_planes:
 
                     expectations.append(None)
 
@@ -428,7 +426,7 @@ class HAL(PluginPrototype):
         # Substitute the observation and background for each data analysis bin
         for i, (data_analysis_bin, orig_data_analysis_bin) in enumerate(zip(self._clone[0]._maptree, self._maptree)):
 
-            if i not in self._active_planes_idx:
+            if i not in self._active_planes:
 
                 continue
 
@@ -563,13 +561,13 @@ class HAL(PluginPrototype):
         # The image is going to cover the diameter plus 20% padding
         xsize = self._get_optimal_xsize(resolution)
 
-        n_active_planes = len(self._active_planes_idx)
+        n_active_planes = len(self._active_planes)
 
         fig, subs = plt.subplots(n_active_planes, 3, figsize=(8, n_active_planes * 2))
 
-        with progress_bar(len(self._active_planes_idx), title='Smoothing maps') as prog_bar:
+        with progress_bar(len(self._active_planes), title='Smoothing maps') as prog_bar:
 
-            for i, plane_id in enumerate(self._active_planes_idx):
+            for i, plane_id in enumerate(self._active_planes):
 
                 data_analysis_bin = self._maptree[plane_id]
 
@@ -643,7 +641,7 @@ class HAL(PluginPrototype):
         # The image is going to cover the diameter plus 20% padding
         xsize = self._get_optimal_xsize(resolution)
 
-        active_planes_bins = map(lambda x: self._maptree[x], self._active_planes_idx)
+        active_planes_bins = map(lambda x: self._maptree[x], self._active_planes)
 
         # Get the center of the projection for this plane
         this_ra, this_dec = self._roi.ra_dec_center
@@ -701,7 +699,7 @@ class HAL(PluginPrototype):
 
         n_points = 0
 
-        for i, data_analysis_bin in enumerate(self._maptree):
-            n_points += data_analysis_bin.observation_map.as_partial().shape[0]
+        for bin_id in self._maptree:
+            n_points += self._maptree[bin_id].observation_map.as_partial().shape[0]
 
         return n_points
