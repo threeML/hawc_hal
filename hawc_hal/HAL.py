@@ -185,7 +185,7 @@ class HAL(PluginPrototype):
 
                 self._active_planes.append(this_bin)
 
-    def display(self):
+    def display(self, verbose=False):
 
         print("Region of Interest: ")
         print("--------------------\n")
@@ -203,7 +203,7 @@ class HAL(PluginPrototype):
         print("Response: ")
         print("----------\n")
 
-        self._response.display()
+        self._response.display(verbose)
 
         print("")
         print("Map Tree: ")
