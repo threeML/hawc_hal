@@ -197,6 +197,7 @@ class HAWCResponse(object):
                                      "Will try with default names" % response_file_name)
 
                     response_bins_ids = None
+            response_bins_ids = response_bins_ids.astype(str)
 
             # Now we create a dictionary of ResponseBin instances for each dec bin_name
             response_bins = collections.OrderedDict()
