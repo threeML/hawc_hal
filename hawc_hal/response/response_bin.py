@@ -29,13 +29,13 @@ class ResponseBin(object):
     @staticmethod
     def _get_en_th1d(open_ttree, dec_id, analysis_bin_id, prefix):
 
-        en_sig_label = "En%s_dec%i_nh%s" % (prefix, dec_id, analysis_bin_id )
+        en_sig_label = "En%s_dec%i_nh%s" % (prefix, dec_id, analysis_bin_id)
 
-        this_en_th1d = open_ttree.FindObjectAny( en_sig_label )
+        this_en_th1d = open_ttree.FindObjectAny(en_sig_label) 
 
         if not this_en_th1d:
 
-            raise IOError("Could not find TH1D named %s." % ( en_sig_label))
+            raise IOError("Could not find TH1D named %s." % en_sig_label)
 
         return this_en_th1d
 
@@ -95,9 +95,9 @@ class ResponseBin(object):
 
         # Read the PSF and make a copy (so it will stay when we close the file)
 
-        psf_label_tf1 = "PSF_dec%i_nh%s_fit" % (dec_id, analysis_bin_id )
+        psf_label_tf1 = "PSF_dec%i_nh%s_fit" % (dec_id, analysis_bin_id)
 
-        tf1 =  open_ttree.FindObjectAny( psf_label_tf1 ) 
+        tf1 = open_ttree.FindObjectAny(psf_label_tf1)
 
         psf_fun = PSFWrapper.from_TF1(tf1)
 
