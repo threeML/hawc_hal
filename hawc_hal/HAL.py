@@ -642,6 +642,10 @@ class HAL(PluginPrototype):
                 # Remove numbers from axis
                 subs[i][2].axis('off')
 
+                subs[i][0].set_title('model, bin {}'.format(data_analysis_bin.name))
+                subs[i][1].set_title('excess, bin {}'.format(data_analysis_bin.name))
+                subs[i][2].set_title('residuals, bin {}'.format(data_analysis_bin.name))
+
                 prog_bar.increase()
 
         fig.set_tight_layout(True)
