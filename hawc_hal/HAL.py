@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 import copy
 from astropy.convolution import Gaussian2DKernel
 from astropy.convolution import convolve_fft as convolve
+from scipy.stats import poisson
 
 from threeML.plugin_prototype import PluginPrototype
 from threeML.plugins.gammaln import logfactorial
@@ -269,8 +270,9 @@ class HAL(PluginPrototype):
         total_counts = np.zeros(len(self._active_planes), dtype=float)
         total_model = np.zeros_like(total_counts)
         model_only = np.zeros_like(total_counts)
-        residuals = np.zeros_like(total_counts)
         net_counts = np.zeros_like(total_counts)
+        yerr_low = np.zeros_like(total_counts)
+        yerr_high = np.zeros_like(total_counts)
 
         for i, energy_id in enumerate(self._active_planes):
 
@@ -287,25 +289,40 @@ class HAL(PluginPrototype):
             net_counts[i] = this_data_tot - this_bkg_tot
             model_only[i] = this_model_tot
 
+            this_wh_model = this_model_tot + this_bkg_tot
+            total_model[i] = this_wh_model
+
             if this_data_tot >= 50.0:
 
                 # Gaussian limit
-                # Under the null hypothesis the data are distributed as a Gaussian with mu = model and
-                # sigma = sqrt(model)
-                # NOTE: since we neglect the background uncertainty, the background is part of the model
-                this_wh_model = this_model_tot + this_bkg_tot
-                total_model[i] = this_wh_model
-
-                residuals[i] = (this_data_tot - this_wh_model) / np.sqrt(this_wh_model)
+                # Under the null hypothesis the data are distributed as a Gaussian with mu = model
+                # and sigma = sqrt(model)
+                # NOTE: since we neglect the background uncertainty, the background is part of the
+                # model
+                yerr_low[i] = np.sqrt(this_data_tot)
+                yerr_high[i] = np.sqrt(this_data_tot)
 
             else:
 
                 # Low-counts
-                raise NotImplementedError("Low-counts case not implemented yet")
+                # Under the null hypothesis the data are distributed as a Poisson distribution with
+                # mean = model, plot the 68% confidence interval (quantile=[0.16,1-0.16]).
+                # NOTE: since we neglect the background uncertainty, the background is part of the
+                # model
+                quantile = 0.16
+                mean = this_wh_model
+                y_low = poisson.isf(1-quantile, mu=mean)
+                y_high = poisson.isf(quantile, mu=mean)
+                yerr_low[i] = mean-y_low
+                yerr_high[i] = y_high-mean
+
+        residuals = (total_counts - total_model) / np.sqrt(total_model)
+        residuals_err = [yerr_high / np.sqrt(total_model),
+                         yerr_low / np.sqrt(total_model)]
 
         fig, subs = plt.subplots(2, 1, gridspec_kw={'height_ratios': [2, 1], 'hspace': 0})
 
-        subs[0].errorbar(self._active_planes, net_counts, yerr=np.sqrt(total_counts),
+        subs[0].errorbar(self._active_planes, net_counts, yerr=[yerr_high, yerr_low],
                          capsize=0,
                          color='black', label='Net counts', fmt='.')
 
@@ -319,11 +336,12 @@ class HAL(PluginPrototype):
 
         subs[1].errorbar(
             self._active_planes, residuals,
-            yerr=np.ones(residuals.shape),
+            yerr=residuals_err,
             capsize=0, fmt='.'
         )
 
         # x_limits = [min(self._active_planes_idx) - 0.5, max(self._active_planes_idx) + 0.5]
+        y_limits = [min(net_counts[net_counts > 0]) / 2., max(net_counts) * 2.]
 
         subs[0].set_yscale("log", nonposy='clip')
         subs[0].set_ylabel("Counts per bin")
@@ -336,6 +354,7 @@ class HAL(PluginPrototype):
 
         # subs[0].set_xlim(x_limits)
         # subs[1].set_xlim(x_limits)
+        subs[0].set_ylim(y_limits)
 
         return fig
 
