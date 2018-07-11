@@ -296,28 +296,30 @@ class HAL(PluginPrototype):
             if this_data_tot >= 50.0:
 
                 # Gaussian limit
-                # Under the null hypothesis the data are distributed as a Gaussian with mu = model and
-                # sigma = sqrt(model)
-                # NOTE: since we neglect the background uncertainty, the background is part of the model
+                # Under the null hypothesis the data are distributed as a Gaussian with mu = model
+                # and sigma = sqrt(model)
+                # NOTE: since we neglect the background uncertainty, the background is part of the
+                # model
                 yerr_low[i] = np.sqrt(this_data_tot)
                 yerr_high[i] = np.sqrt(this_data_tot)
 
             else:
 
                 # Low-counts
-                # Under the null hypothesis the data are distributed as a Poisson distribution with mu = model,
-                # plot the 68% confidence interval (q=[0.16,1-0.16]).
-                # NOTE: since we neglect the background uncertainty, the background is part of the model
-                q = 0.16
-                mu = this_wh_model
-                y_low = poisson.isf(1-q,mu=mu)
-                y_high = poisson.isf(q,mu=mu)
-                yerr_low[i] = mu-y_low
-                yerr_high[i] = y_high-mu
+                # Under the null hypothesis the data are distributed as a Poisson distribution with
+                # mean = model, plot the 68% confidence interval (quantile=[0.16,1-0.16]).
+                # NOTE: since we neglect the background uncertainty, the background is part of the
+                # model
+                quantile = 0.16
+                mean = this_wh_model
+                y_low = poisson.isf(1-quantile, mu=mean)
+                y_high = poisson.isf(quantile, mu=mean)
+                yerr_low[i] = mean-y_low
+                yerr_high[i] = y_high-mean
 
-        residuals = ( total_counts - total_model ) / np.sqrt(total_model)
-        residuals_err = [ yerr_high / np.sqrt(total_model),
-                          yerr_low / np.sqrt(total_model)]
+        residuals = (total_counts - total_model) / np.sqrt(total_model)
+        residuals_err = [yerr_high / np.sqrt(total_model),
+                         yerr_low / np.sqrt(total_model)]
 
         fig, subs = plt.subplots(2, 1, gridspec_kw={'height_ratios': [2, 1], 'hspace': 0})
 
@@ -340,7 +342,7 @@ class HAL(PluginPrototype):
         )
 
         x_limits = [min(self._active_planes_idx) - 0.5, max(self._active_planes_idx) + 0.5]
-        y_limits = [min(net_counts[net_counts>0]) / 2., max(net_counts) * 2.]
+        y_limits = [min(net_counts[net_counts > 0]) / 2., max(net_counts) * 2.]
 
         subs[0].set_yscale("log", nonposy='clip')
         subs[0].set_ylabel("Counts per bin")
