@@ -182,15 +182,21 @@ class HAWCResponse(object):
             # Read in the ids of the response bins ("analysis bins" in LiFF jargon)
             try:
 
-                response_bins_ids = tree_to_ndarray(f.Get("AnalysisBins"), "id")  # type: np.ndarray
+                response_bins_ids = tree_to_ndarray(f.Get("AnalysisBins"), "name")  # type: np.ndarray
 
             except ValueError:
 
-                # Some old response files (or energy responses) have no "id" branch
-                custom_warnings.warn("Response %s has no AnalysisBins 'id' branch. "
+                try:
+                
+                    response_bins_ids = tree_to_ndarray(f.Get("AnalysisBins"), "id")  # type: np.ndarray
+                
+                except ValueError:
+
+                    # Some old response files (or energy responses) have no "name" branch
+                    custom_warnings.warn("Response %s has no AnalysisBins 'id' or 'name' branch. "
                                      "Will try with default names" % response_file_name)
 
-                response_bins_ids = None
+                    response_bins_ids = None
 
             # Now we create a dictionary of ResponseBin instances for each dec bin_name
             response_bins = collections.OrderedDict()

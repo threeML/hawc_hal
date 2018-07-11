@@ -27,44 +27,28 @@ class ResponseBin(object):
         self._psf = psf  # type: PSFWrapper
 
     @staticmethod
-    def _get_en_th1d(open_ttree, dec_id, dec_id_label, analysis_bin_id, analysis_bin_id_label, prefix):
+    def _get_en_th1d(open_ttree, dec_id, analysis_bin_id, prefix):
 
-        nh_name = "nh%i" % analysis_bin_id
+        en_sig_label = "En%s_dec%i_nh%s" % (prefix, dec_id, analysis_bin_id)
 
-        en_sig_label = "En%s_dec%i_%s" % (prefix, dec_id, nh_name)
-
-        this_en_th1d = open_ttree.Get("%s/%s/%s" % (dec_id_label, analysis_bin_id_label, en_sig_label))
+        this_en_th1d = open_ttree.FindObjectAny(en_sig_label) 
 
         if not this_en_th1d:
 
-            # Some old responses have a slightly different label. Try with that
-            nh_name = "nh%02i" % analysis_bin_id
+            raise IOError("Could not find TH1D named %s." % en_sig_label)
 
-            en_sig_label = "En%s_dec%i_%s" % (prefix, dec_id, nh_name)
-
-            this_en_th1d = open_ttree.Get("%s/%s/%s" % (dec_id_label, analysis_bin_id_label, en_sig_label))
-
-            if not this_en_th1d:
-
-                raise IOError("Could not find TH1D named %s" % this_en_th1d)
-
-        return this_en_th1d, nh_name
+        return this_en_th1d
 
     @classmethod
     def from_ttree(cls, open_ttree, dec_id, analysis_bin_id, log_log_spectrum, min_dec, dec_center, max_dec):
 
         from ..root_handler import ROOT
 
-        # Compute the labels as used in the response file
-        dec_id_label = "dec_%02i" % dec_id
-        analysis_bin_id_label = "nh_%02i" % analysis_bin_id
-
         # Read the histogram of the simulated events detected in this bin_name
         # NOTE: we do not copy this TH1D instance because we won't use it after the
         # file is closed
 
-        this_en_sig_th1d, nh_name = cls._get_en_th1d(open_ttree, dec_id, dec_id_label, analysis_bin_id, analysis_bin_id_label,
-                                                     'Sig')
+        this_en_sig_th1d = cls._get_en_th1d(open_ttree, dec_id, analysis_bin_id, 'Sig')
 
         # The sum of the histogram is the total number of simulated events detected
         # in this analysis bin_name
@@ -101,8 +85,7 @@ class ResponseBin(object):
         # NOTE: we do not copy this TH1D instance because we won't use it after the
         # file is closed
 
-        this_en_bg_th1d, _ = cls._get_en_th1d(open_ttree, dec_id, dec_id_label, analysis_bin_id, analysis_bin_id_label,
-                                              'Bg')
+        this_en_bg_th1d = cls._get_en_th1d(open_ttree, dec_id, analysis_bin_id, 'Bg')
 
         # The sum of the histogram is the total number of simulated events detected
         # in this analysis bin_name
@@ -112,13 +95,9 @@ class ResponseBin(object):
 
         # Read the PSF and make a copy (so it will stay when we close the file)
 
-        psf_label_tf1 = "PSF_dec%i_%s_fit" % (dec_id, nh_name)
+        psf_label_tf1 = "PSF_dec%i_nh%s_fit" % (dec_id, analysis_bin_id)
 
-        psf_path = "%s/%s/%s" % (dec_id_label, analysis_bin_id_label, psf_label_tf1)
-
-        tf1 = ROOT.TF1()
-
-        open_ttree.GetObject(psf_path, tf1)
+        tf1 = open_ttree.FindObjectAny(psf_label_tf1)
 
         psf_fun = PSFWrapper.from_TF1(tf1)
 
