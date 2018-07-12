@@ -1,11 +1,15 @@
-from ..psf_fast import PSFWrapper, InvalidPSF
 import numpy as np
 import pandas as pd
 
 from threeML.exceptions.custom_exceptions import custom_warnings
 
+from ..psf_fast import PSFWrapper, InvalidPSF, InvalidPSFError
+
 
 class ResponseBin(object):
+    """
+    Stores detector response for one declination band and one analysis bin (called "name" or "analysis_bin_id" below).
+    """
 
     def __init__(self, name, min_dec, max_dec, dec_center,
                  sim_n_sig_events, sim_n_bg_events,
@@ -160,8 +164,11 @@ class ResponseBin(object):
         sim_signal_events_per_bin = w1 * self._sim_signal_events_per_bin + \
                                     w2 * other_response_bin._sim_signal_events_per_bin
 
-        # Now interpolate the psf
-        new_psf = self._psf.combine_with_other_psf(other_response_bin._psf, w1, w2)
+        # Now interpolate the psf, if none is invalid
+        try:
+            new_psf = self._psf.combine_with_other_psf(other_response_bin._psf, w1, w2)
+        except InvalidPSFError:
+            new_psf = InvalidPSF()
 
         new_response_bin = ResponseBin(new_name, min_dec, max_dec, dec_center,
                                        n_sim_signal_events, n_sim_bkg_events,

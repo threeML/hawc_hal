@@ -1,7 +1,6 @@
+import os
 import numpy as np
 import pandas as pd
-import six
-import os
 
 from threeML.io.rich_display import display
 from threeML.io.file_utils import sanitize_filename
@@ -29,18 +28,17 @@ def map_tree_factory(map_tree_file, roi):
 
 class MapTree(object):
 
-    def __init__(self, analysis_bins_labels, analysis_bins, roi):
+    def __init__(self, analysis_bins, roi):
 
-        self._analysis_bins_labels = analysis_bins_labels
         self._analysis_bins = analysis_bins
         self._roi = roi
 
     @classmethod
     def from_hdf5(cls, map_tree_file, roi):
 
-        bin_names_labels, data_analysis_bins = from_hdf5_file(map_tree_file, roi)
+        data_analysis_bins = from_hdf5_file(map_tree_file, roi)
 
-        return cls(bin_names_labels, data_analysis_bins, roi)
+        return cls(data_analysis_bins, roi)
 
     @classmethod
     def from_root_file(cls, map_tree_file, roi):
@@ -52,9 +50,9 @@ class MapTree(object):
         :return:
         """
 
-        data_bins_labels, data_analysis_bins = from_root_file(map_tree_file, roi)
+        data_analysis_bins = from_root_file(map_tree_file, roi)
 
-        return cls(data_bins_labels, data_analysis_bins, roi)
+        return cls(data_analysis_bins, roi)
 
     def __iter__(self):
         """
@@ -73,41 +71,21 @@ class MapTree(object):
 
     def __getitem__(self, item):
         """
-        This allows to access the analysis bins as:
-
-        first_analysis_bin = maptree[0]
-
-        or by name:
+        This allows to access the analysis bins by name:
 
         first_analysis_bin = maptree["bin_name 0"]
 
-        :param item: integer for serial access, string for access by name
+        :param item: string for access by name
         :return: the analysis bin_name
         """
 
-        if isinstance(item, six.string_types):
+        try:
 
-            try:
+            return self._analysis_bins[item]
 
-                id = self._analysis_bins_labels.index(item)
+        except IndexError:
 
-            except ValueError:
-
-                raise KeyError("There is no analysis bin_name named %s" % item)
-
-            else:
-
-                return self._analysis_bins[id]
-
-        else:
-
-            try:
-
-                return self._analysis_bins[item]
-
-            except IndexError:
-
-                raise IndexError("Analysis bin_name with index %i does not exist" % (item))
+            raise IndexError("Analysis bin_name with index %i does not exist" % (item))
 
     def __len__(self):
 
@@ -116,19 +94,19 @@ class MapTree(object):
     @property
     def analysis_bins_labels(self):
 
-        return self._analysis_bins_labels
+        return self._analysis_bins.keys()
 
     def display(self):
 
         df = pd.DataFrame()
 
-        df['Bin'] = self._analysis_bins_labels
-        df['Nside'] = map(lambda x:x.nside, self._analysis_bins)
-        df['Scheme'] = map(lambda x:x.scheme, self._analysis_bins)
+        df['Bin'] = self._analysis_bins.keys()
+        df['Nside'] = [self._analysis_bins[bin_id].nside for bin_id in self._analysis_bins]
+        df['Scheme'] = [self._analysis_bins[bin_id].scheme for bin_id in self._analysis_bins]
 
         # Compute observed counts, background counts, how many pixels we have in the ROI and
         # the sky area they cover
-        n_bins = len(self._analysis_bins_labels)
+        n_bins = len(self._analysis_bins)
 
         obs_counts = np.zeros(n_bins)
         bkg_counts = np.zeros_like(obs_counts)
@@ -137,7 +115,9 @@ class MapTree(object):
 
         size = 0
 
-        for i, analysis_bin in enumerate(self._analysis_bins):
+        for i, bin_id in enumerate(self._analysis_bins):
+
+            analysis_bin = self._analysis_bins[bin_id]
 
             sparse_obs = analysis_bin.observation_map.as_partial()
             sparse_bkg = analysis_bin.background_map.as_partial()
@@ -158,7 +138,9 @@ class MapTree(object):
 
         display(df)
 
-        print("This Map Tree contains %.3f transits in the first bin" % self._analysis_bins[0].n_transits)
+        first_bin_id = self._analysis_bins.keys()[0]
+        print("This Map Tree contains %.3f transits in the first bin" \
+            % self._analysis_bins[first_bin_id].n_transits)
         print("Total data size: %.2f Mb" % (size * u.byte).to(u.megabyte).value)
 
     def write(self, filename):
@@ -181,7 +163,12 @@ class MapTree(object):
         dfs = []
         all_metas = []
 
-        for analysis_bin in self._analysis_bins:
+        for bin_id in self._analysis_bins:
+
+            analysis_bin = self._analysis_bins[bin_id]
+
+            assert bin_id == analysis_bin.name, \
+                'Bin name inconsistency: {} != {}'.format(bin_id, analysis_bin.name)
 
             multi_index_keys.append(analysis_bin.name)
 
@@ -206,5 +193,3 @@ class MapTree(object):
             else:
 
                 serializer.store_pandas_object('/ROI', pd.Series())
-
-

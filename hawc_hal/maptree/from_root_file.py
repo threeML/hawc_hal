@@ -1,6 +1,7 @@
-import numpy as np
 import os
 import socket
+import collections
+import numpy as np
 
 from threeML.io.file_utils import file_existing_and_readable, sanitize_filename
 from threeML.exceptions.custom_exceptions import custom_warnings
@@ -82,7 +83,7 @@ def from_root_file(map_tree_file, roi):
 
         # These are going to be Healpix maps, one for each data analysis bin_name
 
-        data_analysis_bins = []
+        data_analysis_bins = collections.OrderedDict()
 
         for i in range(n_bins):
 
@@ -138,9 +139,9 @@ def from_root_file(map_tree_file, roi):
                                                          n_transits=n_transits,
                                                          scheme='RING')
 
-            data_analysis_bins.append(this_data_analysis_bin)
+            data_analysis_bins[name] = this_data_analysis_bin
 
-    return data_bins_labels, data_analysis_bins
+    return data_analysis_bins
 
 
 def _read_partial_tree(ttree_instance, elements_to_read):

@@ -1,3 +1,5 @@
+import collections
+
 from hawc_hal.serialize import Serialization
 from hawc_hal.region_of_interest import get_roi_from_dict
 
@@ -8,6 +10,13 @@ from data_analysis_bin import DataAnalysisBin
 
 
 def from_hdf5_file(map_tree_file, roi):
+    """
+    Create a MapTree object from a HDF5 file and a ROI. Do not use this directly, use map_tree_factory instead.
+
+    :param map_tree_file:
+    :param roi:
+    :return:
+    """
 
     # Read the data frames contained in the file
     with Serialization(map_tree_file) as serializer:
@@ -51,7 +60,7 @@ def from_hdf5_file(map_tree_file, roi):
 
     # Loop over them and build a DataAnalysisBin instance for each one
 
-    data_analysis_bins = []
+    data_analysis_bins = collections.OrderedDict()
 
     for bin_name in bin_names:
 
@@ -86,6 +95,6 @@ def from_hdf5_file(map_tree_file, roi):
                                    n_transits=this_meta['n_transits'],
                                    scheme='RING' if this_meta['scheme'] == 0 else 'NEST')
 
-        data_analysis_bins.append(this_bin)
+        data_analysis_bins[bin_name] = this_bin
 
-    return bin_names.values, data_analysis_bins
+    return data_analysis_bins

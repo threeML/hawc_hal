@@ -35,14 +35,17 @@ def get_gnomonic_projection(figure, hpx_map, **kwargs):
 
             kwargs[key] = default_value
 
-    left, bottom, right, top = np.array(plt.gca().get_position()).ravel()
-
-    extent = (left, bottom, right - left, top - bottom)
-    margins = (0.01, 0.0, 0.0, 0.02)
-    extent = (extent[0] + margins[0],
-              extent[1] + margins[1],
-              extent[2] - margins[2] - margins[0],
-              extent[3] - margins[3] - margins[1])
+    ## Colas, 2018-07-11: The following fails for really tall figures,
+    ## as happens with 2D binning. Top ends up negative, probably matplotlib bug.
+    ## So hard code extent instead. Keep the code for now if we want to fix it.
+    # left, bottom, right, top = np.array(plt.gca().get_position()).ravel()
+    # extent = (left, bottom, right - left, top - bottom)
+    # margins = (0.01, 0.0, 0.0, 0.02)
+    # extent = (extent[0] + margins[0],
+    #           extent[1] + margins[1],
+    #           extent[2] - margins[2] - margins[0],
+    #           extent[3] - margins[3] - margins[1])
+    extent = (0.05, 0.05, 0.9, 0.9)
 
     ax = PA.HpxGnomonicAxes(figure, extent,
                             coord=kwargs['coord'],
