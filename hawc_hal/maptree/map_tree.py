@@ -30,21 +30,17 @@ def map_tree_factory(map_tree_file, roi):
 
 class MapTree(object):
 
-    def __init__(self, analysis_bins_labels, analysis_bins, roi):
+    def __init__(self, analysis_bins, roi):
 
-        #### TODO: To move earlier
-        self._analysis_bins = collections.OrderedDict()
-        for l,b in zip(analysis_bins_labels, analysis_bins):
-            self._analysis_bins[l] = b
-
+        self._analysis_bins = analysis_bins
         self._roi = roi
 
     @classmethod
     def from_hdf5(cls, map_tree_file, roi):
 
-        bin_names_labels, data_analysis_bins = from_hdf5_file(map_tree_file, roi)
+        data_analysis_bins = from_hdf5_file(map_tree_file, roi)
 
-        return cls(bin_names_labels, data_analysis_bins, roi)
+        return cls(data_analysis_bins, roi)
 
     @classmethod
     def from_root_file(cls, map_tree_file, roi):
@@ -56,9 +52,9 @@ class MapTree(object):
         :return:
         """
 
-        data_bins_labels, data_analysis_bins = from_root_file(map_tree_file, roi)
+        data_analysis_bins = from_root_file(map_tree_file, roi)
 
-        return cls(data_bins_labels, data_analysis_bins, roi)
+        return cls(data_analysis_bins, roi)
 
     def __iter__(self):
         """
@@ -199,5 +195,3 @@ class MapTree(object):
             else:
 
                 serializer.store_pandas_object('/ROI', pd.Series())
-
-

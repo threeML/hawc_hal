@@ -361,5 +361,3 @@ class HAWCResponse(object):
             serializer.store_pandas_object('/dec_bins_definition', meta_df)
             serializer.store_pandas_object('/effective_area', effarea_df)
             serializer.store_pandas_object('/psf', psf_df)
-
-
