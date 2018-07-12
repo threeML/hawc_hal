@@ -122,8 +122,9 @@ class HAL(PluginPrototype):
 
         central_response_bins = self._response.get_response_dec_bin(self._roi.ra_dec_center[1])
 
-        self._psf_convolutors = map(lambda response_bin: PSFConvolutor(response_bin.psf, self._flat_sky_projection),
-                                    central_response_bins)
+        self._psf_convolutors = collections.OrderedDict()
+        for bin_id in central_response_bins:
+            self._psf_convolutors[bin_id] = PSFConvolutor(central_response_bins[bin_id].psf, self._flat_sky_projection)
 
     def _compute_likelihood_biases(self):
 
