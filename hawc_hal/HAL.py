@@ -157,12 +157,12 @@ class HAL(PluginPrototype):
 
             assert bin_id_max is not None, "If you provide a minimum bin, you also need to provide a maximum bin"
 
-            # Make sure they are strings
-            bin_id_min = str(bin_id_min)
-            bin_id_max = str(bin_id_max)
+            # Make sure they are integers
+            bin_id_min = int(bin_id_min)
+            bin_id_max = int(bin_id_max)
 
             self._active_planes = []
-            for this_bin in range(idx1, idx2 + 1):
+            for this_bin in range(bin_id_min, bin_id_max + 1):
                 this_bin = str(this_bin)
                 if not this_bin in self._all_planes:
 

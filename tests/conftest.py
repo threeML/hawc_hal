@@ -63,7 +63,12 @@ def fit_point_source(roi,
 
 def check_map_trees(m1, m2):
 
-    for p1, p2 in zip(m1, m2):
+    assert len(m1) == len(m2)
+
+    for p_key in m1:
+
+        p1 = m1[p_key]
+        p2 = m2[p_key]
 
         assert np.allclose(p1.observation_map.as_partial(), p2.observation_map.as_partial())
         assert np.allclose(p1.background_map.as_partial(), p2.background_map.as_partial())
@@ -81,7 +86,12 @@ def check_responses(r1, r2):
         rbb1 = r1.response_bins[resp_key]
         rbb2 = r2.response_bins[resp_key]
 
-        for rb1, rb2 in zip(rbb1, rbb2):
+        assert len(rbb1.keys()) == len(rbb2.keys())
+
+        for rb_key in rbb1:
+
+            rb1 = rbb1[rb_key]
+            rb2 = rbb2[rb_key]
 
             assert rb1.name == rb2.name
 

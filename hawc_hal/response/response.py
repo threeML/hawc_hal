@@ -338,12 +338,15 @@ class HAWCResponse(object):
         # Loop over all the dec bins (making sure that they are in order)
         for dec_center in sorted(center_decs):
 
-            for response_bin in self._response_bins[dec_center]:
+            for bin_id in self._response_bins[dec_center]:
 
+                response_bin = self._response_bins[dec_center][bin_id]
                 this_effarea_df, this_meta, this_psf_df = response_bin.to_pandas()
 
                 effarea_dfs.append(this_effarea_df)
                 psf_dfs.append(this_psf_df)
+                assert bin_id == response_bin.name, \
+                    'Bin name inconsistency: {} != {}'.format(bin_id, response_bin.name)
                 multi_index_keys.append((dec_center, response_bin.name))
                 all_metas.append(pd.Series(this_meta))
 
