@@ -244,7 +244,6 @@ class HAWCResponse(object):
         :return:
         """
 
-
         # Sort declination bins by distance to the provided declination
         dec_bins_keys = self._response_bins.keys()
         dec_bins_by_distance = sorted(dec_bins_keys, key=lambda x: abs(x - dec))

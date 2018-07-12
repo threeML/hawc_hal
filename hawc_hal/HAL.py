@@ -45,9 +45,6 @@ class HAL(PluginPrototype):
 
         self._response = hawc_response_factory(response_file)
 
-        # Make sure that the response_file and the map tree are aligned
-        # assert len(self._maptree) == self._response.n_energy_planes, "Response and map tree are not aligned"
-
         # Use a renormalization of the background as nuisance parameter
         # NOTE: it is fixed to 1.0 unless the user explicitly sets it free (experimental)
         self._nuisance_parameters = collections.OrderedDict()
@@ -341,7 +338,6 @@ class HAL(PluginPrototype):
             capsize=0, fmt='.'
         )
 
-        # x_limits = [min(self._active_planes_idx) - 0.5, max(self._active_planes_idx) + 0.5]
         y_limits = [min(net_counts[net_counts > 0]) / 2., max(net_counts) * 2.]
 
         subs[0].set_yscale("log", nonposy='clip')
@@ -353,8 +349,6 @@ class HAL(PluginPrototype):
         subs[1].set_xticks(self._active_planes)
         subs[1].set_xticklabels(self._active_planes)
 
-        # subs[0].set_xlim(x_limits)
-        # subs[1].set_xlim(x_limits)
         subs[0].set_ylim(y_limits)
 
         return fig
@@ -378,7 +372,7 @@ class HAL(PluginPrototype):
 
         for bin_id in self._active_planes:
 
-            data_analysis_bin = self._maptree[bin_id] # Should crash if not there
+            data_analysis_bin = self._maptree[bin_id]
 
             this_model_map_hpx = self._get_expectation(data_analysis_bin, bin_id, n_point_sources, n_ext_sources)
 
