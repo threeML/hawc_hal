@@ -162,7 +162,7 @@ class HAL(PluginPrototype):
             self._active_planes = []
             for this_bin in range(bin_id_min, bin_id_max + 1):
                 this_bin = str(this_bin)
-                if not this_bin in self._all_planes:
+                if this_bin not in self._all_planes:
 
                     raise ValueError("Bin %s it not contained in this response" % this_bin)
 
@@ -185,6 +185,9 @@ class HAL(PluginPrototype):
                 self._active_planes.append(this_bin)
 
     def display(self, verbose=False):
+        """
+        Prints summary of the current object content.
+        """
 
         print("Region of Interest: ")
         print("--------------------\n")
@@ -386,7 +389,8 @@ class HAL(PluginPrototype):
                                                   bkg,
                                                   this_model_map_hpx)
 
-            total_log_like += this_pseudo_log_like - self._log_factorials[bin_id] - self._saturated_model_like_per_maptree[bin_id]
+            total_log_like += this_pseudo_log_like - self._log_factorials[bin_id] \
+                              - self._saturated_model_like_per_maptree[bin_id]
 
         return total_log_like
 

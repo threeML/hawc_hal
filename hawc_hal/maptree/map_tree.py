@@ -1,8 +1,6 @@
+import os
 import numpy as np
 import pandas as pd
-import six
-import os
-import collections
 
 from threeML.io.rich_display import display
 from threeML.io.file_utils import sanitize_filename

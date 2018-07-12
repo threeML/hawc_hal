@@ -305,6 +305,11 @@ class HAWCResponse(object):
         return len(self._response_bins.values()[0])
 
     def display(self, verbose=False):
+        """
+        Prints summary of the current object content.
+
+        :param verbose bool: Prints the full list of declinations and analysis bins.
+        """
 
         print("Response file: %s" % self._response_file_name)
         print("Number of dec bins: %s" % len(self._dec_bins))

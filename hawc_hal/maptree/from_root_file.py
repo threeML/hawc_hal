@@ -1,7 +1,7 @@
-import numpy as np
 import os
 import socket
 import collections
+import numpy as np
 
 from threeML.io.file_utils import file_existing_and_readable, sanitize_filename
 from threeML.exceptions.custom_exceptions import custom_warnings

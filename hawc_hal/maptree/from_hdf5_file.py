@@ -10,6 +10,13 @@ from data_analysis_bin import DataAnalysisBin
 
 
 def from_hdf5_file(map_tree_file, roi):
+    """
+    Create a MapTree object from a HDF5 file and a ROI. Do not use this directly, use map_tree_factory instead.
+
+    :param map_tree_file:
+    :param roi:
+    :return:
+    """
 
     # Read the data frames contained in the file
     with Serialization(map_tree_file) as serializer:

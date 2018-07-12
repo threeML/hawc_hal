@@ -1,11 +1,15 @@
-from ..psf_fast import PSFWrapper, InvalidPSF, InvalidPSFError
 import numpy as np
 import pandas as pd
 
 from threeML.exceptions.custom_exceptions import custom_warnings
 
+from ..psf_fast import PSFWrapper, InvalidPSF, InvalidPSFError
+
 
 class ResponseBin(object):
+    """
+    Stores detector response for one declination band and one analysis bin (called "name" or "analysis_bin_id" below).
+    """
 
     def __init__(self, name, min_dec, max_dec, dec_center,
                  sim_n_sig_events, sim_n_bg_events,

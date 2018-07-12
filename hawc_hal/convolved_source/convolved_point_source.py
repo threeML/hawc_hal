@@ -1,6 +1,6 @@
-import numpy as np
 import os
 import collections
+import numpy as np
 
 from astromodels import PointSource
 from ..psf_fast import PSFInterpolator
@@ -48,7 +48,7 @@ class ConvolvedPointSource(object):
             self._psf_interpolators = collections.OrderedDict()
             for bin_id in self._response_energy_bins:
                 self._psf_interpolators[bin_id] = PSFInterpolator(self._response_energy_bins[bin_id].psf,
-                                                                               self._flat_sky_projection)
+                                                                  self._flat_sky_projection)
 
     def get_source_map(self, response_bin_id, tag=None, integrate=False):
 
