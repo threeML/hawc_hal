@@ -569,6 +569,10 @@ class HAL(PluginPrototype):
         return proj
 
     def display_fit(self, smoothing_kernel_sigma=0.1, display_colorbar=False):
+        """
+        Display the model, excess and residual maps for each analysis bin (plane).
+        3 columns, len(self._active_planes) lines.
+        """
 
         n_point_sources = self._likelihood_model.get_number_of_point_sources()
         n_ext_sources = self._likelihood_model.get_number_of_extended_sources()
@@ -648,8 +652,8 @@ class HAL(PluginPrototype):
                 subs[i][2].set_title('residuals, bin {}'.format(data_analysis_bin.name))
 
                 if display_colorbar:
-                    for j in range(len(images)):
-                        plt.colorbar(images[j], ax=subs[i][j])
+                    for j, image in enumerate(images):
+                        plt.colorbar(image, ax=subs[i][j])
 
                 prog_bar.increase()
 
