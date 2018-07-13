@@ -60,7 +60,7 @@ def fit_point_source(roi,
 
     if not liff:
 
-        hawc.display_fit().savefig("display_fit.png")
+        hawc.display_fit(display_colorbar=True).savefig("display_fit.png")
 
 
     return param_df, like_df
