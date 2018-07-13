@@ -36,5 +36,6 @@ setup(
                       'astropy',
                       'scipy',
                       'matplotlib',
-                      'numba']
+                      'numba',
+                      'reproject']
 )
