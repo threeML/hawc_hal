@@ -4,7 +4,7 @@ from astropy.wcs.utils import proj_plane_pixel_area
 import numpy as np
 
 from util import cartesian
-from psf_fast.sphere_dist import sphere_dist
+from hawc_hal.sphere_dist import sphere_dist
 
 
 _fits_header = """
