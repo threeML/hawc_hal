@@ -49,7 +49,7 @@ class PSFWrapper(object):
         self._brightness_interpolation = scipy.interpolate.InterpolatedUnivariateSpline(brightness_interp_x,
                                                                                         brightness_interp_y,
                                                                                         k=2,
-                                                                                        ext='zeros',
+                                                                                        ext='extrapolate',
                                                                                         check_finite=True)
 
     def _prepare_brightness_interpolation_points(self):
@@ -62,11 +62,9 @@ class PSFWrapper(object):
         interp_y = np.array(map(lambda (a, b): self.integral(a, b) / (np.pi * (b ** 2 - a ** 2)) / self._total_integral,
                                 zip(self._xs[:-1], self._xs[1:])))
 
-        # Add zero at r=0 and at r = _INTEGRAL_OUTER_RADIUS so that the extrapolated values will be correct
+        # Add zero at r = _INTEGRAL_OUTER_RADIUS so that the extrapolated values will be correct
         interp_x = np.append(interp_x, [_INTEGRAL_OUTER_RADIUS])
         interp_y = np.append(interp_y, [0.0])
-        interp_x = np.insert(interp_x, 0, 0.0)
-        interp_y = np.insert(interp_y, 0, 0.0)
 
         return interp_x, interp_y
 
