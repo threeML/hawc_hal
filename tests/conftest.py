@@ -44,7 +44,7 @@ def fit_point_source(roi,
 
     data = DataList(hawc)
 
-    jl = JointLikelihood(point_source_model, data, verbose=False)
+    jl = JointLikelihood(point_source_model, data, verbose=True)
 
     point_source_model.display(complete=True)
 
@@ -57,6 +57,11 @@ def fit_point_source(roi,
     # _ = jl.get_errors()
 
     print("Fit time: %s" % (time.time() - beg))
+
+    if not liff:
+
+        hawc.display_fit().savefig("display_fit.png")
+
 
     return param_df, like_df
 

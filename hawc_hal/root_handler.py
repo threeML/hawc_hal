@@ -2,6 +2,7 @@
 # only use in methods that actually need ROOT
 
 import ROOT
+ROOT.PyConfig.IgnoreCommandLineOptions = True
 
 from ROOT import TEntryList
 

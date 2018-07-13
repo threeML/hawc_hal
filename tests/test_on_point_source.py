@@ -39,6 +39,7 @@ if __name__ == "__main__":
     parser.add_argument("--model_radius", help="Radius of the model ROI", type=float, default=def_mrad)
     parser.add_argument("--maptree", help="Maptree", type=str, default=maptree())
     parser.add_argument("--response", help="Response", type=str, default=response())
+    parser.add_argument("--free_position", help='Use this to set the position free', action='store_true', default=False)
 
     args = parser.parse_args()
 
@@ -48,6 +49,11 @@ if __name__ == "__main__":
                          dec=args.dec_roi)
 
     pts_model = point_source_model(ra=args.ra, dec=args.dec)
+
+    if args.free_position:
+
+        pts_model.pts.position.ra.free = True
+        pts_model.pts.position.dec.free = True
 
     test_on_point_source(roi,
                          liff=args.liff,
