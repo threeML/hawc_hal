@@ -58,6 +58,9 @@ def test_plots(test_fit):
     fig = hawc.display_fit(smoothing_kernel_sigma=0.3)
     fig.savefig("hal_src_fit_planes.png")
 
+    fig = hawc.display_fit(smoothing_kernel_sigma=0.3, display_colorbar=True)
+    fig.savefig("hal_src_fit_planes_colorbar.png")
+
 
 def test_compute_TS(test_fit):
 
