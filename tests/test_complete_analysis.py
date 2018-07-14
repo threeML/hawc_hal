@@ -26,7 +26,7 @@ def test_fit(roi, maptree, response):
 
     data = DataList(hawc)
 
-    jl = JointLikelihood(pts_model, data, verbose=False)
+    jl = JointLikelihood(pts_model, data, verbose=True)
     param_df, like_df = jl.fit()
 
     return jl, hawc, pts_model, param_df, like_df, data
@@ -100,6 +100,8 @@ def test_fit_with_free_position(test_fit):
 
     jl, hawc, pts_model, param_df, like_df, data = test_fit
 
+    hawc.psf_integration_method = 'fast'
+
     # Free the position of the source
     pts_model.pts.position.ra.free = True
     pts_model.pts.position.dec.free = True
@@ -126,6 +128,8 @@ def test_fit_with_free_position(test_fit):
 
     plt.plot([ra], [dec], 'x')
     fig.savefig("hal_src_localization.png")
+
+    hawc.psf_integration_method = 'exact'
 
 
 def test_bayesian_analysis(test_fit):

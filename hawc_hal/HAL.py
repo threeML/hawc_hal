@@ -127,6 +127,39 @@ class HAL(PluginPrototype):
         # This will save a clone of self for simulations
         self._clone = None
 
+        # Integration method for the PSF (see psf_integration_method)
+        self._psf_integration_method = "exact"
+
+    @property
+    def psf_integration_method(self):
+        """
+        Get or set the method for the integration of the PSF.
+
+        * "exact" is more accurate but slow, if the position is free to vary it adds a lot of time to the fit. This is
+        the default, to be used when the position of point sources are fixed. The computation in that case happens only
+        once so the impact on the run time is negligible.
+        * "fast" is less accurate (up to an error of few percent in flux) but a lot faster. This should be used when
+        the position of the point source is free, because in that case the integration of the PSF happens every time
+        the position changes, so several times during the fit.
+
+        If you have a fit with a free position, use "fast". When the position is found, you can fix it, switch to
+        "exact" and redo the fit to obtain the most accurate measurement of the flux. For normal sources the difference
+        will be small, but for very bright sources it might be up to a few percent (most of the time < 1%). If you are
+        interested in the localization contour there is no need to rerun with "exact".
+
+        :param mode: either "exact" or "fast"
+        :return: None
+        """
+
+        return self._psf_integration_method
+
+    @psf_integration_method.setter
+    def psf_integration_method(self, mode):
+
+        assert mode.lower() in ["exact", "fast"], "PSF integration method must be either 'exact' or 'fast'"
+
+        self._psf_integration_method = mode.lower()
+
     def _setup_psf_convolutors(self):
 
         central_response_bins = self._response.get_response_dec_bin(self._roi.ra_dec_center[1])
@@ -526,9 +559,11 @@ class HAL(PluginPrototype):
 
         for pts_id in range(n_point_sources):
 
-            this_convolved_source = self._convolved_point_sources[pts_id]
+            this_conv_src = self._convolved_point_sources[pts_id]
 
-            expectation_per_transit = this_convolved_source.get_source_map(energy_bin_id, tag=None)
+            expectation_per_transit = this_conv_src.get_source_map(energy_bin_id,
+                                                                   tag=None,
+                                                                   psf_integration_method=self._psf_integration_method)
 
             expectation_from_this_source = expectation_per_transit * data_analysis_bin.n_transits
 
@@ -549,9 +584,9 @@ class HAL(PluginPrototype):
 
             for ext_id in range(n_ext_sources):
 
-                this_convolved_source = self._convolved_ext_sources[ext_id]
+                this_conv_src = self._convolved_ext_sources[ext_id]
 
-                expectation_per_transit = this_convolved_source.get_source_map(energy_bin_id)
+                expectation_per_transit = this_conv_src.get_source_map(energy_bin_id)
 
                 if this_ext_model_map is None:
 

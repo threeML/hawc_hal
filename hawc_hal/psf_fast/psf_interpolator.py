@@ -30,7 +30,7 @@ class PSFInterpolator(object):
         # This will contain cached source images
         self._point_source_images = collections.OrderedDict()
 
-    def _get_point_source_image_aitoff(self, ra, dec):
+    def _get_point_source_image_aitoff(self, ra, dec, psf_integration_method):
 
         # Get the density for the required (RA, Dec) points by interpolating the density profile
 
@@ -48,9 +48,17 @@ class PSFInterpolator(object):
                                self._flat_sky_p.project_plane_pixel_area
 
         # Now reproject this brightness on the new image
-        brightness, _ = reproject.reproject_exact((ancillary_brightness, ancillary_flat_sky_proj.wcs),
-                                                    self._flat_sky_p.wcs, shape_out=(self._flat_sky_p.npix_height,
-                                                                                     self._flat_sky_p.npix_width))
+        if psf_integration_method == 'exact':
+
+            reprojection_method = reproject.reproject_exact
+
+        else:
+
+            reprojection_method = reproject.reproject_interp
+
+        brightness, _ = reprojection_method((ancillary_brightness, ancillary_flat_sky_proj.wcs),
+                                            self._flat_sky_p.wcs, shape_out=(self._flat_sky_p.npix_height,
+                                                                             self._flat_sky_p.npix_width))
 
         brightness[np.isnan(brightness)] = 0.0
 
@@ -106,10 +114,10 @@ class PSFInterpolator(object):
 
         return point_source_img_ait
 
-    def point_source_image(self, ra_src, dec_src):
+    def point_source_image(self, ra_src, dec_src, psf_integration_method='exact'):
 
         # Make a unique key for this request
-        key = (ra_src, dec_src)
+        key = (ra_src, dec_src, psf_integration_method)
 
         # If we already computed this image, return it, otherwise compute it from scratch
         if key in self._point_source_images:
@@ -118,7 +126,7 @@ class PSFInterpolator(object):
 
         else:
 
-            point_source_img_ait = self._get_point_source_image_aitoff(ra_src, dec_src)
+            point_source_img_ait = self._get_point_source_image_aitoff(ra_src, dec_src, psf_integration_method)
 
             # Store for future use
 

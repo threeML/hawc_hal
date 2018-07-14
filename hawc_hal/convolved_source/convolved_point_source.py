@@ -50,7 +50,7 @@ class ConvolvedPointSource(object):
                 self._psf_interpolators[bin_id] = PSFInterpolator(self._response_energy_bins[bin_id].psf,
                                                                   self._flat_sky_projection)
 
-    def get_source_map(self, response_bin_id, tag=None, integrate=False):
+    def get_source_map(self, response_bin_id, tag=None, integrate=False, psf_integration_method='fast'):
 
         # Get current point source position
         # NOTE: this might change if the point source position is free during the fit,
@@ -72,7 +72,7 @@ class ConvolvedPointSource(object):
         # Get the PSF image
         # This is cached inside the PSF class, so that if the position doesn't change this line
         # is very fast
-        this_map = psf_interpolator.point_source_image(ra_src, dec_src)
+        this_map = psf_interpolator.point_source_image(ra_src, dec_src, psf_integration_method)
 
         # Check that the point source image is entirely contained in the ROI, if not print a warning
         map_sum = this_map.sum()
