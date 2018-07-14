@@ -38,14 +38,14 @@ class PSFInterpolator(object):
         ancillary_image_pixel_size = 0.05
         pixel_side = 2 * int(np.ceil(self._psf.truncation_radius / ancillary_image_pixel_size))
         ancillary_flat_sky_proj = flat_sky_projection.FlatSkyProjection(ra, dec, ancillary_image_pixel_size,
-                                                                        pixel_side, pixel_side,
-                                                                        oversample=False)
+                                                                        pixel_side, pixel_side)
 
         # Now we compute the angular distance of all pixels in the ancillary image with respect to the center
         angular_distances = sphere_dist(ra, dec, ancillary_flat_sky_proj.ras, ancillary_flat_sky_proj.decs)
 
         # Compute the brightness (i.e., the differential PSF)
-        ancillary_brightness = self._psf.brightness(angular_distances).reshape((pixel_side, pixel_side))
+        ancillary_brightness = self._psf.brightness(angular_distances).reshape((pixel_side, pixel_side)) * \
+                               self._flat_sky_p.project_plane_pixel_area
 
         # Now reproject this brightness on the new image
         brightness, _ = reproject.reproject_exact((ancillary_brightness, ancillary_flat_sky_proj.wcs),
@@ -55,7 +55,7 @@ class PSFInterpolator(object):
         brightness[np.isnan(brightness)] = 0.0
 
         # Now "integrate", i.e., multiply by pixel area
-        point_source_img_ait = brightness * self._flat_sky_p.project_plane_pixel_area
+        point_source_img_ait = brightness
 
         # # First let's compute the core of the PSF, i.e., the central area with a radius of 0.5 deg,
         # # using a small pixel size

@@ -32,9 +32,9 @@ class Serialization(object):
 
         return self._store.keys()
 
-    def store_pandas_object(self, path, object, **metadata):
+    def store_pandas_object(self, path, obj, **metadata):
 
-        self._store.put(path, object, format='fixed')
+        self._store.put(path, obj, format='fixed')
 
         self._store.get_storer(path).attrs.metadata = metadata
 

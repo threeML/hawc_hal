@@ -56,7 +56,7 @@ def _get_all_ra_dec(input_wcs, h, w):
 
 class FlatSkyProjection(object):
 
-    def __init__(self, ra_center, dec_center, pixel_size_deg, npix_height, npix_width, oversample=True):
+    def __init__(self, ra_center, dec_center, pixel_size_deg, npix_height, npix_width):
 
         assert npix_height % 2 == 0, "Number of height pixels must be even"
         assert npix_width % 2 == 0, "Number of width pixels must be even"
@@ -92,121 +92,148 @@ class FlatSkyProjection(object):
         assert self._ras.shape[0] == npix_width * npix_height
 
         # Pre-compute pixel area
-        self._pixel_area= proj_plane_pixel_area(self._wcs)
+        self._pixel_area = proj_plane_pixel_area(self._wcs)
 
         # Pre-compute an oversampled version to be used for PSF integration
-        if oversample and pixel_size_deg > 0.025:
-
-            self._oversampled, self._oversample_factor = self._oversample(new_pixel_size=0.025)
-
-        else:
-
-            self._oversampled = self
-            self._oversample_factor = 1
+        # if oversample and pixel_size_deg > 0.025:
+        #
+        #     self._oversampled, self._oversample_factor = self._oversample(new_pixel_size=0.025)
+        #
+        # else:
+        #
+        #     self._oversampled = self
+        #     self._oversample_factor = 1
 
         # Cache for angular distances from a point (see get_spherical_distances_from)
         self._distance_cache = {}
 
-    def _oversample(self, new_pixel_size):
-        """Return a new instance oversampled by the provided factor"""
+    # def _oversample(self, new_pixel_size):
+    #     """Return a new instance oversampled by the provided factor"""
+    #
+    #     # Compute the oversampling factor (as a float because we need it for the division down)
+    #     factor = float(np.ceil(self._pixel_size_deg / new_pixel_size))
+    #
+    #     if factor <= 1:
+    #
+    #         # The projection is already with a smaller pixel size than the oversampled version
+    #         # No need to oversample
+    #         return self, 1
+    #
+    #     else:
+    #
+    #         new_fp = FlatSkyProjection(self._ra_center, self._dec_center,
+    #                                    self._pixel_size_deg / factor,
+    #                                    self._npix_height * factor,
+    #                                    self._npix_width * factor,
+    #                                    oversample=False)
+    #
+    #         return new_fp, int(factor)
 
-        # Compute the oversampling factor (as a float because we need it for the division down)
-        factor = float(np.ceil(self._pixel_size_deg / new_pixel_size))
-
-        if factor <= 1:
-
-            # The projection is already with a smaller pixel size than the oversampled version
-            # No need to oversample
-            return self, 1
-
-        else:
-
-            new_fp = FlatSkyProjection(self._ra_center, self._dec_center,
-                                       self._pixel_size_deg / factor,
-                                       self._npix_height * factor,
-                                       self._npix_width * factor,
-                                       oversample=False)
-
-            return new_fp, int(factor)
-
-    @property
-    def oversampled(self):
-        return self._oversampled
-
-    @property
-    def oversample_factor(self):
-        return self._oversample_factor
+    # @property
+    # def oversampled(self):
+    #     return self._oversampled
+    #
+    # @property
+    # def oversample_factor(self):
+    #     return self._oversample_factor
 
     @property
     def ras(self):
+        """
+        :return: Right Ascension for all pixels
+        """
         return self._ras
 
     @property
     def decs(self):
+        """
+        :return: Declination for all pixels
+        """
         return self._decs
 
     @property
     def ra_center(self):
+        """
+        :return: R.A. for the center of the projection
+        """
         return self._ra_center
 
     @property
     def dec_center(self):
+        """
+        :return: Declination for the center of the projection
+        """
         return self._dec_center
 
     @property
     def pixel_size(self):
+        """
+        :return: size (in deg) of the pixel
+        """
         return self._pixel_size_deg
 
     @property
     def wcs(self):
+        """
+        :return: World Coordinate System instance describing the projection
+        """
         return self._wcs
 
     @property
     def npix_height(self):
+        """
+        :return: height of the projection in pixels
+        """
         return self._npix_height
 
     @property
     def npix_width(self):
+        """
+        :return: width of the projection in pixels
+        """
         return self._npix_width
 
     @property
     def project_plane_pixel_area(self):
+        """
+        :return: area of the pixels (remember, this is an equal-area projection so all pixels are equal)
+        """
         return self._pixel_area
 
-    def get_spherical_distances_from(self, ra, dec, cutout_radius):
-        """
-        Returns the distances for all points in this grid from the given point
-
-        :param ra:
-        :param dec:
-        :param cutout_radius: do not consider elements beyond this radius (NOTE: we use a planar approximation on
-        purpose, to make things fast, so the cut is not precise)
-        :return: (angular distances of selected points from (ra, dec), selection indexes)
-        """
-
-        # This is typically used sequentially on different energy bins, so we cache the result and re-use it
-        # if we already computed it
-
-        key = (ra, dec, cutout_radius, self.ras.shape[0], self.decs.shape[0])
-
-        if key not in self._distance_cache:
-
-            # In order to gain speed, we use a planar approximation (instead of using the harversine formula we assume
-            # plane geometry). This gets more and more unprecise the large the cutout radius, but we do not care here
-
-            selection_idx = (((ra - self.ras)**2 + (dec - self.decs)**2) <= (1.2*cutout_radius)**2)  # type: np.ndarray
-
-            ds = sphere_dist(ra, dec, self.ras[selection_idx], self.decs[selection_idx])
-
-            # Refine selection by putting to False all elements in the mask at a distance larger than the cutout
-            # radius
-            fine_selection_idx = (ds <= cutout_radius)
-            selection_idx[selection_idx.nonzero()[0][~fine_selection_idx]] = False
-
-            # This is to make sure we only keep cached the last result, and the dictionary does not grow indefinitely
-            self._distance_cache = {}
-
-            self._distance_cache[key] = (ds[fine_selection_idx], selection_idx)
-
-        return self._distance_cache[key]
+    # def get_spherical_distances_from(self, ra, dec, cutout_radius):
+    #     """
+    #     Returns the distances for all points in this grid from the given point
+    #
+    #     :param ra:
+    #     :param dec:
+    #     :param cutout_radius: do not consider elements beyond this radius (NOTE: we use a planar approximation on
+    #     purpose, to make things fast, so the cut is not precise)
+    #     :return: (angular distances of selected points from (ra, dec), selection indexes)
+    #     """
+    #
+    #     # This is typically used sequentially on different energy bins, so we cache the result and re-use it
+    #     # if we already computed it
+    #
+    #     key = (ra, dec, cutout_radius, self.ras.shape[0], self.decs.shape[0])
+    #
+    #     if key not in self._distance_cache:
+    #
+    #         # In order to gain speed, we use a planar approximation (instead of using the harversine formula we assume
+    #         # plane geometry). This gets more and more unprecise the large the cutout radius, but we do not care here
+    #
+    #         selection_idx = (((ra - self.ras)**2 + (dec - self.decs)**2) <= (1.2*cutout_radius)**2)  # type: np.ndarray
+    #
+    #         ds = sphere_dist(ra, dec, self.ras[selection_idx], self.decs[selection_idx])
+    #
+    #         # Refine selection by putting to False all elements in the mask at a distance larger than the cutout
+    #         # radius
+    #         fine_selection_idx = (ds <= cutout_radius)
+    #         selection_idx[selection_idx.nonzero()[0][~fine_selection_idx]] = False
+    #
+    #         # This is to make sure we only keep cached the last result, and the dictionary does not grow indefinitely
+    #         self._distance_cache = {}
+    #
+    #         self._distance_cache[key] = (ds[fine_selection_idx], selection_idx)
+    #
+    #     return self._distance_cache[key]
 

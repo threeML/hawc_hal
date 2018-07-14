@@ -207,7 +207,7 @@ def point_source_model(ra=83.6279, dec=22.14):
     spectrum.piv.fix = True
 
     spectrum.K = 3.15e-11 / (u.TeV * u.cm ** 2 * u.s)  # norm (in 1/(keV cm2 s))
-    spectrum.K.bounds = (1e-25, 1e-19)  # without units energies are in keV
+    spectrum.K.bounds = (1e-23, 1e-17)  # without units energies are in keV
 
     spectrum.index = -2.0
     spectrum.bounds = (-5, 0.0)
@@ -219,3 +219,4 @@ def point_source_model(ra=83.6279, dec=22.14):
     model = Model(source)
 
     return model
+

@@ -11,7 +11,6 @@ from threeML.exceptions.custom_exceptions import custom_warnings
 from ..psf_fast import PSFWrapper
 from response_bin import ResponseBin
 
-
 _instances = {}
 
 
@@ -66,6 +65,12 @@ class HAWCResponse(object):
 
     @classmethod
     def from_hdf5(cls, response_file_name):
+        """
+        Build response from a HDF5 file. Do not use directly, use the hawc_response_factory function instead.
+
+        :param response_file_name:
+        :return: a HAWCResponse instance
+        """
 
         response_bins = collections.OrderedDict()
 
@@ -142,6 +147,12 @@ class HAWCResponse(object):
 
     @classmethod
     def from_root_file(cls, response_file_name):
+        """
+        Build response from a ROOT file. Do not use directly, use the hawc_response_factory function instead.
+
+        :param response_file_name:
+        :return: a HAWCResponse instance
+        """
 
         from ..root_handler import open_ROOT_file, get_list_of_keys, tree_to_ndarray
 
@@ -152,14 +163,15 @@ class HAWCResponse(object):
         # Check that they exists and can be read
 
         if not file_existing_and_readable(response_file_name):  # pragma: no cover
+
             raise IOError("Response %s does not exist or is not readable" % response_file_name)
 
         # Read response
 
-        with open_ROOT_file(response_file_name) as f:
+        with open_ROOT_file(response_file_name) as root_file:
 
             # Get the name of the trees
-            object_names = get_list_of_keys(f)
+            object_names = get_list_of_keys(root_file)
 
             # Make sure we have all the things we need
 
@@ -168,10 +180,10 @@ class HAWCResponse(object):
             assert 'AnalysisBins' in object_names
 
             # Read spectrum used during the simulation
-            log_log_spectrum = f.Get("LogLogSpectrum")
+            log_log_spectrum = root_file.Get("LogLogSpectrum")
 
             # Get the analysis bins definition
-            dec_bins_ = tree_to_ndarray(f.Get("DecBins"))
+            dec_bins_ = tree_to_ndarray(root_file.Get("DecBins"))
 
             dec_bins_lower_edge = dec_bins_['lowerEdge']  # type: np.ndarray
             dec_bins_upper_edge = dec_bins_['upperEdge']  # type: np.ndarray
@@ -182,21 +194,22 @@ class HAWCResponse(object):
             # Read in the ids of the response bins ("analysis bins" in LiFF jargon)
             try:
 
-                response_bins_ids = tree_to_ndarray(f.Get("AnalysisBins"), "name")  # type: np.ndarray
+                response_bins_ids = tree_to_ndarray(root_file.Get("AnalysisBins"), "name")  # type: np.ndarray
 
             except ValueError:
 
                 try:
-                
-                    response_bins_ids = tree_to_ndarray(f.Get("AnalysisBins"), "id")  # type: np.ndarray
-                
+
+                    response_bins_ids = tree_to_ndarray(root_file.Get("AnalysisBins"), "id")  # type: np.ndarray
+
                 except ValueError:
 
                     # Some old response files (or energy responses) have no "name" branch
                     custom_warnings.warn("Response %s has no AnalysisBins 'id' or 'name' branch. "
-                                     "Will try with default names" % response_file_name)
+                                         "Will try with default names" % response_file_name)
 
                     response_bins_ids = None
+
             response_bins_ids = response_bins_ids.astype(str)
 
             # Now we create a dictionary of ResponseBin instances for each dec bin_name
@@ -214,13 +227,12 @@ class HAWCResponse(object):
                     # Default are just integers. let's read how many nHit bins are from the first dec bin
                     dec_id_label = "dec_%02i" % dec_id
 
-                    n_energy_bins = f.Get(dec_id_label).GetNkeys()
+                    n_energy_bins = root_file.Get(dec_id_label).GetNkeys()
 
                     response_bins_ids = range(n_energy_bins)
 
                 for response_bin_id in response_bins_ids:
-
-                    this_response_bin = ResponseBin.from_ttree(f, dec_id, response_bin_id, log_log_spectrum,
+                    this_response_bin = ResponseBin.from_ttree(root_file, dec_id, response_bin_id, log_log_spectrum,
                                                                min_dec, dec_center, max_dec)
 
                     this_response_bins[response_bin_id] = this_response_bin
@@ -228,7 +240,7 @@ class HAWCResponse(object):
                 response_bins[dec_bins[dec_id][1]] = this_response_bins
 
         # Now the file is closed. Let's explicitly remove f so we are sure it is freed
-        del f
+        del root_file
 
         # Instance the class and return it
         instance = cls(response_file_name, dec_bins, response_bins)
@@ -265,7 +277,6 @@ class HAWCResponse(object):
 
             # Let's handle the special case where the requested dec is exactly on a response bin
             if abs(dec_bin_one - dec) < 0.01:
-
                 # Do not interpolate
                 return self._response_bins[dec_bin_one]
 
@@ -281,13 +292,11 @@ class HAWCResponse(object):
             new_responses = collections.OrderedDict()
 
             for bin_id in energy_bins_one:
-
                 this_new_response = energy_bins_one[bin_id].combine_with_weights(energy_bins_two[bin_id], dec, w1, w2)
 
                 new_responses[bin_id] = this_new_response
 
             return new_responses
-
 
     @property
     def dec_bins(self):
@@ -343,7 +352,6 @@ class HAWCResponse(object):
         for dec_center in sorted(center_decs):
 
             for bin_id in self._response_bins[dec_center]:
-
                 response_bin = self._response_bins[dec_center][bin_id]
                 this_effarea_df, this_meta, this_psf_df = response_bin.to_pandas()
 

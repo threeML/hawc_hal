@@ -22,7 +22,7 @@ def fit_point_source(roi,
                    maptree,
                    response,
                    roi,
-                   flat_sky_pixels_sizes=pixel_size)
+                   flat_sky_pixels_size=pixel_size)
 
         hawc.set_active_measurements(bin_list=bin_list)
 

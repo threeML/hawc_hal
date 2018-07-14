@@ -1,11 +1,15 @@
+from __future__ import print_function
+
+import copy
 import collections
+
 import numpy as np
 import healpy as hp
 import matplotlib.pyplot as plt
-import copy
+from scipy.stats import poisson
+
 from astropy.convolution import Gaussian2DKernel
 from astropy.convolution import convolve_fft as convolve
-from scipy.stats import poisson
 
 from threeML.plugin_prototype import PluginPrototype
 from threeML.plugins.gammaln import logfactorial
@@ -14,28 +18,36 @@ from threeML.io.progress_bar import progress_bar
 
 from astromodels import Parameter
 
-from maptree import map_tree_factory
-from response import hawc_response_factory
-from convolved_source import ConvolvedPointSource, \
+from hawc_hal.maptree import map_tree_factory
+from hawc_hal.response import hawc_response_factory
+from hawc_hal.convolved_source import ConvolvedPointSource, \
     ConvolvedExtendedSource3D, ConvolvedExtendedSource2D, ConvolvedSourcesContainer
-from healpix_handling import FlatSkyToHealpixTransform
-from healpix_handling import SparseHealpix
-from healpix_handling import get_gnomonic_projection
-from psf_fast import PSFConvolutor
-from log_likelihood import log_likelihood
-from util import ra_to_longitude
+from hawc_hal.healpix_handling import FlatSkyToHealpixTransform
+from hawc_hal.healpix_handling import SparseHealpix
+from hawc_hal.healpix_handling import get_gnomonic_projection
+from hawc_hal.psf_fast import PSFConvolutor
+from hawc_hal.log_likelihood import log_likelihood
+from hawc_hal.util import ra_to_longitude
 
 
 class HAL(PluginPrototype):
+    """
+    The HAWC Accelerated Likelihood plugin for 3ML.
+    :param name: name for the plugin
+    :param maptree: Map Tree (either ROOT or hdf5 format)
+    :param response: Response of HAWC (either ROOT or hd5 format)
+    :param roi: a ROI instance describing the Region Of Interest
+    :param flat_sky_pixels_size: size of the pixel for the flat sky projection (Hammer Aitoff)
+    """
 
-    def __init__(self, name, maptree, response_file, roi, flat_sky_pixels_sizes=0.17):
+    def __init__(self, name, maptree, response_file, roi, flat_sky_pixels_size=0.17):
 
         # Store ROI
         self._roi = roi
 
         # Set up the flat-sky projection
 
-        self._flat_sky_projection = roi.get_flat_sky_projection(flat_sky_pixels_sizes)
+        self._flat_sky_projection = roi.get_flat_sky_projection(flat_sky_pixels_size)
 
         # Read map tree (data)
 
@@ -149,6 +161,24 @@ class HAL(PluginPrototype):
         return sum(self._saturated_model_like_per_maptree.values())
 
     def set_active_measurements(self, bin_id_min=None, bin_id_max=None, bin_list=None):
+        """
+        Set the active analysis bins to use during the analysis. It can be used in two ways:
+
+        - Specifying a range: if the response and the maptree allows it, you can specify a minimum id and a maximum id
+        number. This only works if the analysis bins are numerical, like in the normal fHit analysis. For example:
+
+            > set_active_measurement(bin_id_min=1, bin_id_max=9(
+
+        - Specifying a list of bins as strings. This is more powerful, as allows to select any bins, even
+        non-contiguous bins. For example:
+
+            > set_active_measurement(bin_list=[list])
+
+        :param bin_id_min: minimum bin (only works for fHit analysis. For the others, use bin_list)
+        :param bin_id_max: maximum bin (only works for fHit analysis. For the others, use bin_list)
+        :param bin_list: a list of analysis bins to use
+        :return: None
+        """
 
         # Check for legal input
         if bin_id_min is not None:
@@ -241,7 +271,8 @@ class HAL(PluginPrototype):
 
         ext_sources = self._likelihood_model.extended_sources.values()
 
-        if len(ext_sources) > 0:
+        # NOTE: ext_sources evaluate to False if empty
+        if ext_sources:
 
             # We will need to convolve
 
@@ -264,6 +295,11 @@ class HAL(PluginPrototype):
                 self._convolved_ext_sources.append(this_convolved_ext_source)
 
     def display_spectrum(self):
+        """
+        Make a plot of the current spectrum and its residuals (integrated over space)
+
+        :return: a matplotlib.Figure
+        """
 
         n_point_sources = self._likelihood_model.get_number_of_point_sources()
         n_ext_sources = self._likelihood_model.get_number_of_extended_sources()
@@ -321,9 +357,15 @@ class HAL(PluginPrototype):
         residuals_err = [yerr_high / np.sqrt(total_model),
                          yerr_low / np.sqrt(total_model)]
 
+        yerr = [yerr_high, yerr_low]
+
+        return self._plot_spectrum(net_counts, yerr, model_only, residuals, residuals_err)
+
+    def _plot_spectrum(self, net_counts, yerr, model_only, residuals, residuals_err):
+
         fig, subs = plt.subplots(2, 1, gridspec_kw={'height_ratios': [2, 1], 'hspace': 0})
 
-        subs[0].errorbar(self._active_planes, net_counts, yerr=[yerr_high, yerr_low],
+        subs[0].errorbar(self._active_planes, net_counts, yerr=yerr,
                          capsize=0,
                          color='black', label='Net counts', fmt='.')
 
@@ -407,6 +449,13 @@ class HAL(PluginPrototype):
         self._response.write(response_file_name)
 
     def get_simulated_dataset(self, name):
+        """
+        Return a simulation of this dataset using the current model with current parameters.
+
+        :param name: new name for the new plugin instance
+        :return: a HAL instance
+        """
+
 
         # First get expectation under the current model and store them, if we didn't do it yet
 
@@ -417,15 +466,15 @@ class HAL(PluginPrototype):
 
             expectations = []
 
-            for i, data_analysis_bin in enumerate(self._maptree):
+            for bin_id, data_analysis_bin in enumerate(self._maptree):
 
-                if i not in self._active_planes:
+                if bin_id not in self._active_planes:
 
                     expectations.append(None)
 
                 else:
 
-                    expectations.append(self._get_expectation(data_analysis_bin, i,
+                    expectations.append(self._get_expectation(data_analysis_bin, bin_id,
                                                               n_point_sources, n_ext_sources) +
                                         data_analysis_bin.background_map.as_partial())
 
@@ -442,16 +491,16 @@ class HAL(PluginPrototype):
             self._clone = (clone, expectations)
 
         # Substitute the observation and background for each data analysis bin
-        for i, (data_analysis_bin, orig_data_analysis_bin) in enumerate(zip(self._clone[0]._maptree, self._maptree)):
+        for bin_id, data_analysis_bin in enumerate(self._clone[0]._maptree):
 
-            if i not in self._active_planes:
+            if bin_id not in self._active_planes:
 
                 continue
 
             else:
 
                 # Active plane. Generate new data
-                expectation = self._clone[1][i]
+                expectation = self._clone[1][bin_id]
                 new_data = np.random.poisson(expectation, size=(1, expectation.shape[0])).flatten()
 
                 # Substitute data
@@ -569,6 +618,12 @@ class HAL(PluginPrototype):
         return proj
 
     def display_fit(self, smoothing_kernel_sigma=0.1):
+        """
+        Make a figure containing 3 maps for each active analysis bins with respectively model, data and residuals.
+
+        :param smoothing_kernel_sigma: sigma for the Gaussian smoothing kernel
+        :return: a matplotlib.Figure
+        """
 
         n_point_sources = self._likelihood_model.get_number_of_point_sources()
         n_ext_sources = self._likelihood_model.get_number_of_extended_sources()
@@ -656,6 +711,12 @@ class HAL(PluginPrototype):
         return 2.2 * self._roi.data_radius.to("deg").value / (resolution / 60.0)
 
     def display_stacked_image(self, smoothing_kernel_sigma=0.5):
+        """
+        Display a map with all active analysis bins stacked together.
+
+        :param smoothing_kernel_sigma: sigma for the Gaussian smoothing kernel to apply
+        :return: a matplotlib.Figure instance
+        """
 
         # This is the resolution (i.e., the size of one pixel) of the image in arcmin
         resolution = 3.0
@@ -663,7 +724,7 @@ class HAL(PluginPrototype):
         # The image is going to cover the diameter plus 20% padding
         xsize = self._get_optimal_xsize(resolution)
 
-        active_planes_bins = map(lambda x: self._maptree[x], self._active_planes)
+        active_planes_bins = [self._maptree[x] for x in self._active_planes]
 
         # Get the center of the projection for this plane
         this_ra, this_dec = self._roi.ra_dec_center
@@ -695,7 +756,7 @@ class HAL(PluginPrototype):
 
         delta_coord = (self._roi.data_radius.to("deg").value * 2.0) / 15.0
 
-        fig, sub = plt.subplots(1,1)
+        fig, sub = plt.subplots(1, 1)
 
         proj = self._represent_healpix_map(fig, total, longitude, latitude, xsize, resolution, smoothing_kernel_sigma)
 
@@ -718,6 +779,11 @@ class HAL(PluginPrototype):
         return self.get_log_like()
 
     def get_number_of_data_points(self):
+        """
+        Return the number of active bins across all active analysis bins
+
+        :return: number of active bins
+        """
 
         n_points = 0
 
