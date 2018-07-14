@@ -78,9 +78,9 @@ install:
   - pip install .
 
 script:
-  - while sleep 540; do echo "=====[ $SECONDS seconds still running ]====="; done &
+  #- while sleep 540; do echo "=====[ $SECONDS seconds still running ]====="; done &
   - python -m pytest -vv --cov=hawc_hal
-  - kill %1
+  #- kill %1
   - conda clean -y -a
   - pip uninstall hawc_hal -y
 
