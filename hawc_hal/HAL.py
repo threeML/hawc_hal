@@ -568,7 +568,11 @@ class HAL(PluginPrototype):
 
         return proj
 
-    def display_fit(self, smoothing_kernel_sigma=0.1):
+    def display_fit(self, smoothing_kernel_sigma=0.1, display_colorbar=False):
+        """
+        Display the model, excess and residual maps for each analysis bin (plane).
+        3 columns, len(self._active_planes) lines.
+        """
 
         n_point_sources = self._likelihood_model.get_number_of_point_sources()
         n_ext_sources = self._likelihood_model.get_number_of_extended_sources()
@@ -584,6 +588,8 @@ class HAL(PluginPrototype):
         fig, subs = plt.subplots(n_active_planes, 3, figsize=(8, n_active_planes * 2))
 
         with progress_bar(len(self._active_planes), title='Smoothing maps') as prog_bar:
+
+            images = ['None'] * 3
 
             for i, plane_id in enumerate(self._active_planes):
 
@@ -611,7 +617,7 @@ class HAL(PluginPrototype):
                                                      longitude, latitude,
                                                      xsize, resolution, smoothing_kernel_sigma)
 
-                subs[i][0].imshow(proj_m, origin='lower')
+                images[0] = subs[i][0].imshow(proj_m, origin='lower')
 
                 # Remove numbers from axis
                 subs[i][0].axis('off')
@@ -626,7 +632,7 @@ class HAL(PluginPrototype):
                                                      longitude, latitude,
                                                      xsize, resolution, smoothing_kernel_sigma)
 
-                subs[i][1].imshow(proj_d, origin='lower')
+                images[1] = subs[i][1].imshow(proj_d, origin='lower')
 
                 # Remove numbers from axis
                 subs[i][1].axis('off')
@@ -636,7 +642,7 @@ class HAL(PluginPrototype):
                 # proj_res = self._represent_healpix_map(fig, res,
                 #                                        longitude, latitude,
                 #                                        xsize, resolution, smoothing_kernel_sigma)
-                subs[i][2].imshow(res, origin='lower')
+                images[2] = subs[i][2].imshow(res, origin='lower')
 
                 # Remove numbers from axis
                 subs[i][2].axis('off')
@@ -644,6 +650,10 @@ class HAL(PluginPrototype):
                 subs[i][0].set_title('model, bin {}'.format(data_analysis_bin.name))
                 subs[i][1].set_title('excess, bin {}'.format(data_analysis_bin.name))
                 subs[i][2].set_title('residuals, bin {}'.format(data_analysis_bin.name))
+
+                if display_colorbar:
+                    for j, image in enumerate(images):
+                        plt.colorbar(image, ax=subs[i][j])
 
                 prog_bar.increase()
 
