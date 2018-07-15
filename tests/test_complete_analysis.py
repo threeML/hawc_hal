@@ -131,6 +131,9 @@ def test_fit_with_free_position(test_fit):
 
     hawc.psf_integration_method = 'exact'
 
+    pts_model.pts.position.ra.free = False
+    pts_model.pts.position.dec.free = False
+
 
 def test_bayesian_analysis(test_fit):
 
