@@ -497,19 +497,20 @@ class HAL(PluginPrototype):
             n_point_sources = self._likelihood_model.get_number_of_point_sources()
             n_ext_sources = self._likelihood_model.get_number_of_extended_sources()
 
-            expectations = []
+            expectations = collections.OrderedDict()
 
-            for bin_id, data_analysis_bin in enumerate(self._maptree):
+            for bin_id in self._maptree:
 
+                data_analysis_bin = self._maptree[bin_id]
                 if bin_id not in self._active_planes:
 
-                    expectations.append(None)
+                    expectations[bin_id] = None
 
                 else:
 
-                    expectations.append(self._get_expectation(data_analysis_bin, bin_id,
-                                                              n_point_sources, n_ext_sources) +
-                                        data_analysis_bin.background_map.as_partial())
+                    expectations[bin_id] = self._get_expectation(data_analysis_bin, bin_id,
+                        n_point_sources, n_ext_sources) + \
+                        data_analysis_bin.background_map.as_partial()
 
             if parallel_client.is_parallel_computation_active():
 
@@ -524,7 +525,9 @@ class HAL(PluginPrototype):
             self._clone = (clone, expectations)
 
         # Substitute the observation and background for each data analysis bin
-        for bin_id, data_analysis_bin in enumerate(self._clone[0]._maptree):
+        for bin_id in self._clone[0]._maptree:
+
+            data_analysis_bin = self._clone[0]._maptree[bin_id]
 
             if bin_id not in self._active_planes:
 
