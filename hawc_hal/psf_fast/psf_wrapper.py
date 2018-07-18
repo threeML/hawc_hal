@@ -182,8 +182,6 @@ class InvalidPSF(object):
 
     def __getattribute__(self, item):
 
-        print type(item)
-        print item
         if item in ["__copy__", "__deepcopy__"]:
             return object.__getattribute__(self, item)
         raise InvalidPSFError("Trying to use an invalid PSF")
