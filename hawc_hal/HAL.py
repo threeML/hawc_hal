@@ -253,12 +253,12 @@ class HAL(PluginPrototype):
         """
 
         print("Region of Interest: ")
-        print("--------------------\n")
+        print("-------------------\n")
         self._roi.display()
 
         print("")
         print("Flat sky projection: ")
-        print("----------------------\n")
+        print("--------------------\n")
 
         print("Width x height: %s x %s px" % (self._flat_sky_projection.npix_width,
                                               self._flat_sky_projection.npix_height))
@@ -266,7 +266,7 @@ class HAL(PluginPrototype):
 
         print("")
         print("Response: ")
-        print("----------\n")
+        print("---------\n")
 
         self._response.display(verbose)
 
@@ -277,8 +277,8 @@ class HAL(PluginPrototype):
         self._maptree.display()
 
         print("")
-        print("Active energy/nHit planes: ")
-        print("---------------------------\n")
+        print("Active energy/nHit planes ({}):".format(len(self._active_planes)))
+        print("-------------------------------\n")
         print(self._active_planes)
 
     def set_model(self, likelihood_model_instance):
@@ -657,9 +657,12 @@ class HAL(PluginPrototype):
 
     def display_fit(self, smoothing_kernel_sigma=0.1, display_colorbar=False):
         """
-        Make a figure containing 3 maps for each active analysis bins with respectively model, data and residuals.
+        Make a figure containing 4 maps for each active analysis bins with respectively model, data,
+        background and residuals. The model, data and residual maps are smoothed, the background
+        map is not.
 
-        :param smoothing_kernel_sigma: sigma for the Gaussian smoothing kernel
+        :param smoothing_kernel_sigma: sigma for the Gaussian smoothing kernel, for all but
+        background maps
         :param display_colorbar: whether or not to display the colorbar in the residuals
         :return: a matplotlib.Figure
         """
@@ -674,12 +677,14 @@ class HAL(PluginPrototype):
         xsize = self._get_optimal_xsize(resolution)
 
         n_active_planes = len(self._active_planes)
+        n_columns = 4
 
-        fig, subs = plt.subplots(n_active_planes, 3, figsize=(8, n_active_planes * 2))
+        fig, subs = plt.subplots(n_active_planes, n_columns,
+                                 figsize=(2.7 * n_columns, n_active_planes * 2))
 
         with progress_bar(len(self._active_planes), title='Smoothing maps') as prog_bar:
 
-            images = ['None'] * 3
+            images = ['None'] * n_columns
 
             for i, plane_id in enumerate(self._active_planes):
 
@@ -702,15 +707,11 @@ class HAL(PluginPrototype):
                 latitude = this_dec
 
                 # Plot model
-
                 proj_m = self._represent_healpix_map(fig, whole_map,
                                                      longitude, latitude,
                                                      xsize, resolution, smoothing_kernel_sigma)
 
                 images[0] = subs[i][0].imshow(proj_m, origin='lower')
-
-                # Remove numbers from axis
-                subs[i][0].axis('off')
 
                 # Plot data map
                 # Here we removed the background otherwise nothing is visible
@@ -724,22 +725,27 @@ class HAL(PluginPrototype):
 
                 images[1] = subs[i][1].imshow(proj_d, origin='lower')
 
-                # Remove numbers from axis
-                subs[i][1].axis('off')
+                # Plot background map.
+                # No smoothing for this one (because a goal is to check it is smooth).
+                proj_b = self._represent_healpix_map(fig, background_map,
+                                                     longitude, latitude,
+                                                     xsize, resolution, None)
+
+                images[2] = subs[i][2].imshow(proj_b, origin='lower')
 
                 # Now residuals
                 res = proj_d - proj_m
-                # proj_res = self._represent_healpix_map(fig, res,
-                #                                        longitude, latitude,
-                #                                        xsize, resolution, smoothing_kernel_sigma)
-                images[2] = subs[i][2].imshow(res, origin='lower')
+                images[3] = subs[i][3].imshow(res, origin='lower')
 
-                # Remove numbers from axis
-                subs[i][2].axis('off')
 
                 subs[i][0].set_title('model, bin {}'.format(data_analysis_bin.name))
                 subs[i][1].set_title('excess, bin {}'.format(data_analysis_bin.name))
-                subs[i][2].set_title('residuals, bin {}'.format(data_analysis_bin.name))
+                subs[i][2].set_title('background, bin {}'.format(data_analysis_bin.name))
+                subs[i][3].set_title('residuals, bin {}'.format(data_analysis_bin.name))
+
+                # Remove numbers from axis
+                for j in range(n_columns):
+                    subs[i][j].axis('off')
 
                 if display_colorbar:
                     for j, image in enumerate(images):
