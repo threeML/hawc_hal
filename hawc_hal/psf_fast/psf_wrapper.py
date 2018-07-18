@@ -174,14 +174,11 @@ class PSFWrapper(object):
 # This is to make sure that we never use an invalid PSF without knowing it
 class InvalidPSF(object):
 
-    def __copy__(self, memo):
-        return InvalidPSF()
-
     def __deepcopy__(self, memo):
         return InvalidPSF()
 
     def __getattribute__(self, item):
 
-        if item in ["__copy__", "__deepcopy__"]:
+        if item == "__deepcopy__":
             return object.__getattribute__(self, item)
         raise InvalidPSFError("Trying to use an invalid PSF")
