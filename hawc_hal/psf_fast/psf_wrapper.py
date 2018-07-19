@@ -174,6 +174,14 @@ class PSFWrapper(object):
 # This is to make sure that we never use an invalid PSF without knowing it
 class InvalidPSF(object):
 
+    # It can be useful to copy an invalid PSF. For instance HAL.get_simulated_dataset() makes a
+    # copy of the HAL instance, including detector response, which can contain InvalidPSF (which
+    # is fine as long as they are not used).
+    def __deepcopy__(self, memo):
+        return InvalidPSF()
+
     def __getattribute__(self, item):
 
+        if item == "__deepcopy__":
+            return object.__getattribute__(self, item)
         raise InvalidPSFError("Trying to use an invalid PSF")
