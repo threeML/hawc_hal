@@ -706,41 +706,44 @@ class HAL(PluginPrototype):
                 # Declination is already between -90 and 90
                 latitude = this_dec
 
-                # Plot model
-                proj_m = self._represent_healpix_map(fig, whole_map,
-                                                     longitude, latitude,
-                                                     xsize, resolution, smoothing_kernel_sigma)
 
-                images[0] = subs[i][0].imshow(proj_m, origin='lower')
+                # Background and excess maps
 
-                # Plot data map
+                # Make all the projections: model, excess, background, residuals
+                proj_model = self._represent_healpix_map(fig, whole_map,
+                                                         longitude, latitude,
+                                                         xsize, resolution, smoothing_kernel_sigma)
                 # Here we removed the background otherwise nothing is visible
                 # Get background (which is in a way "part of the model" since the uncertainties are neglected)
                 background_map = data_analysis_bin.background_map.as_dense()
                 bkg_subtracted = data_analysis_bin.observation_map.as_dense() - background_map
+                proj_data = self._represent_healpix_map(fig, bkg_subtracted,
+                                                        longitude, latitude,
+                                                        xsize, resolution, smoothing_kernel_sigma)
+                # No smoothing for this one (because a goal is to check it is smooth).
+                proj_bkg = self._represent_healpix_map(fig, background_map,
+                                                       longitude, latitude,
+                                                       xsize, resolution, None)
+                proj_residuals = proj_data - proj_model
 
-                proj_d = self._represent_healpix_map(fig, bkg_subtracted,
-                                                     longitude, latitude,
-                                                     xsize, resolution, smoothing_kernel_sigma)
+                # Common color scale range for model and excess maps
+                vmin = min(np.nanmin(proj_model), np.nanmin(proj_data))
+                vmax = max(np.nanmax(proj_model), np.nanmax(proj_data))
 
-                images[1] = subs[i][1].imshow(proj_d, origin='lower')
+                # Plot model
+                images[0] = subs[i][0].imshow(proj_model, origin='lower', vmin=vmin, vmax=vmax)
+                subs[i][0].set_title('model, bin {}'.format(data_analysis_bin.name))
+
+                # Plot data map
+                images[1] = subs[i][1].imshow(proj_data, origin='lower', vmin=vmin, vmax=vmax)
+                subs[i][1].set_title('excess, bin {}'.format(data_analysis_bin.name))
 
                 # Plot background map.
-                # No smoothing for this one (because a goal is to check it is smooth).
-                proj_b = self._represent_healpix_map(fig, background_map,
-                                                     longitude, latitude,
-                                                     xsize, resolution, None)
-
-                images[2] = subs[i][2].imshow(proj_b, origin='lower')
+                images[2] = subs[i][2].imshow(proj_bkg, origin='lower')
+                subs[i][2].set_title('background, bin {}'.format(data_analysis_bin.name))
 
                 # Now residuals
-                res = proj_d - proj_m
-                images[3] = subs[i][3].imshow(res, origin='lower')
-
-
-                subs[i][0].set_title('model, bin {}'.format(data_analysis_bin.name))
-                subs[i][1].set_title('excess, bin {}'.format(data_analysis_bin.name))
-                subs[i][2].set_title('background, bin {}'.format(data_analysis_bin.name))
+                images[3] = subs[i][3].imshow(proj_residuals, origin='lower')
                 subs[i][3].set_title('residuals, bin {}'.format(data_analysis_bin.name))
 
                 # Remove numbers from axis
