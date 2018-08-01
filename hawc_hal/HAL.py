@@ -166,8 +166,9 @@ class HAL(PluginPrototype):
 
         self._psf_convolutors = collections.OrderedDict()
         for bin_id in central_response_bins:
-            self._psf_convolutors[bin_id] = PSFConvolutor(central_response_bins[bin_id].psf, self._flat_sky_projection)
-
+            if bin_id in self._active_planes:
+               self._psf_convolutors[bin_id] = PSFConvolutor(central_response_bins[bin_id].psf, self._flat_sky_projection)
+ 
     def _compute_likelihood_biases(self):
 
         for bin_label in self._maptree:
@@ -563,7 +564,7 @@ class HAL(PluginPrototype):
         for pts_id in range(n_point_sources):
 
             this_conv_src = self._convolved_point_sources[pts_id]
-
+            
             expectation_per_transit = this_conv_src.get_source_map(energy_bin_id,
                                                                    tag=None,
                                                                    psf_integration_method=self._psf_integration_method)

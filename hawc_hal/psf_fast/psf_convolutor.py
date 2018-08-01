@@ -32,7 +32,7 @@ class PSFConvolutor(object):
 
         self._kernel = psf_stamp[yoff:-yoff, xoff:-xoff]
 
-        assert np.isclose(self._kernel.sum(), 1.0, rtol=1e-2), "Failed to generate proper kernel normalization"
+        assert np.isclose(self._kernel.sum(), 1.0, rtol=1e-2), "Failed to generate proper kernel normalization: got _kernel.sum() = %f; expected 1.0+-0.01." % self._kernel.sum()
 
         # Renormalize to exactly 1
         self._kernel = self._kernel / self._kernel.sum()
