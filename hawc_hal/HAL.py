@@ -252,6 +252,10 @@ class HAL(PluginPrototype):
 
                 self._active_planes.append(this_bin)
 
+        if self._likelihood_model:
+
+            self.set_model( self._likelihood_model )
+
     def display(self, verbose=False):
         """
         Prints summary of the current object content.
