@@ -166,7 +166,12 @@ class HAL(PluginPrototype):
 
         self._psf_convolutors = collections.OrderedDict()
         for bin_id in central_response_bins:
-            self._psf_convolutors[bin_id] = PSFConvolutor(central_response_bins[bin_id].psf, self._flat_sky_projection)
+
+            #Only set up PSF convolutors for active bins.
+            if bin_id in self._active_planes:
+                self._psf_convolutors[bin_id] = PSFConvolutor(central_response_bins[bin_id].psf,
+                                                              self._flat_sky_projection)
+
 
     def _compute_likelihood_biases(self):
 
@@ -246,6 +251,10 @@ class HAL(PluginPrototype):
                     raise ValueError("Bin %s it not contained in this response" % this_bin)
 
                 self._active_planes.append(this_bin)
+
+        if self._likelihood_model:
+
+            self.set_model( self._likelihood_model )
 
     def display(self, verbose=False):
         """
