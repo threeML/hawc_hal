@@ -1,7 +1,15 @@
+import matplotlib
+matplotlib.use("Agg")
+
+import os
+
+os.environ['OMP_NUM_THREADS'] = '1'
+os.environ['MKL_NUM_THREADS'] = '1'
+os.environ['NUMEXPR_NUM_THREADS'] = '1'
+
 import pytest
 from hawc_hal import HealpixConeROI
 from threeML import *
-import os
 from hawc_hal import HAL
 import time
 
@@ -50,7 +58,7 @@ def fit_point_source(roi,
 
     beg = time.time()
 
-    # jl.set_minimizer("ROOT")
+    jl.set_minimizer("ROOT")
 
     param_df, like_df = jl.fit()
 

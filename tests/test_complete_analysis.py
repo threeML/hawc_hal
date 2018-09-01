@@ -27,6 +27,7 @@ def test_fit(roi, maptree, response):
     data = DataList(hawc)
 
     jl = JointLikelihood(pts_model, data, verbose=True)
+
     param_df, like_df = jl.fit()
 
     return jl, hawc, pts_model, param_df, like_df, data
@@ -77,6 +78,7 @@ def test_goodness(test_fit):
 
     # Compute goodness of fit with Monte Carlo
     gf = GoodnessOfFit(jl)
+
     gof, param, likes = gf.by_mc(10)
     print("Prob. of obtaining -log(like) >= observed by chance if null hypothesis is true: %.2f" % gof['HAWC'])
 
