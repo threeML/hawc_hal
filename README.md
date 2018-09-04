@@ -16,6 +16,7 @@ If you have `conda` installed, it is highly reccomended that you install `numba`
 Then:
 
 ```bash
+> pip install --no-binary :all: root_numpy 
 > pip uninstall hawc_hal -y ; pip install git+https://github.com/giacomov/hawc_hal.git
 ```
 
