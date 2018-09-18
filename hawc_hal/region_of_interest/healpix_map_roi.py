@@ -1,75 +1,85 @@
 import numpy as np
 import astropy.units as u
 import healpy as hp
-from healpix_roi_base import HealpixROIBase, _RING, _NESTED
 from astropy.io import fits
 
+from threeML.exceptions.custom_exceptions import custom_warnings
 from astromodels.core.sky_direction import SkyDirection
 
+from healpix_roi_base import HealpixROIBase, _RING, _NESTED
+from healpix_cone_roi import HealpixConeROI, _get_radians
 from ..healpix_handling import radec_to_vec
 from ..flat_sky_projection import FlatSkyProjection
 
 
-def _get_radians(my_angle):
-
-    if isinstance(my_angle, u.Quantity):
-
-        my_angle_radians = my_angle.to(u.rad).value
-
-    else:
-
-        my_angle_radians = np.deg2rad(my_angle)
-
-    return my_angle_radians
-
-
 class HealpixMapROI(HealpixROIBase):
 
-    def __init__(self, model_radius, map=None, file = None, *args, **kwargs):
+    def __init__(self, model_radius, map=None, file = None, threshold=0.5, *args, **kwargs):
         """
-        A cone Region of Interest defined by a center and a radius.
+        A cone Region of Interest defined by a healpix map (can be read from a fits file).
+        User needs to supply a cone region (center and radius) defining the plane projection for the model map.
 
         Examples:
 
-            ROI centered on (R.A., Dec) = (1.23, 4.56) in J2000 ICRS coordinate system, with a radius of 5 degrees:
+            Model map centered on (R.A., Dec) = (1.23, 4.56) in J2000 ICRS coordinate system, with a radius of 5 degrees, ROI defined in healpix map in fitsfile:
 
-            > roi = HealpixConeROI(5.0, ra=1.23, dec=4.56)
+            > roi = HealpixMapROI(5.0, ra=1.23, dec=4.56, file = "myROI.fits" )
 
-            ROI centered on (L, B) = (1.23, 4.56) (Galactic coordiantes) with a radius of 30 arcmin:
+            Model map centered on (L, B) = (1.23, 4.56) (Galactic coordiantes) with a radius of 30 arcmin, ROI defined on-the-fly in healpix map:
 
-            > roi = HealpixConeROI(30.0 * u.arcmin, l=1.23, dec=4.56)
+            > roi = HealpixMapROI(30.0 * u.arcmin, l=1.23, dec=4.56, map = my_roi)
 
-        :param data_radius: radius of the cone. Either an astropy.Quantity instance, or a float, in which case it is assumed
-        to be the radius in degrees
         :param model_radius: radius of the model cone. Either an astropy.Quantity instance, or a float, in which case it
         is assumed to be the radius in degrees
+        :param map: healpix map containing the ROI.
+        :param file: fits file containing a healpix map with the ROI.
+        :param threshold: value below which pixels in the map will be set inactive (=not in ROI).
         :param args: arguments for the SkyDirection class of astromodels
         :param kwargs: keywords for the SkyDirection class of astromodels
         """
  
-        assert file is not kwargs or map is  not None, "Must supply either healpix map or fits file to create HealpixMapROI"
-
+        assert file is not None or map is  not None, "Must supply either healpix map or fits file to create HealpixMapROI"
 
         self._center = SkyDirection(*args, **kwargs)
 
         self._model_radius_radians = _get_radians(model_radius)
-        
-        if file is not None:
-            self._filename = file
-            map =  hp.fitsfunc.read_map(self._filename)
-        elif map is not None:
+         
+        self._threshold  = threshold
+ 
+        self.read_map( map=map, file=file )
+
+
+    def read_map( self, map=None, file=None ):
+        assert file is not None or map is  not None, "Must supply either healpix map or fits file"
+ 
+        if map is not None:
             map = map
             self._filename = None
+
+        elif file is not None:
+            self._filename = file
+            map =  hp.fitsfunc.read_map(self._filename)
 
         self._maps = {}
 
         self._original_nside = hp.npix2nside( map.shape[0] )
         self._maps[self._original_nside] = map
+        
+        self.check_roi_inside_model()
 
-        self._threshold  = 0.5
-        if "threshold" in kwargs:
-            self._threshold = kwargs["threshold"]
 
+    def check_roi_inside_model( self ):
+      
+        active_pixels = self.active_pixels( self._original_nside )
+        
+        radius = np.rad2deg(self._model_radius_radians)
+        ra, dec = self.ra_dec_center
+        temp_roi =  HealpixConeROI( data_radius = radius , model_radius=radius, ra=ra, dec=dec )
+        
+        model_pixels = temp_roi.active_pixels( self._original_nside )
+        
+        if not all(p in model_pixels for p in active_pixels):
+            custom_warnings.warn("Some pixels inside your ROI are not contained in the model map.")
 
     def to_dict(self):
 
@@ -79,7 +89,7 @@ class HealpixMapROI(HealpixROIBase):
              'ra': ra,
              'dec': dec,
              'model_radius_deg': np.rad2deg(self._model_radius_radians),
-             'map': self._map,
+             'map': self._maps[self._original_nside],
              'threshold': self._threshold,
              'file': self._filename }
 
@@ -88,7 +98,7 @@ class HealpixMapROI(HealpixROIBase):
     @classmethod
     def from_dict(cls, data):
 
-        return cls(data['data_radius_deg'], threshold = data['threshold'], map = data['map'], ra=data['ra'], dec=data['dec'], file=data['file'])
+        return cls(data['model_radius_deg'], threshold = data['threshold'], map = data['map'], ra=data['ra'], dec=data['dec'], file=data['file'])
 
     def __str__(self):
 
@@ -124,17 +134,7 @@ class HealpixMapROI(HealpixROIBase):
 
         return lon, lat
 
-    def _get_healpix_vec(self):
-
-        lon, lat = self._get_ra_dec()
-
-        vec = radec_to_vec(lon, lat)
-
-        return vec
-
     def _active_pixels(self, nside, ordering):
-
-        vec = self._get_healpix_vec()
 
         nest = ordering is _NESTED
             
