@@ -1,4 +1,5 @@
 from healpix_cone_roi import HealpixConeROI, HealpixROIBase
+from healpix_map_roi import HealpixMapROI
 
 
 def get_roi_from_dict(dictionary):
