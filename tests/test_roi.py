@@ -32,14 +32,14 @@ def test_rois():
                      dec=dec)
 
   m = np.zeros(hp.nside2npix(NSIDE))
-  vec = Sky2Vec( ra, dec )
+  vec = Sky2Vec(ra, dec)
   m[hp.query_disc(NSIDE, vec, (data_radius*u.degree).to(u.radian).value, inclusive=False)] = 1
 
   hp.fitsfunc.write_map("roitemp.fits" , m, nest=False, coord="C", partial=False, overwrite=True )  
 
 
-  map_roi = HealpixMapROI( ra= ra, dec=dec, model_radius=model_radius, map=m)
-  fits_roi = HealpixMapROI( ra= ra, dec=dec, model_radius=model_radius, file="roitemp.fits")
+  map_roi = HealpixMapROI(ra= ra, dec=dec, model_radius=model_radius, roimap=m)
+  fits_roi = HealpixMapROI(ra= ra, dec=dec, model_radius=model_radius, roifile="roitemp.fits")
 
   assert np.all( cone_roi.active_pixels(NSIDE) == map_roi.active_pixels(NSIDE))
   assert np.all( fits_roi.active_pixels(NSIDE) == map_roi.active_pixels(NSIDE))

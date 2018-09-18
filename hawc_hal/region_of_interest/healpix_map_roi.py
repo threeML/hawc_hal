@@ -1,31 +1,31 @@
 import numpy as np
 import astropy.units as u
 import healpy as hp
-from astropy.io import fits
 
 from threeML.exceptions.custom_exceptions import custom_warnings
 from astromodels.core.sky_direction import SkyDirection
 
-from healpix_roi_base import HealpixROIBase, _RING, _NESTED
-from healpix_cone_roi import HealpixConeROI, _get_radians
-from ..healpix_handling import radec_to_vec
+from hawc_hal.region_of_interest.healpix_roi_base import HealpixROIBase
+from hawc_hal.region_of_interest.healpix_cone_roi import HealpixConeROI, _get_radians
 from ..flat_sky_projection import FlatSkyProjection
 
 
 class HealpixMapROI(HealpixROIBase):
 
-    def __init__(self, model_radius, map=None, file = None, threshold=0.5, *args, **kwargs):
+    def __init__(self, model_radius, roimap=None, roifile=None, threshold=0.5, *args, **kwargs):
         """
         A cone Region of Interest defined by a healpix map (can be read from a fits file).
         User needs to supply a cone region (center and radius) defining the plane projection for the model map.
 
         Examples:
 
-            Model map centered on (R.A., Dec) = (1.23, 4.56) in J2000 ICRS coordinate system, with a radius of 5 degrees, ROI defined in healpix map in fitsfile:
+            Model map centered on (R.A., Dec) = (1.23, 4.56) in J2000 ICRS coordinate system,
+            with a radius of 5 degrees, ROI defined in healpix map in fitsfile:
 
             > roi = HealpixMapROI(5.0, ra=1.23, dec=4.56, file = "myROI.fits" )
 
-            Model map centered on (L, B) = (1.23, 4.56) (Galactic coordiantes) with a radius of 30 arcmin, ROI defined on-the-fly in healpix map:
+            Model map centered on (L, B) = (1.23, 4.56) (Galactic coordiantes) 
+            with a radius of 30 arcmin, ROI defined on-the-fly in healpix map:
 
             > roi = HealpixMapROI(30.0 * u.arcmin, l=1.23, dec=4.56, map = my_roi)
 
@@ -38,46 +38,47 @@ class HealpixMapROI(HealpixROIBase):
         :param kwargs: keywords for the SkyDirection class of astromodels
         """
  
-        assert file is not None or map is  not None, "Must supply either healpix map or fits file to create HealpixMapROI"
+        assert file is not None or map is  not None, "Must supply either healpix map or fitsfile to create HealpixMapROI"
 
         self._center = SkyDirection(*args, **kwargs)
 
         self._model_radius_radians = _get_radians(model_radius)
-         
-        self._threshold  = threshold
- 
-        self.read_map( map=map, file=file )
+
+        self._threshold = threshold
+
+        self.read_map(roimap=roimap, roifile=roifile)
 
 
-    def read_map( self, map=None, file=None ):
-        assert file is not None or map is  not None, "Must supply either healpix map or fits file"
+    def read_map(self, roimap=None, roifile=None):
+        assert roifile is not None or roimap is  not None, \
+                    "Must supply either healpix map or fits file"
  
-        if map is not None:
-            map = map
+        if roimap is not None:
+            roimap = roimap
             self._filename = None
 
-        elif file is not None:
-            self._filename = file
-            map =  hp.fitsfunc.read_map(self._filename)
+        elif roifile is not None:
+            self._filename = roifile
+            roimap =  hp.fitsfunc.read_map(self._filename)
 
-        self._maps = {}
+        self._roimaps = {}
 
-        self._original_nside = hp.npix2nside( map.shape[0] )
-        self._maps[self._original_nside] = map
+        self._original_nside = hp.npix2nside(roimap.shape[0])
+        self._roimaps[self._original_nside] = roimap
         
         self.check_roi_inside_model()
 
 
-    def check_roi_inside_model( self ):
-      
-        active_pixels = self.active_pixels( self._original_nside )
-        
+    def check_roi_inside_model(self):
+
+        active_pixels = self.active_pixels(self._original_nside)
+
         radius = np.rad2deg(self._model_radius_radians)
         ra, dec = self.ra_dec_center
-        temp_roi =  HealpixConeROI( data_radius = radius , model_radius=radius, ra=ra, dec=dec )
-        
+        temp_roi =  HealpixConeROI(data_radius = radius , model_radius=radius, ra=ra, dec=dec)
+
         model_pixels = temp_roi.active_pixels( self._original_nside )
-        
+
         if not all(p in model_pixels for p in active_pixels):
             custom_warnings.warn("Some pixels inside your ROI are not contained in the model map.")
 
@@ -89,16 +90,18 @@ class HealpixMapROI(HealpixROIBase):
              'ra': ra,
              'dec': dec,
              'model_radius_deg': np.rad2deg(self._model_radius_radians),
-             'map': self._maps[self._original_nside],
+             'roimap': self._roimaps[self._original_nside],
              'threshold': self._threshold,
-             'file': self._filename }
+             'roifile': self._filename }
 
         return s
 
     @classmethod
     def from_dict(cls, data):
 
-        return cls(data['model_radius_deg'], threshold = data['threshold'], map = data['map'], ra=data['ra'], dec=data['dec'], file=data['file'])
+        return cls(data['model_radius_deg'], threshold = data['threshold'], 
+                    roimap = data['roimap'], ra=data['ra'], 
+                    dec=data['dec'], roifile=data['roifile'])
 
     def __str__(self):
 
@@ -107,7 +110,7 @@ class HealpixMapROI(HealpixROIBase):
                self.model_radius.to(u.deg).value, self._threshold))
 
         if self._filename is not None: 
-            s  =  "%s,  data ROI from %s" %  (s, self._filename)
+            s = "%s, data ROI from %s" % (s, self._filename)
             
         return s
 
@@ -135,15 +138,13 @@ class HealpixMapROI(HealpixROIBase):
         return lon, lat
 
     def _active_pixels(self, nside, ordering):
-
-        nest = ordering is _NESTED
             
-        if not nside in self._maps:
-          self._maps[nside] = hp.ud_grade(self._maps[self._original_nside], nside_out=nside)
+        if not nside in self._roimaps:
+          self._roimaps[nside] = hp.ud_grade(self._maps[self._original_nside], nside_out=nside)
 
-        pixels_inside_map = np.where( self._maps[ nside ] >= self._threshold )[0]
+        pixels_inside_roi = np.where(self._roimaps[nside] >= self._threshold)[0]
 
-        return pixels_inside_map
+        return pixels_inside_roi
 
     def get_flat_sky_projection(self, pixel_size_deg):
 
