@@ -24,7 +24,7 @@ class HealpixMapROI(HealpixROIBase):
 
             > roi = HealpixMapROI(5.0, ra=1.23, dec=4.56, file = "myROI.fits" )
 
-            Model map centered on (L, B) = (1.23, 4.56) (Galactic coordiantes) 
+            Model map centered on (L, B) = (1.23, 4.56) (Galactic coordiantes)
             with a radius of 30 arcmin, ROI defined on-the-fly in healpix map:
 
             > roi = HealpixMapROI(30.0 * u.arcmin, l=1.23, dec=4.56, map = my_roi)
@@ -38,7 +38,7 @@ class HealpixMapROI(HealpixROIBase):
         :param kwargs: keywords for the SkyDirection class of astromodels
         """
  
-        assert file is not None or map is  not None, "Must supply either healpix map or fitsfile to create HealpixMapROI"
+        assert roifile is not None or roimap is not None, "Must supply either healpix map or fitsfile to create HealpixMapROI"
 
         self._center = SkyDirection(*args, **kwargs)
 
@@ -99,9 +99,9 @@ class HealpixMapROI(HealpixROIBase):
     @classmethod
     def from_dict(cls, data):
 
-        return cls(data['model_radius_deg'], threshold = data['threshold'], 
-                    roimap = data['roimap'], ra=data['ra'], 
-                    dec=data['dec'], roifile=data['roifile'])
+        return cls(data['model_radius_deg'], threshold=data['threshold'],
+                   roimap=data['roimap'], ra=data['ra'],
+                   dec=data['dec'], roifile=data['roifile'])
 
     def __str__(self):
 
@@ -138,9 +138,9 @@ class HealpixMapROI(HealpixROIBase):
         return lon, lat
 
     def _active_pixels(self, nside, ordering):
-            
+
         if not nside in self._roimaps:
-          self._roimaps[nside] = hp.ud_grade(self._maps[self._original_nside], nside_out=nside)
+          self._roimaps[nside] = hp.ud_grade(self._roimaps[self._original_nside], nside_out=nside)
 
         pixels_inside_roi = np.where(self._roimaps[nside] >= self._threshold)[0]
 
