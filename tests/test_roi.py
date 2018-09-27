@@ -38,8 +38,8 @@ def test_rois():
   hp.fitsfunc.write_map("roitemp.fits" , m, nest=False, coord="C", partial=False, overwrite=True )  
 
 
-  map_roi = HealpixMapROI(ra= ra, dec=dec, model_radius=model_radius, roimap=m)
-  fits_roi = HealpixMapROI(ra= ra, dec=dec, model_radius=model_radius, roifile="roitemp.fits")
+  map_roi = HealpixMapROI(data_radius=data_radius, ra=ra, dec=dec, model_radius=model_radius, roimap=m)
+  fits_roi = HealpixMapROI(data_radius=data_radius, ra=ra, dec=dec, model_radius=model_radius, roifile="roitemp.fits")
 
   assert np.all( cone_roi.active_pixels(NSIDE) == map_roi.active_pixels(NSIDE))
   assert np.all( fits_roi.active_pixels(NSIDE) == map_roi.active_pixels(NSIDE))
