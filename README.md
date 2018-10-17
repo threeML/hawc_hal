@@ -101,7 +101,7 @@ fig = plot_point_source_spectra(jl.results,
                                 ene_max=100,
                                 num_ene=50,
                                 energy_unit='TeV',
-                                flux_unit='1/(TeV s cm2)')
+                                flux_unit='TeV/(s cm2)')
 fig.savefig("hal_mkn421_fit_spectrum.png")
 
 # Look at the different energy planes (the columns are model, data, residuals)
