@@ -95,6 +95,15 @@ fig = hawc.display_spectrum()
 # Save it to file
 fig.savefig("hal_mkn421_residuals.png")
 
+# See the spectrum fit
+fig = plot_point_source_spectra(jl.results,
+                                ene_min=0.1,
+                                ene_max=100,
+                                num_ene=50,
+                                energy_unit='TeV',
+                                flux_unit='1/(TeV s cm2)')
+fig.savefig("hal_mkn421_fit_spectrum.png")
+
 # Look at the different energy planes (the columns are model, data, residuals)
 fig = hawc.display_fit(smoothing_kernel_sigma=0.3)
 fig.savefig("hal_mkn421_fit_planes.png")
