@@ -160,7 +160,7 @@ for parameter in model.parameters.values():
 # Let's execute our bayes analysis
 bs = BayesianAnalysis(model, data)
 samples = bs.sample(30, 100, 100)
-fig = bs.corner_plot()
+fig = bs.results.corner_plot()
 
 fig.savefig("hal_corner_plot.png")
 ```
