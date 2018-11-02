@@ -51,15 +51,17 @@ class PSFInterpolator(object):
         if psf_integration_method == 'exact':
 
             reprojection_method = reproject.reproject_exact
+            additional_keywords = {'parallel': False}
 
         else:
 
             reprojection_method = reproject.reproject_interp
+            additional_keywords = {}
 
         brightness, _ = reprojection_method((ancillary_brightness, ancillary_flat_sky_proj.wcs),
                                             self._flat_sky_p.wcs, shape_out=(self._flat_sky_p.npix_height,
                                                                              self._flat_sky_p.npix_width),
-                                            parallel=False)
+                                            **additional_keywords)
 
         brightness[np.isnan(brightness)] = 0.0
 
