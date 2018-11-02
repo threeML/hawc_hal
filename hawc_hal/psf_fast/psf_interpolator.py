@@ -58,7 +58,8 @@ class PSFInterpolator(object):
 
         brightness, _ = reprojection_method((ancillary_brightness, ancillary_flat_sky_proj.wcs),
                                             self._flat_sky_p.wcs, shape_out=(self._flat_sky_p.npix_height,
-                                                                             self._flat_sky_p.npix_width))
+                                                                             self._flat_sky_p.npix_width),
+                                            parallel=False)
 
         brightness[np.isnan(brightness)] = 0.0
 
