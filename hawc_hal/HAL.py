@@ -711,7 +711,6 @@ class HAL(PluginPrototype):
                 # Declination is already between -90 and 90
                 latitude = this_dec
 
-
                 # Background and excess maps
 
                 # Make all the projections: model, excess, background, residuals
@@ -862,12 +861,12 @@ class HAL(PluginPrototype):
         if not (plane_id in self._active_planes):
             raise ValueError("{0} not a plane in the current model".format(plane_id))
 
-        this_model_map_hpx = self._get_expectation(self._maptree[plane_id], plane_id, n_pt_src, n_ext_src)
+        expect = self._get_expectation(self._maptree[plane_id], plane_id, n_pt_src, n_ext_src)
 
-        model_map = SparseHealpix(this_model_map_hpx,
+        model_map = SparseHealpix(expect,
                                   self._active_pixels[plane_id],
                                   self._maptree[plane_id].observation_map.nside)
-        # Make a full healpix map for a second
+
         if fullSky:
             model_map=model_map.as_dense()
 
