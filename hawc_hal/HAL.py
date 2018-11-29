@@ -30,6 +30,7 @@ from hawc_hal.log_likelihood import log_likelihood
 from hawc_hal.util import ra_to_longitude
 
 
+
 class HAL(PluginPrototype):
     """
     The HAWC Accelerated Likelihood plugin for 3ML.
@@ -712,6 +713,7 @@ class HAL(PluginPrototype):
                 latitude = this_dec
 
                 # Background and excess maps
+                bkg_subtracted, data_map, background_map = self._get_excess(data_analysis_bin,all=True)
 
                 # Make all the projections: model, excess, background, residuals
                 proj_model = self._represent_healpix_map(fig, whole_map,
@@ -719,8 +721,6 @@ class HAL(PluginPrototype):
                                                          xsize, resolution, smoothing_kernel_sigma)
                 # Here we removed the background otherwise nothing is visible
                 # Get background (which is in a way "part of the model" since the uncertainties are neglected)
-                background_map = data_analysis_bin.background_map.as_dense()
-                bkg_subtracted = data_analysis_bin.observation_map.as_dense() - background_map
                 proj_data = self._represent_healpix_map(fig, bkg_subtracted,
                                                         longitude, latitude,
                                                         xsize, resolution, smoothing_kernel_sigma)
@@ -853,7 +853,7 @@ class HAL(PluginPrototype):
 
 
 
-    def _get_model_map(self, plane_id, n_pt_src, n_ext_src, fullSky=True ):
+    def _get_model_map(self, plane_id, n_pt_src, n_ext_src, fullSky ):
         """
         This function returns a model map for a particular bin
         """
@@ -872,17 +872,54 @@ class HAL(PluginPrototype):
 
         return model_map
 
+
+    def _get_excess(self, data_analysis_bin, all=True ):
+        """
+        This function returns the excess counts for a particular bin
+        if all=True, also returns the data and background maps
+        """
+        data_map = data_analysis_bin.observation_map.as_dense()
+        bkg_map  = data_analysis_bin.background_map.as_dense()
+        excess = data_map - bkg_map
+
+        if all:
+            return excess, data_map, bkg_map 
+        return excess
+
     def write_model_map(self, fileName="testingONLY", poisson=False, partial=False):
         """
         This function writes the model map to a file. (it is currently not implemented)
         The interface is based off of HAWCLike for consistency
         """
     
+        full= not partial
+        n_pt = self._likelihood_model.get_number_of_point_sources()
+        n_ext = self._likelihood_model.get_number_of_extended_sources()
 
-        #make model map
-        #poisson fluctuate if necassary
-        #save the map
-        #return nothing
+        maptreeFile=copy.deepcopy(self._maptree)
+
+        for plane_id in self._active_planes:
+
+            data_analysis_bin=maptreeFile[plane_id]
+
+            model_map=self._get_model_map(plane_id, n_pt, n_ext, fullSky=True)
+
+            bkg=data_analysis_bin.background_map.as_dense()
+
+            fake_data=model_map+bkg
+
+            
+
+            
+
+            print(len(model_map))
+            if poisson:
+                #do stuff later
+                pass
+
+
+            #save the file
+
         print("This function doesn't do anything yet")
         pass
 
