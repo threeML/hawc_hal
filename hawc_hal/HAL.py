@@ -854,3 +854,28 @@ class HAL(PluginPrototype):
             n_points += self._maptree[bin_id].observation_map.as_partial().shape[0]
 
         return n_points
+
+
+    def write_model_map(self, fileName, poisson=False):
+        """
+        This function writes the model map to a file. (it is currently not implemented)
+        The interface is based off of HAWCLike for consistency
+        """
+        #make model map
+        #poisson fluctuate if necassary
+        #save the map
+        #return nothing
+        print("This function doesn't do anything yet")
+        pass
+
+
+    def write_residual_map(self, fileName):
+        """
+        This function writes the residual map to a file. (it is currently not implemented)
+        The interface is based off of HAWCLike for consistency
+        """
+        #make model map
+        #subtract data map
+        #save the map
+        #return nothing
+        pass
