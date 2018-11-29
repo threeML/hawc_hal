@@ -702,12 +702,8 @@ class HAL(PluginPrototype):
                 # Get the center of the projection for this plane
                 this_ra, this_dec = self._roi.ra_dec_center
 
-                this_model_map_hpx = self._get_expectation(data_analysis_bin, plane_id, n_point_sources, n_ext_sources)
-
                 # Make a full healpix map for a second
-                whole_map = SparseHealpix(this_model_map_hpx,
-                                          self._active_pixels[plane_id],
-                                          data_analysis_bin.observation_map.nside).as_dense()
+                whole_map=self._get_model_map(plane_id, n_point_sources, n_ext_sources,fullSky=True)
 
                 # Healpix uses longitude between -180 and 180, while R.A. is between 0 and 360. We need to fix that:
                 longitude = ra_to_longitude(this_ra)
@@ -856,11 +852,34 @@ class HAL(PluginPrototype):
         return n_points
 
 
-    def write_model_map(self, fileName, poisson=False):
+
+
+    def _get_model_map(self, plane_id, n_pt_src, n_ext_src, fullSky=True ):
+        """
+        This function returns a model map for a particular bin
+        """
+
+        if not (plane_id in self._active_planes):
+            raise ValueError("{0} not a plane in the current model".format(plane_id))
+
+        this_model_map_hpx = self._get_expectation(self._maptree[plane_id], plane_id, n_pt_src, n_ext_src)
+
+        model_map = SparseHealpix(this_model_map_hpx,
+                                  self._active_pixels[plane_id],
+                                  self._maptree[plane_id].observation_map.nside)
+        # Make a full healpix map for a second
+        if fullSky:
+            model_map=model_map.as_dense()
+
+        return model_map
+
+    def write_model_map(self, fileName="testingONLY", poisson=False, partial=False):
         """
         This function writes the model map to a file. (it is currently not implemented)
         The interface is based off of HAWCLike for consistency
         """
+    
+
         #make model map
         #poisson fluctuate if necassary
         #save the map
@@ -878,4 +897,5 @@ class HAL(PluginPrototype):
         #subtract data map
         #save the map
         #return nothing
+        print("This function doesn't do anything yet")
         pass
