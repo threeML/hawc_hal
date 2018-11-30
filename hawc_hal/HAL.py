@@ -891,7 +891,6 @@ class HAL(PluginPrototype):
         """
         This writes either a model map or a residual map, depending on which one is preferred
         """
-
         which = which.lower()
         assert which in [ 'model', 'residual' ]
 
@@ -910,7 +909,7 @@ class HAL(PluginPrototype):
                 bin_map=self._get_model_map(plane_id, n_pt, n_ext)
                 fake_data=bin_map+bkg
             else:
-                bin_map=data_analysis_bin.observation
+                bin_map=data_analysis_bin.observation_map
                 fake_data=bin_map-bkg
 
 
@@ -933,7 +932,7 @@ class HAL(PluginPrototype):
 
         #save the file
         new_map_tree = MapTree(map_analysis_bins, self._roi)
-        new_map.write(filename)
+        new_map_tree.write(filename)
 
 
     def write_model_map(self, fileName, poisson=False):
@@ -941,7 +940,7 @@ class HAL(PluginPrototype):
         This function writes the model map to a file. (it is currently not implemented)
         The interface is based off of HAWCLike for consistency
         """
-        self._write_a_map(fileName, 'model', poisson):
+        self._write_a_map(fileName, 'model', poisson)
         
 
 
@@ -950,4 +949,4 @@ class HAL(PluginPrototype):
         This function writes the residual map to a file. (it is currently not implemented)
         The interface is based off of HAWCLike for consistency
         """
-        self._write_a_map(fileName, 'residual', False):
+        self._write_a_map(fileName, 'residual', False)
