@@ -886,28 +886,33 @@ class HAL(PluginPrototype):
             return excess, data_map, bkg_map 
         return excess
 
-    def write_model_map(self, fileName, poisson=False):
+
+    def _write_a_map(self, filename, which, poisson=False):
         """
-        This function writes the model map to a file. (it is currently not implemented)
-        The interface is based off of HAWCLike for consistency
+        This writes either a model map or a residual map, depending on which one is preferred
         """
-    
+
+        which = which.lower()
+        assert which in [ 'model', 'residual' ]
+
         n_pt = self._likelihood_model.get_number_of_point_sources()
         n_ext = self._likelihood_model.get_number_of_extended_sources()
 
-        model_analysis_bins = collections.OrderedDict()
+        map_analysis_bins = collections.OrderedDict()
 
         for plane_id in self._active_planes:
 
             data_analysis_bin=self._maptree[plane_id]
 
-            model_map=self._get_model_map(plane_id, n_pt, n_ext)
-
             bkg=data_analysis_bin.background_map
-            '''
-            THIS IS ONLY A TEST
-            '''
-            fake_data=model_map+bkg
+
+            if which=='model':
+                bin_map=self._get_model_map(plane_id, n_pt, n_ext)
+                fake_data=bin_map+bkg
+            else:
+                bin_map=data_analysis_bin.observation
+                fake_data=bin_map-bkg
+
 
             this_bin = DataAnalysisBin(plane_id,
                                    observation_hpx_map=fake_data,
@@ -916,7 +921,7 @@ class HAL(PluginPrototype):
                                    n_transits=data_analysis_bin.n_transits,
                                    scheme='RING')
 
-            model_analysis_bins[plane_id]=this_bin
+            map_analysis_bins[plane_id]=this_bin
 
             
 
@@ -927,9 +932,16 @@ class HAL(PluginPrototype):
 
 
         #save the file
-        model_maptree = MapTree(model_analysis_bins, self._roi)
-        model_maptree.write(fileName)
-        print("This function might do something yet")
+        new_map_tree = MapTree(map_analysis_bins, self._roi)
+        new_map.write(filename)
+
+
+    def write_model_map(self, fileName, poisson=False):
+        """
+        This function writes the model map to a file. (it is currently not implemented)
+        The interface is based off of HAWCLike for consistency
+        """
+        self._write_a_map(fileName, 'model', poisson):
         
 
 
@@ -938,9 +950,4 @@ class HAL(PluginPrototype):
         This function writes the residual map to a file. (it is currently not implemented)
         The interface is based off of HAWCLike for consistency
         """
-        #make model map
-        #subtract data map
-        #save the map
-        #return nothing
-        print("This function doesn't do anything yet")
-        pass
+        self._write_a_map(fileName, 'residual', False):
