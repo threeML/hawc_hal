@@ -19,6 +19,8 @@ from threeML.io.progress_bar import progress_bar
 from astromodels import Parameter
 
 from hawc_hal.maptree import map_tree_factory
+from hawc_hal.maptree import MapTree
+from hawc_hal.maptree import DataAnalysisBin
 from hawc_hal.response import hawc_response_factory
 from hawc_hal.convolved_source import ConvolvedPointSource, \
     ConvolvedExtendedSource3D, ConvolvedExtendedSource2D, ConvolvedSourcesContainer
@@ -704,7 +706,7 @@ class HAL(PluginPrototype):
                 this_ra, this_dec = self._roi.ra_dec_center
 
                 # Make a full healpix map for a second
-                whole_map=self._get_model_map(plane_id, n_point_sources, n_ext_sources,fullSky=True)
+                whole_map=self._get_model_map(plane_id, n_point_sources, n_ext_sources).as_dense()
 
                 # Healpix uses longitude between -180 and 180, while R.A. is between 0 and 360. We need to fix that:
                 longitude = ra_to_longitude(this_ra)
@@ -853,7 +855,7 @@ class HAL(PluginPrototype):
 
 
 
-    def _get_model_map(self, plane_id, n_pt_src, n_ext_src, fullSky ):
+    def _get_model_map(self, plane_id, n_pt_src, n_ext_src):
         """
         This function returns a model map for a particular bin
         """
@@ -867,8 +869,6 @@ class HAL(PluginPrototype):
                                   self._active_pixels[plane_id],
                                   self._maptree[plane_id].observation_map.nside)
 
-        if fullSky:
-            model_map=model_map.as_dense()
 
         return model_map
 
@@ -886,42 +886,51 @@ class HAL(PluginPrototype):
             return excess, data_map, bkg_map 
         return excess
 
-    def write_model_map(self, fileName="testingONLY", poisson=False, partial=False):
+    def write_model_map(self, fileName, poisson=False):
         """
         This function writes the model map to a file. (it is currently not implemented)
         The interface is based off of HAWCLike for consistency
         """
     
-        full= not partial
         n_pt = self._likelihood_model.get_number_of_point_sources()
         n_ext = self._likelihood_model.get_number_of_extended_sources()
 
-        maptreeFile=copy.deepcopy(self._maptree)
+        model_analysis_bins = collections.OrderedDict()
 
         for plane_id in self._active_planes:
 
-            data_analysis_bin=maptreeFile[plane_id]
+            data_analysis_bin=self._maptree[plane_id]
 
-            model_map=self._get_model_map(plane_id, n_pt, n_ext, fullSky=True)
+            model_map=self._get_model_map(plane_id, n_pt, n_ext)
 
-            bkg=data_analysis_bin.background_map.as_dense()
+            bkg=data_analysis_bin.background_map
+            '''
+            THIS IS ONLY A TEST
+            '''
+            fake_data=data_analysis_bin.observation_map #model_map+bkg
 
-            fake_data=model_map+bkg
+            this_bin = DataAnalysisBin(plane_id,
+                                   observation_hpx_map=fake_data,
+                                   background_hpx_map=bkg,
+                                   active_pixels_ids=self._active_pixels[plane_id],
+                                   n_transits=data_analysis_bin.n_transits,
+                                   scheme='RING')
+
+            model_analysis_bins[plane_id]=this_bin
 
             
 
             
-
-            print(len(model_map))
             if poisson:
                 #do stuff later
                 pass
 
 
-            #save the file
-
-        print("This function doesn't do anything yet")
-        pass
+        #save the file
+        model_maptree = MapTree(model_analysis_bins, self._roi)
+        model_maptree.write(fileName)
+        print("This function might do something yet")
+        
 
 
     def write_residual_map(self, fileName):

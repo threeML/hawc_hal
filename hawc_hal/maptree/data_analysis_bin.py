@@ -6,7 +6,6 @@ class DataAnalysisBin(object):
     def __init__(self, name, observation_hpx_map, background_hpx_map, active_pixels_ids, n_transits, scheme='RING'):
 
         # Get nside
-
         self._nside = observation_hpx_map.nside
 
         nside_bkg = background_hpx_map.nside
