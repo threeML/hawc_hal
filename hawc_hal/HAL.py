@@ -907,7 +907,7 @@ class HAL(PluginPrototype):
             '''
             THIS IS ONLY A TEST
             '''
-            fake_data=data_analysis_bin.observation_map #model_map+bkg
+            fake_data=model_map+bkg
 
             this_bin = DataAnalysisBin(plane_id,
                                    observation_hpx_map=fake_data,

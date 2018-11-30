@@ -74,6 +74,24 @@ class SparseHealpix(HealpixWrapperBase):
 
         super(SparseHealpix, self).__init__(sparse=True, nside=nside)
 
+    def __add__(self, other_map):
+        
+        #Make sure they have the same pixels
+        assert np.array_equal(self._pixels_ids, other_map._pixels_ids)
+
+        #inflate them
+        big_self_map=self.as_dense()
+        
+        big_other_map=other_map.as_dense()
+        
+        #add them
+        dense_added=big_self_map+big_other_map
+
+        #deflate
+        sparse_added=SparseHealpix(dense_added[self._pixels_ids],self._pixels_ids,self.nside)
+        
+        return sparse_added
+        
     def as_dense(self):
         """
         Returns the dense (i.e., full sky) representation of the map. Note that this means unwrapping the map,
