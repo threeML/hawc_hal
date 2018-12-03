@@ -63,7 +63,6 @@ EPOCH   = 'unknown '           / e.g. J2000, current, J2016, B1950, etc.
 HIERARCH MAPFILETYPE = 'duration' / e.g. standard, duration, integration   
 '''
 
-
 FITS_COMMENT="FITS (Flexible Image Transport System) format is defined in 'Astronomy and Astrophysics', volume 376, page 359; bibcode: 2001A&A...376..359H"
 
 primary_keys=['COMMENT', 'COMMENT', 'DATE', 'STARTMJD', 'STOPMJD',
