@@ -899,36 +899,35 @@ class HAL(PluginPrototype):
 
         map_analysis_bins = collections.OrderedDict()
 
+        if poisson:
+            poisson_set = self.get_simulated_dataset("model map")
+  
         for plane_id in self._active_planes:
 
             data_analysis_bin=self._maptree[plane_id]
 
             bkg=data_analysis_bin.background_map
+            obs=data_analysis_bin.observation_map
+
+            if poisson:
+                model_excess = poisson_set._maptree[plane_id].observation_map - poisson_set._maptree[plane_id].background_map
+            else:
+                model_excess = self._get_model_map(plane_id, n_pt, n_ext)
+            
+            if which=='residual':
+                bkg += model_excess
 
             if which=='model':
-                bin_map=self._get_model_map(plane_id, n_pt, n_ext)
-                fake_data=bin_map+bkg
-            else:
-                bin_map=data_analysis_bin.observation_map
-                fake_data=bin_map-bkg
-
+                obs = model_excess + bkg
 
             this_bin = DataAnalysisBin(plane_id,
-                                   observation_hpx_map=fake_data,
+                                   observation_hpx_map=obs,
                                    background_hpx_map=bkg,
                                    active_pixels_ids=self._active_pixels[plane_id],
                                    n_transits=data_analysis_bin.n_transits,
                                    scheme='RING')
 
             map_analysis_bins[plane_id]=this_bin
-
-            
-
-            
-            if poisson:
-                #do stuff later
-                pass
-
 
         #save the file
         new_map_tree = MapTree(map_analysis_bins, self._roi)
