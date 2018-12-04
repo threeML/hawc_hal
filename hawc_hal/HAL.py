@@ -715,7 +715,7 @@ class HAL(PluginPrototype):
                 latitude = this_dec
 
                 # Background and excess maps
-                bkg_subtracted, data_map, background_map = self._get_excess(data_analysis_bin, all=True)
+                bkg_subtracted, _, background_map = self._get_excess(data_analysis_bin, all_maps=True)
 
                 # Make all the projections: model, excess, background, residuals
                 proj_model = self._represent_healpix_map(fig, whole_map,
@@ -857,18 +857,16 @@ class HAL(PluginPrototype):
         This function returns a model map for a particular bin
         """
 
-        if not (plane_id in self._active_planes):
+        if plane_id not in self._active_planes:
             raise ValueError("{0} not a plane in the current model".format(plane_id))
 
-        expect = self._get_expectation(self._maptree[plane_id], plane_id, n_pt_src, n_ext_src)
-
-        model_map = SparseHealpix(expect,
+        model_map = SparseHealpix(self._get_expectation(self._maptree[plane_id], plane_id, n_pt_src, n_ext_src),
                                   self._active_pixels[plane_id],
                                   self._maptree[plane_id].observation_map.nside)
 
         return model_map
 
-    def _get_excess(self, data_analysis_bin, all=True):
+    def _get_excess(self, data_analysis_bin, all_maps=True):
         """
         This function returns the excess counts for a particular bin
         if all=True, also returns the data and background maps
@@ -877,11 +875,11 @@ class HAL(PluginPrototype):
         bkg_map = data_analysis_bin.background_map.as_dense()
         excess = data_map - bkg_map
 
-        if all:
+        if all_maps:
             return excess, data_map, bkg_map
         return excess
 
-    def _write_a_map(self, filename, which, poisson=False):
+    def _write_a_map(self, file_name, which, fluctuate=False):
         """
         This writes either a model map or a residual map, depending on which one is preferred
         """
@@ -893,7 +891,7 @@ class HAL(PluginPrototype):
 
         map_analysis_bins = collections.OrderedDict()
 
-        if poisson:
+        if fluctuate:
             poisson_set = self.get_simulated_dataset("model map")
 
         for plane_id in self._active_planes:
@@ -903,8 +901,9 @@ class HAL(PluginPrototype):
             bkg = data_analysis_bin.background_map
             obs = data_analysis_bin.observation_map
 
-            if poisson:
-                model_excess = poisson_set._maptree[plane_id].observation_map - poisson_set._maptree[plane_id].background_map
+            if fluctuate:
+                model_excess = poisson_set._maptree[plane_id].observation_map \
+                               - poisson_set._maptree[plane_id].background_map
             else:
                 model_excess = self._get_model_map(plane_id, n_pt, n_ext)
 
@@ -925,18 +924,18 @@ class HAL(PluginPrototype):
 
         # save the file
         new_map_tree = MapTree(map_analysis_bins, self._roi)
-        new_map_tree.write(filename)
+        new_map_tree.write(file_name)
 
-    def write_model_map(self, fileName, poisson=False):
+    def write_model_map(self, file_name, poisson_fluctuate=False):
         """
         This function writes the model map to a file. (it is currently not implemented)
         The interface is based off of HAWCLike for consistency
         """
-        self._write_a_map(fileName, 'model', poisson)
+        self._write_a_map(file_name, 'model', poisson_fluctuate)
 
-    def write_residual_map(self, fileName):
+    def write_residual_map(self, file_name):
         """
         This function writes the residual map to a file. (it is currently not implemented)
         The interface is based off of HAWCLike for consistency
         """
-        self._write_a_map(fileName, 'residual', False)
+        self._write_a_map(file_name, 'residual')

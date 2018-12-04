@@ -20,7 +20,6 @@ class HealpixWrapperBase(object):
         self._nside = int(nside)
         self._npix = hp.nside2npix(self._nside)
         self._pixel_area = hp.nside2pixarea(self._nside, degrees=True)
-
         self._sparse = bool(sparse)
 
     @property
@@ -75,9 +74,9 @@ class SparseHealpix(HealpixWrapperBase):
         super(SparseHealpix, self).__init__(sparse=True, nside=nside)
 
     def __add__(self, other_map):
-        
+
         # Make sure they have the same pixels
-        assert np.array_equal(self._pixels_ids, other_map._pixels_ids)
+        assert np.array_equal(self.pixels, other_map.pixels)
 
         # inflate them
         big_self_map = self.as_dense()
@@ -88,7 +87,7 @@ class SparseHealpix(HealpixWrapperBase):
         dense_added = big_self_map + big_other_map
 
         # deflate
-        sparse_added = SparseHealpix(dense_added[self._pixels_ids], self._pixels_ids, self.nside)
+        sparse_added = SparseHealpix(dense_added[self.pixels], self.pixels, self.nside)
         
         return sparse_added
 
@@ -96,14 +95,14 @@ class SparseHealpix(HealpixWrapperBase):
 
         # Make sure they have the same pixels
         assert np.array_equal(self._pixels_ids, other_map._pixels_ids)
-        
+
         big_other_map = other_map.as_dense()
         big_self_map = self.as_dense()
-        
+
         subtraction = big_self_map - big_other_map
 
-        sparse_subtracted = SparseHealpix(subtraction[self._pixels_ids], self._pixels_ids, self.nside)
-        
+        sparse_subtracted = SparseHealpix(subtraction[self.pixels], self.pixels, self.nside)
+
         return sparse_subtracted
 
     def as_dense(self):
@@ -118,7 +117,7 @@ class SparseHealpix(HealpixWrapperBase):
         new_map = np.full(self.npix, self._fill_value)
 
         # Assign the active pixels their values
-        new_map[self._pixels_ids] = self._partial_map
+        new_map[self.pixels] = self._partial_map
 
         return new_map
 
@@ -131,6 +130,10 @@ class SparseHealpix(HealpixWrapperBase):
         assert new_values.shape == self._partial_map.shape
 
         self._partial_map[:] = new_values
+
+    @property
+    def pixels(self):
+        return self._pixels_ids
 
 
 
