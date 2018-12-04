@@ -76,33 +76,33 @@ class SparseHealpix(HealpixWrapperBase):
 
     def __add__(self, other_map):
         
-        #Make sure they have the same pixels
+        # Make sure they have the same pixels
         assert np.array_equal(self._pixels_ids, other_map._pixels_ids)
 
-        #inflate them
-        big_self_map=self.as_dense()
+        # inflate them
+        big_self_map = self.as_dense()
         
-        big_other_map=other_map.as_dense()
+        big_other_map = other_map.as_dense()
         
-        #add them
-        dense_added=big_self_map+big_other_map
+        # add them
+        dense_added = big_self_map + big_other_map
 
-        #deflate
-        sparse_added=SparseHealpix(dense_added[self._pixels_ids],self._pixels_ids,self.nside)
+        # deflate
+        sparse_added = SparseHealpix(dense_added[self._pixels_ids], self._pixels_ids, self.nside)
         
         return sparse_added
 
     def __sub__(self, other_map):
 
-        #Make sure they have the same pixels
+        # Make sure they have the same pixels
         assert np.array_equal(self._pixels_ids, other_map._pixels_ids)
         
-        big_other_map=other_map.as_dense()
-        big_self_map=self.as_dense()
+        big_other_map = other_map.as_dense()
+        big_self_map = self.as_dense()
         
-        subtraction= big_self_map - big_other_map
+        subtraction = big_self_map - big_other_map
 
-        sparse_subtracted=SparseHealpix(subtraction[self._pixels_ids],self._pixels_ids,self.nside)
+        sparse_subtracted = SparseHealpix(subtraction[self._pixels_ids], self._pixels_ids, self.nside)
         
         return sparse_subtracted
 

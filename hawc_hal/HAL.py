@@ -683,7 +683,7 @@ class HAL(PluginPrototype):
         n_ext_sources = self._likelihood_model.get_number_of_extended_sources()
 
         # This is the resolution (i.e., the size of one pixel) of the image
-        resolution = 3.0 # arcmin
+        resolution = 3.0  # arcmin
 
         # The image is going to cover the diameter plus 20% padding
         xsize = self._get_optimal_xsize(resolution)
@@ -706,7 +706,7 @@ class HAL(PluginPrototype):
                 this_ra, this_dec = self._roi.ra_dec_center
 
                 # Make a full healpix map for a second
-                whole_map=self._get_model_map(plane_id, n_point_sources, n_ext_sources).as_dense()
+                whole_map = self._get_model_map(plane_id, n_point_sources, n_ext_sources).as_dense()
 
                 # Healpix uses longitude between -180 and 180, while R.A. is between 0 and 360. We need to fix that:
                 longitude = ra_to_longitude(this_ra)
@@ -715,7 +715,7 @@ class HAL(PluginPrototype):
                 latitude = this_dec
 
                 # Background and excess maps
-                bkg_subtracted, data_map, background_map = self._get_excess(data_analysis_bin,all=True)
+                bkg_subtracted, data_map, background_map = self._get_excess(data_analysis_bin, all=True)
 
                 # Make all the projections: model, excess, background, residuals
                 proj_model = self._represent_healpix_map(fig, whole_map,
@@ -852,9 +852,6 @@ class HAL(PluginPrototype):
 
         return n_points
 
-
-
-
     def _get_model_map(self, plane_id, n_pt_src, n_ext_src):
         """
         This function returns a model map for a particular bin
@@ -869,30 +866,27 @@ class HAL(PluginPrototype):
                                   self._active_pixels[plane_id],
                                   self._maptree[plane_id].observation_map.nside)
 
-
         return model_map
 
-
-    def _get_excess(self, data_analysis_bin, all=True ):
+    def _get_excess(self, data_analysis_bin, all=True):
         """
         This function returns the excess counts for a particular bin
         if all=True, also returns the data and background maps
         """
         data_map = data_analysis_bin.observation_map.as_dense()
-        bkg_map  = data_analysis_bin.background_map.as_dense()
+        bkg_map = data_analysis_bin.background_map.as_dense()
         excess = data_map - bkg_map
 
         if all:
-            return excess, data_map, bkg_map 
+            return excess, data_map, bkg_map
         return excess
-
 
     def _write_a_map(self, filename, which, poisson=False):
         """
         This writes either a model map or a residual map, depending on which one is preferred
         """
         which = which.lower()
-        assert which in [ 'model', 'residual' ]
+        assert which in ['model', 'residual']
 
         n_pt = self._likelihood_model.get_number_of_point_sources()
         n_ext = self._likelihood_model.get_number_of_extended_sources()
@@ -901,38 +895,37 @@ class HAL(PluginPrototype):
 
         if poisson:
             poisson_set = self.get_simulated_dataset("model map")
-  
+
         for plane_id in self._active_planes:
 
-            data_analysis_bin=self._maptree[plane_id]
+            data_analysis_bin = self._maptree[plane_id]
 
-            bkg=data_analysis_bin.background_map
-            obs=data_analysis_bin.observation_map
+            bkg = data_analysis_bin.background_map
+            obs = data_analysis_bin.observation_map
 
             if poisson:
                 model_excess = poisson_set._maptree[plane_id].observation_map - poisson_set._maptree[plane_id].background_map
             else:
                 model_excess = self._get_model_map(plane_id, n_pt, n_ext)
-            
-            if which=='residual':
+
+            if which == 'residual':
                 bkg += model_excess
 
-            if which=='model':
+            if which == 'model':
                 obs = model_excess + bkg
 
             this_bin = DataAnalysisBin(plane_id,
-                                   observation_hpx_map=obs,
-                                   background_hpx_map=bkg,
-                                   active_pixels_ids=self._active_pixels[plane_id],
-                                   n_transits=data_analysis_bin.n_transits,
-                                   scheme='RING')
+                                       observation_hpx_map=obs,
+                                       background_hpx_map=bkg,
+                                       active_pixels_ids=self._active_pixels[plane_id],
+                                       n_transits=data_analysis_bin.n_transits,
+                                       scheme='RING')
 
-            map_analysis_bins[plane_id]=this_bin
+            map_analysis_bins[plane_id] = this_bin
 
-        #save the file
+        # save the file
         new_map_tree = MapTree(map_analysis_bins, self._roi)
         new_map_tree.write(filename)
-
 
     def write_model_map(self, fileName, poisson=False):
         """
@@ -940,8 +933,6 @@ class HAL(PluginPrototype):
         The interface is based off of HAWCLike for consistency
         """
         self._write_a_map(fileName, 'model', poisson)
-        
-
 
     def write_residual_map(self, fileName):
         """
