@@ -78,9 +78,9 @@ class SparseHealpix(HealpixWrapperBase):
         # Make sure they have the same pixels
         assert np.array_equal(self._pixels_ids, other_map.pixels_ids)
 
-        dense_added = self.as_partial() + other_map.as_partial()
+        added = self.as_partial() + other_map.as_partial()
 
-        sparse_added = SparseHealpix(dense_added, self._pixels_ids, self.nside)
+        sparse_added = SparseHealpix(added, self._pixels_ids, self.nside)
         
         return sparse_added
 
