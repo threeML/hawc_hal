@@ -19,8 +19,8 @@ from threeML.io.progress_bar import progress_bar
 from astromodels import Parameter
 
 from hawc_hal.maptree import map_tree_factory
-from hawc_hal.maptree import MapTree
-from hawc_hal.maptree import DataAnalysisBin
+from hawc_hal.maptree.map_tree import MapTree
+from hawc_hal.maptree.data_analysis_bin import DataAnalysisBin
 from hawc_hal.response import hawc_response_factory
 from hawc_hal.convolved_source import ConvolvedPointSource, \
     ConvolvedExtendedSource3D, ConvolvedExtendedSource2D, ConvolvedSourcesContainer
