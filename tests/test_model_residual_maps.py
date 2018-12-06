@@ -1,17 +1,17 @@
 from hawc_hal import HAL, HealpixConeROI
 import matplotlib.pyplot as plt
 from threeML import *
-import os
-from os import getcwd
-from os.path import isfile
+#import os
+from os.path import isfile, dirname, realpath
 from hawc_hal.maptree import map_tree_factory
 
 
 
-cwd=getcwd()
+test_file = realpath(__file__)
 
-output = "{0}/data".format(cwd)
+file_dir = dirname(test_file)
 
+output = "{0}/data".format(file_dir)
 
 # Define the ROI
 ra_src, dec_src = 101.75, 16.0
