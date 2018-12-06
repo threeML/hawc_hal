@@ -177,7 +177,7 @@ fig.savefig("hal_corner_plot.png")
 ### Convert ROOT maptree to hdf5 maptree
 
 ```python
-from hawc_hal.map_tree import map_tree_factory
+from hawc_hal.maptree import map_tree_factory
 from hawc_hal import HealpixConeROI
 
 root_map_tree = "maptree_1024.root" # path to your ROOT maptree
