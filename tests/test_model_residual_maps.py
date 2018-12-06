@@ -10,8 +10,6 @@ cwd=os.getcwd()
 
 output = "{0}/data".format(cwd)
 
-assert os.path.isdir(output)
-
 
 # Define the ROI
 ra_src, dec_src = 101.75, 16.0
@@ -24,9 +22,11 @@ roi = HealpixConeROI(data_radius=data_radius,
                      ra=ra_src,
                      dec=dec_src)
 
-#maptree = "/Volumes/Disk/maps/nHit/liff/maptree_1024.root"
 maptree = "{0}/geminga_maptree.root".format(output)
 response = "{0}/detector_response.root".format(output)
+
+assert os.path.isfile(maptree)
+assert os.path.isfile(response)
 
 hawc = HAL("HAWC",
            maptree,
