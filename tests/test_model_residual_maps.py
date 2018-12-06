@@ -1,41 +1,21 @@
 import pytest
+from os.path import dirname
+from hawc_hal import HealpixConeROI, HAL
+from hawc_hal.maptree import map_tree_factory
+from threeML import Model, JointLikelihood, DataList
+import astropy.units as u
+from astromodels import PointSource, ExtendedSource, Powerlaw, Gaussian_on_sphere
 
-@pytest.fixture
-def input():
-    from os.path import isfile, dirname, abspath
-    from hawc_hal import HealpixConeROI
-    # Define the ROI
-    ra_src, dec_src = 101.75, 16.0
-    
-    data_radius = 5.0
-    model_radius = 7.0
-    
-    roi = HealpixConeROI(data_radius=data_radius,
-                         model_radius=model_radius,
-                         ra=ra_src,
-                         dec=dec_src)
+from conftest import check_map_trees
 
-    test_file = abspath(__file__)
-    file_dir = dirname(test_file)
-    output = "{0}/data".format(file_dir)
+def test_model_residual_maps(geminga_maptree, geminga_response, geminga_roi):
 
-    maptree = "{0}/geminga_maptree.root".format(output)
-    response = "{0}/detector_response.root".format(output)
+    #data_radius = 5.0
+    #model_radius = 7.0
+    output = dirname(geminga_maptree)
 
-    assert isfile(maptree) == True
-    assert isfile(response) == True
-
-    return ( maptree, response, roi, output, ra_src, dec_src )
-
-def test_model_residual_maps(input):
-    from hawc_hal.maptree import map_tree_factory
-    from hawc_hal import HAL
-    from threeML import Model, JointLikelihood, DataList
-    import astropy.units as u
-    from astromodels import PointSource, ExtendedSource, Powerlaw, Gaussian_on_sphere
-
-
-    maptree, response, roi, output, ra_src, dec_src, = input
+    ra_src, dec_src = 101.7, 16.0
+    maptree, response, roi  = geminga_maptree, geminga_response, geminga_roi
 
     hawc = HAL("HAWC", maptree, response, roi)
 
@@ -54,7 +34,7 @@ def test_model_residual_maps(input):
 
     '''
     pt_shift=3.0
-    ext_shift = 1.0
+    ext_shift = 2.0
 
     # First source
     spectrum1 = Powerlaw()
@@ -109,33 +89,6 @@ def test_model_residual_maps(input):
     hawc_model = map_tree_factory(model_file_name,roi)
     hawc_residual = map_tree_factory(residual_file_name,roi)
 
-    # Check to see if it worked!
-    for model_bin_name, residual_bin_name in zip(hawc_model.analysis_bins_labels, hawc_residual.analysis_bins_labels):
 
-        assert model_bin_name == residual_bin_name
-
-        '''
-        Check the model maps!
-        '''
-        model_bin = hawc_model[model_bin_name]
-
-        check_model = model_map_tree[model_bin_name]
-
-        # good model file
-        assert all( model_bin.observation_map.as_partial() == check_model.observation_map.as_partial() )
-        assert all( model_bin.background_map.as_partial() == check_model.background_map.as_partial() )
-        # good pixel ids (defined as same for both bkg and obs, so we only test one
-        assert all( model_bin.observation_map.pixels_ids == check_model.observation_map.pixels_ids )
-
-        '''
-        Now check the residual maps
-        '''
-        residual_bin = hawc_residual[residual_bin_name]
-
-        check_residual = residual_map_tree[residual_bin_name]
-
-        # good residual file
-        assert all( residual_bin.observation_map.as_partial() == check_residual.observation_map.as_partial() )
-        assert all( residual_bin.background_map.as_partial() == check_residual.background_map.as_partial() )
-        # good pixel ids (defined as same for both bkg and obs, so we only test one
-        assert all( residual_bin.observation_map.pixels_ids == check_residual.observation_map.pixels_ids )
+    check_map_trees(hawc_model, model_map_tree)
+    check_map_trees(hawc_residual, residual_map_tree)
