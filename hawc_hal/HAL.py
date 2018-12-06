@@ -820,7 +820,8 @@ class HAL(PluginPrototype):
 
         proj = self._represent_healpix_map(fig, total, longitude, latitude, xsize, resolution, smoothing_kernel_sigma)
 
-        sub.imshow(proj, origin='lower')
+        cax = sub.imshow(proj, origin='lower')
+        fig.colorbar(cax)
         sub.axis('off')
 
         hp.graticule(delta_coord, delta_coord)
@@ -869,7 +870,7 @@ class HAL(PluginPrototype):
     def _get_excess(self, data_analysis_bin, all_maps=True):
         """
         This function returns the excess counts for a particular bin
-        if all=True, also returns the data and background maps
+        if all_maps=True, also returns the data and background maps
         """
         data_map = data_analysis_bin.observation_map.as_dense()
         bkg_map = data_analysis_bin.background_map.as_dense()
@@ -879,7 +880,7 @@ class HAL(PluginPrototype):
             return excess, data_map, bkg_map
         return excess
 
-    def _write_a_map(self, file_name, which, fluctuate=False):
+    def _write_a_map(self, file_name, which, fluctuate=False, return_map=False):
         """
         This writes either a model map or a residual map, depending on which one is preferred
         """
@@ -926,16 +927,27 @@ class HAL(PluginPrototype):
         new_map_tree = MapTree(map_analysis_bins, self._roi)
         new_map_tree.write(file_name)
 
-    def write_model_map(self, file_name, poisson_fluctuate=False):
+        if return_map:
+            return new_map_tree
+
+    def write_model_map(self, file_name, poisson_fluctuate=False, test_return_map=False):
         """
         This function writes the model map to a file. (it is currently not implemented)
         The interface is based off of HAWCLike for consistency
         """
-        self._write_a_map(file_name, 'model', poisson_fluctuate)
+        if test_return_map:
+            print("You should only return a model map here for testing purposes!")
+            return self._write_a_map(file_name, 'model', poisson_fluctuate, test_return_map)
+        else:
+            self._write_a_map(file_name, 'model', poisson_fluctuate, test_return_map)
 
-    def write_residual_map(self, file_name):
+    def write_residual_map(self, file_name, test_return_map=False):
         """
         This function writes the residual map to a file. (it is currently not implemented)
         The interface is based off of HAWCLike for consistency
         """
-        self._write_a_map(file_name, 'residual')
+        if test_return_map:
+            print("You should only return a residual map here for testing purposes!")
+            return self._write_a_map(file_name, 'residual', False, test_return_map)
+        else:
+            self._write_a_map(file_name, 'residual', False, test_return_map)
