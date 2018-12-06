@@ -2,11 +2,13 @@ from hawc_hal import HAL, HealpixConeROI
 import matplotlib.pyplot as plt
 from threeML import *
 import os
+from os import getcwd
+from os.path import isfile
 from hawc_hal.maptree import map_tree_factory
 
 
 
-cwd=os.getcwd()
+cwd=getcwd()
 
 output = "{0}/data".format(cwd)
 
@@ -25,8 +27,8 @@ roi = HealpixConeROI(data_radius=data_radius,
 maptree = "{0}/geminga_maptree.root".format(output)
 response = "{0}/detector_response.root".format(output)
 
-assert os.path.isfile(maptree)
-assert os.path.isfile(response)
+assert isfile(maptree) == True
+assert isfile(response) == True
 
 hawc = HAL("HAWC",
            maptree,
