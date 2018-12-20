@@ -199,7 +199,7 @@ class HAL(PluginPrototype):
 
         :return:
         """
-        return sum(self._saturated_model_like_per_maptree.values())
+        return sum(self._saturated_model_like_per_maptree[bin_label] for bin_label in self._active_planes)
 
     def set_active_measurements(self, bin_id_min=None, bin_id_max=None, bin_list=None):
         """

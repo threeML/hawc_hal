@@ -76,7 +76,7 @@ class MapTree(object):
         first_analysis_bin = maptree["bin_name 0"]
 
         :param item: string for access by name
-        :return: the analysis bin_name
+        :return: the analysis bin
         """
 
         try:
@@ -85,7 +85,7 @@ class MapTree(object):
 
         except IndexError:
 
-            raise IndexError("Analysis bin_name with index %i does not exist" % (item))
+            raise IndexError("Analysis bin with index %i does not exist" % (item))
 
     def __len__(self):
 
