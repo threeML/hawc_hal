@@ -39,7 +39,7 @@ def hawc_response_factory(response_file_name):
 
             new_instance = HAWCResponse.from_root_file(response_file_name)
 
-        elif extension in ['.hd5', '.hdf5']:
+        elif extension in ['.hd5', '.hdf5', '.hdf']:
 
             new_instance = HAWCResponse.from_hdf5(response_file_name)
 
@@ -124,7 +124,7 @@ class HAWCResponse(object):
                 sim_differential_photon_fluxes = this_effarea_df.loc[:, 'sim_differential_photon_fluxes'].values
                 sim_signal_events_per_bin = this_effarea_df.loc[:, 'sim_signal_events_per_bin'].values
 
-                this_psf = PSFWrapper.from_pandas(psf_dfs.loc[dec_center, energy_bin])
+                this_psf = PSFWrapper.from_pandas(psf_dfs.loc[dec_center, energy_bin, :])
 
                 this_response_bin = ResponseBin(energy_bin, min_dec, max_dec, dec_center,
                                                 sim_n_sig_events, sim_n_bg_events,

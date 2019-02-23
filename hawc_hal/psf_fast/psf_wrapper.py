@@ -128,7 +128,21 @@ class PSFWrapper(object):
     @classmethod
     def from_pandas(cls, df):
 
-        return cls(df.loc[:, 'xs'].values, df.loc[:, 'ys'].values)
+        # Check for an invalid PSF
+        xs = df.loc[:, 'xs'].values
+        ys = df.loc[:, 'ys'].values
+
+        if len(xs) == 0:
+
+            # Should never happen
+            assert len(ys) == 0, "Corrupted response file? A PSF has 0 xs values but more than 0 ys values"
+
+            # An invalid PSF
+            return InvalidPSF()
+
+        else:
+
+            return cls(xs, ys)
 
     @classmethod
     def from_TF1(cls, tf1_instance):
@@ -180,8 +194,18 @@ class InvalidPSF(object):
     def __deepcopy__(self, memo):
         return InvalidPSF()
 
+    # This allow the Invalid PSF to be saved in the HDF file
+    def to_pandas(self):
+
+        items = (('xs', []), ('ys', []))
+
+        return pd.DataFrame.from_dict(dict(items))
+
     def __getattribute__(self, item):
 
-        if item == "__deepcopy__":
+        # White list of available attributes
+        if item in ["__deepcopy__", "to_pandas"]:
+
             return object.__getattribute__(self, item)
+
         raise InvalidPSFError("Trying to use an invalid PSF")
