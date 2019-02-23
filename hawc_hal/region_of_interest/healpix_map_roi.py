@@ -12,7 +12,7 @@ from ..flat_sky_projection import FlatSkyProjection
 
 class HealpixMapROI(HealpixROIBase):
 
-    def __init__(self, model_radius, data_radius, roimap=None, roifile=None, threshold=0.5, *args, **kwargs):
+    def __init__(self, data_radius, model_radius, roimap=None, roifile=None, threshold=0.5, *args, **kwargs):
         """
         A cone Region of Interest defined by a healpix map (can be read from a fits file).
         User needs to supply a cone region (center and radius) defining the plane projection for the model map.
@@ -104,7 +104,7 @@ class HealpixMapROI(HealpixROIBase):
     @classmethod
     def from_dict(cls, data):
 
-        return cls(data['model_radius_deg'], data['data_radius_deg'], threshold=data['threshold'],
+        return cls(data['data_radius_deg'], data['model_radius_deg'], threshold=data['threshold'],
                    roimap=data['roimap'], ra=data['ra'],
                    dec=data['dec'], roifile=data['roifile'])
 
