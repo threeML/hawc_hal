@@ -22,17 +22,17 @@ class HealpixMapROI(HealpixROIBase):
             Model map centered on (R.A., Dec) = (1.23, 4.56) in J2000 ICRS coordinate system,
             with a radius of 5 degrees, ROI defined in healpix map in fitsfile:
 
-            > roi = HealpixMapROI(5.0, ra=1.23, dec=4.56, file = "myROI.fits" )
+            > roi = HealpixMapROI(model_radius=5.0, data_radius=4.0, ra=1.23, dec=4.56, file = "myROI.fits" )
 
             Model map centered on (L, B) = (1.23, 4.56) (Galactic coordiantes)
             with a radius of 30 arcmin, ROI defined on-the-fly in healpix map:
 
-            > roi = HealpixMapROI(30.0 * u.arcmin, l=1.23, dec=4.56, map = my_roi)
+            > roi = HealpixMapROI(model_radius=30.0 * u.arcmin, data_radius=20.0 * u.arcmin, l=1.23, dec=4.56, map = my_roi)
 
         :param model_radius: radius of the model cone. Either an astropy.Quantity instance, or a float, in which case it
         is assumed to be the radius in degrees
         :param data_radius: radius used for displaying maps. Either an astropy.Quantity instance, or a float, in which case it
-        is assumed to be the radius in degrees
+        is assumed to be the radius in degrees. Note: THIS RADIUS IS JUST USED FOR PLOTTING, DOES NOT AFFECT THE FIT.
         :param map: healpix map containing the ROI.
         :param file: fits file containing a healpix map with the ROI.
         :param threshold: value below which pixels in the map will be set inactive (=not in ROI).
