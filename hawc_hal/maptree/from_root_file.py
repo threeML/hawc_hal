@@ -67,8 +67,13 @@ def from_root_file(map_tree_file, roi):
 
     with open_ROOT_file(map_tree_file) as f:
 
-        data_bins_labels = list(root_numpy.tree2array(f.Get("BinInfo"), "name"))
-
+        try:
+            data_bins_labels = list(root_numpy.tree2array(f.Get("BinInfo"), "name"))
+        except ValueError:
+            data_bins_labels = list(root_numpy.tree2array(f.Get("BinInfo"), "id"))
+            data_bins_labels = [ str(i) for i in data_bins_labels ]
+        else:
+            raise ValueError, "Unknown Tree name: Not 'id' or 'name' "
         # A transit is defined as 1 day, and totalDuration is in hours
         # Get the number of transit from bin 0 (as LiFF does)
 
