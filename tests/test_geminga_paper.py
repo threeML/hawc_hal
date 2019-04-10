@@ -14,7 +14,7 @@ from threeML import *
 import argparse
 from collections import namedtuple
 
-
+@pytest.mark.xfail
 def test_geminga_paper(geminga_maptree, geminga_response):
 
     Args_fake = namedtuple('args', 'mtfile,rsfile,startBin,stopBin,RA,Dec,uratio,delta,ROI,output,plugin')
