@@ -1,4 +1,5 @@
 from hawc_hal import HAL, HealpixConeROI
+import pytest
 
 try:
 
