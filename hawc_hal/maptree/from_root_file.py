@@ -67,7 +67,26 @@ def from_root_file(map_tree_file, roi):
 
     with open_ROOT_file(map_tree_file) as f:
 
-        data_bins_labels = list(root_numpy.tree2array(f.Get("BinInfo"), "name"))
+        # Newer maps use "name" rather than "id"
+        try:
+
+            data_bins_labels = list(root_numpy.tree2array(f.Get("BinInfo"), "name"))
+
+        except ValueError:
+
+            # Check to see if its an old style maptree 
+            try:
+
+                data_bins_labels = list(root_numpy.tree2array(f.Get("BinInfo"), "id"))
+
+            except ValueError:
+                
+                # Give a useful error message
+                raise ValueError, "Maptree has no Branch: 'id' or 'name' "
+
+            # If the old style, we need to make them strings
+            data_bins_labels = [ str(i) for i in data_bins_labels ]
+
 
         # A transit is defined as 1 day, and totalDuration is in hours
         # Get the number of transit from bin 0 (as LiFF does)
