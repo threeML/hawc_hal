@@ -234,7 +234,7 @@ class HAL(PluginPrototype):
                 this_bin = str(this_bin)
                 if this_bin not in self._all_planes:
 
-                    raise ValueError("Bin {0} it not contained in this maptree".format(this_bin))
+                    raise ValueError("Bin {0} is not contained in this maptree".format(this_bin))
 
                 self._active_planes.append(this_bin)
 
@@ -250,7 +250,7 @@ class HAL(PluginPrototype):
 
                 if not this_bin in self._all_planes:
 
-                    raise ValueError("Bin {0} it not contained in this maptree".format(this_bin))
+                    raise ValueError("Bin {0} is not contained in this maptree".format(this_bin))
 
                 self._active_planes.append(this_bin)
 
