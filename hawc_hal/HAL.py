@@ -169,7 +169,6 @@ class HAL(PluginPrototype):
 
         self._psf_convolutors = collections.OrderedDict()
         for bin_id in central_response_bins:
-
             #Only set up PSF convolutors for active bins.
             if bin_id in self._active_planes:
                 self._psf_convolutors[bin_id] = PSFConvolutor(central_response_bins[bin_id].psf,
@@ -235,7 +234,7 @@ class HAL(PluginPrototype):
                 this_bin = str(this_bin)
                 if this_bin not in self._all_planes:
 
-                    raise ValueError("Bin %s it not contained in this response" % this_bin)
+                    raise ValueError("Bin {0} it not contained in this maptree".format(this_bin))
 
                 self._active_planes.append(this_bin)
 
@@ -251,7 +250,7 @@ class HAL(PluginPrototype):
 
                 if not this_bin in self._all_planes:
 
-                    raise ValueError("Bin %s it not contained in this response" % this_bin)
+                    raise ValueError("Bin {0} it not contained in this maptree".format(this_bin))
 
                 self._active_planes.append(this_bin)
 
