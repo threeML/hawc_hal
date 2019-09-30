@@ -692,7 +692,7 @@ class HAL(PluginPrototype):
         n_columns = 4
 
         fig, subs = plt.subplots(n_active_planes, n_columns,
-                                 figsize=(2.7 * n_columns, n_active_planes * 2))
+                                 figsize=(2.7 * n_columns, n_active_planes * 2), squeeze=False)
 
         with progress_bar(len(self._active_planes), title='Smoothing maps') as prog_bar:
 
