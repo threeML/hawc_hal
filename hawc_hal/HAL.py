@@ -409,14 +409,15 @@ class HAL(PluginPrototype):
     def _plot_spectrum(self, net_counts, yerr, model_only, residuals, residuals_err):
 
         fig, subs = plt.subplots(2, 1, gridspec_kw={'height_ratios': [2, 1], 'hspace': 0})
+        
+        #numerical values for the x axis needed for some older versions of matplotlib.
+        numerical_xs = np.arange( 0, len(self._active_planes) )
 
-        xs = np.arange( 0, len(self._active_planes) )
-
-        subs[0].errorbar(xs, net_counts, yerr=yerr,
+        subs[0].errorbar(numerical_xs, net_counts, yerr=yerr,
                          capsize=0,
                          color='black', label='Net counts', fmt='.')
 
-        subs[0].plot(xs, model_only, label='Convolved model')
+        subs[0].plot(numerical_xs, model_only, label='Convolved model')
 
         subs[0].legend(bbox_to_anchor=(1.0, 1.0), loc="upper right",
                        numpoints=1)
@@ -425,7 +426,7 @@ class HAL(PluginPrototype):
         subs[1].axhline(0, linestyle='--')
 
         subs[1].errorbar(
-            xs, residuals,
+            numerical_xs, residuals,
             yerr=residuals_err,
             capsize=0, fmt='.'
         )
@@ -438,7 +439,7 @@ class HAL(PluginPrototype):
 
         subs[1].set_xlabel("Analysis bin")
         subs[1].set_ylabel(r"$\frac{{cts - mod - bkg}}{\sqrt{mod + bkg}}$")
-        subs[1].set_xticks(xs)
+        subs[1].set_xticks(numerical_xs)
         subs[1].set_xticklabels(self._active_planes)
 
         subs[0].set_ylim(y_limits)
