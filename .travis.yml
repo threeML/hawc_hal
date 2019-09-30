@@ -4,7 +4,7 @@ os:
 - osx
 osx_image: xcode6.4
 dist: trusty
-sudo: false
+sudo: required
 
 env:
   - MPLBACKEND='Agg' OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 NUMEXPR_NUM_THREADS=1 PATH="${HOME}/miniconda/bin:${PATH}"
@@ -15,67 +15,14 @@ cache:
     - $HOME/miniconda
   timeout: 1000
 
-before_cache:
-  - if ! [[ $TRAVIS_TAG ]]; then rm -rf $HOME/miniconda/conda-bld; fi
-  - conda clean -y -a
-  - rm -rf $HOME/miniconda/locks $HOME/miniconda/pkgs $HOME/miniconda/var $HOME/miniconda/conda-meta/history
-
-
 before_install:
   - echo "listing home"
   - ls $HOME
   - echo "end of listing"
-  - |
-
-        if [ ! -d "$HOME/miniconda/envs/test-environment" ]; then
-
-            rm -rf $HOME/miniconda
-
-            # Rebuilding the cache
-
-            echo "########################################"
-            echo "INSTALLATION CACHE NOT FOUND. REBUILDING"
-            echo "########################################"
-
-            # Install Miniconda appropriate for the system (Mac or Linux)
-
-            if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then
-
-                wget https://repo.continuum.io/miniconda/Miniconda2-latest-Linux-x86_64.sh -O miniconda.sh
-
-            else
-
-              wget https://repo.continuum.io/miniconda/Miniconda2-latest-MacOSX-x86_64.sh -O miniconda.sh
-
-            fi
-
-            # Install miniconda and all the packages
-
-            bash miniconda.sh -b -p $HOME/miniconda
-            hash -r
-            conda config --set always_yes yes --set changeps1 no
-            conda update -q conda
-            conda create -q -n test-environment -c conda-forge -c threeml python=2.7 root5 numba numpy scipy astropy healpy threeml
-
-        else
-
-            # Using cache
-
-            echo "##################################"
-            echo "INSTALLATION CACHE FOUND. REUSING"
-            echo "##################################"
-
-        fi
+  - source ci/install_miniconda.sh
 
 install:
-  - conda config --set always_yes yes --set changeps1 no
-  - conda info -a
-  - source activate test-environment
-  - hash -r
-  - conda update -c conda-forge -c threeml threeml astromodels
-  - conda install -c conda-forge pytest-cov codecov
-  - pip install root_numpy
-  - pip install .
+  - source ci/install_package.sh
 
 script:
   - while sleep 540; do echo "=====[ $SECONDS seconds still running ]====="; done &
@@ -86,3 +33,8 @@ script:
 
 after_success:
   - codecov
+
+before_cache:
+  - if ! [[ $TRAVIS_TAG ]]; then rm -rf $HOME/miniconda/conda-bld; fi
+  - conda clean -y -a
+  - rm -rf $HOME/miniconda/locks $HOME/miniconda/pkgs $HOME/miniconda/var $HOME/miniconda/conda-meta/history

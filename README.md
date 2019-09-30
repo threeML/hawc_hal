@@ -1,4 +1,4 @@
-[![Build Status](https://travis-ci.org/giacomov/hawc_hal.svg?branch=master)](https://travis-ci.org/giacomov/hawc_hal)
+[![Build Status](https://travis-ci.org/threeML/hawc_hal.svg?branch=master)](https://travis-ci.org/threeML/hawc_hal)
 [![codecov](https://codecov.io/gh/giacomov/hawc_hal/branch/master/graph/badge.svg)](https://codecov.io/gh/giacomov/hawc_hal)
 [![Maintainability](https://api.codeclimate.com/v1/badges/7a1c8e60a5cde4275292/maintainability)](https://codeclimate.com/github/giacomov/hawc_hal/maintainability)
 [![Scrutinizer Code Quality](https://scrutinizer-ci.com/g/giacomov/hawc_hal/badges/quality-score.png?b=master)](https://scrutinizer-ci.com/g/giacomov/hawc_hal/?branch=master)
@@ -16,6 +16,7 @@ If you have `conda` installed, it is highly reccomended that you install `numba`
 Then:
 
 ```bash
+> pip install --no-binary :all: root_numpy 
 > pip uninstall hawc_hal -y ; pip install git+https://github.com/giacomov/hawc_hal.git
 ```
 
@@ -94,6 +95,15 @@ fig = hawc.display_spectrum()
 # Save it to file
 fig.savefig("hal_mkn421_residuals.png")
 
+# See the spectrum fit
+fig = plot_point_source_spectra(jl.results,
+                                ene_min=0.1,
+                                ene_max=100,
+                                num_ene=50,
+                                energy_unit='TeV',
+                                flux_unit='TeV/(s cm2)')
+fig.savefig("hal_mkn421_fit_spectrum.png")
+
 # Look at the different energy planes (the columns are model, data, residuals)
 fig = hawc.display_fit(smoothing_kernel_sigma=0.3)
 fig.savefig("hal_mkn421_fit_planes.png")
@@ -159,7 +169,7 @@ for parameter in model.parameters.values():
 # Let's execute our bayes analysis
 bs = BayesianAnalysis(model, data)
 samples = bs.sample(30, 100, 100)
-fig = bs.corner_plot()
+fig = bs.results.corner_plot()
 
 fig.savefig("hal_corner_plot.png")
 ```
@@ -167,7 +177,7 @@ fig.savefig("hal_corner_plot.png")
 ### Convert ROOT maptree to hdf5 maptree
 
 ```python
-from hawc_hal.map_tree import map_tree_factory
+from hawc_hal.maptree import map_tree_factory
 from hawc_hal import HealpixConeROI
 
 root_map_tree = "maptree_1024.root" # path to your ROOT maptree

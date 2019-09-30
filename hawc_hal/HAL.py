@@ -19,6 +19,8 @@ from threeML.io.progress_bar import progress_bar
 from astromodels import Parameter
 
 from hawc_hal.maptree import map_tree_factory
+from hawc_hal.maptree.map_tree import MapTree
+from hawc_hal.maptree.data_analysis_bin import DataAnalysisBin
 from hawc_hal.response import hawc_response_factory
 from hawc_hal.convolved_source import ConvolvedPointSource, \
     ConvolvedExtendedSource3D, ConvolvedExtendedSource2D, ConvolvedSourcesContainer
@@ -28,6 +30,7 @@ from hawc_hal.healpix_handling import get_gnomonic_projection
 from hawc_hal.psf_fast import PSFConvolutor
 from hawc_hal.log_likelihood import log_likelihood
 from hawc_hal.util import ra_to_longitude
+
 
 
 class HAL(PluginPrototype):
@@ -166,7 +169,11 @@ class HAL(PluginPrototype):
 
         self._psf_convolutors = collections.OrderedDict()
         for bin_id in central_response_bins:
-            self._psf_convolutors[bin_id] = PSFConvolutor(central_response_bins[bin_id].psf, self._flat_sky_projection)
+            #Only set up PSF convolutors for active bins.
+            if bin_id in self._active_planes:
+                self._psf_convolutors[bin_id] = PSFConvolutor(central_response_bins[bin_id].psf,
+                                                              self._flat_sky_projection)
+
 
     def _compute_likelihood_biases(self):
 
@@ -227,7 +234,7 @@ class HAL(PluginPrototype):
                 this_bin = str(this_bin)
                 if this_bin not in self._all_planes:
 
-                    raise ValueError("Bin %s it not contained in this response" % this_bin)
+                    raise ValueError("Bin {0} is not contained in this maptree".format(this_bin))
 
                 self._active_planes.append(this_bin)
 
@@ -243,9 +250,13 @@ class HAL(PluginPrototype):
 
                 if not this_bin in self._all_planes:
 
-                    raise ValueError("Bin %s it not contained in this response" % this_bin)
+                    raise ValueError("Bin {0} is not contained in this maptree".format(this_bin))
 
                 self._active_planes.append(this_bin)
+
+        if self._likelihood_model:
+
+            self.set_model( self._likelihood_model )
 
     def display(self, verbose=False):
         """
@@ -674,7 +685,7 @@ class HAL(PluginPrototype):
         n_ext_sources = self._likelihood_model.get_number_of_extended_sources()
 
         # This is the resolution (i.e., the size of one pixel) of the image
-        resolution = 3.0 # arcmin
+        resolution = 3.0  # arcmin
 
         # The image is going to cover the diameter plus 20% padding
         xsize = self._get_optimal_xsize(resolution)
@@ -683,7 +694,7 @@ class HAL(PluginPrototype):
         n_columns = 4
 
         fig, subs = plt.subplots(n_active_planes, n_columns,
-                                 figsize=(2.7 * n_columns, n_active_planes * 2))
+                                 figsize=(2.7 * n_columns, n_active_planes * 2), squeeze=False)
 
         with progress_bar(len(self._active_planes), title='Smoothing maps') as prog_bar:
 
@@ -696,12 +707,8 @@ class HAL(PluginPrototype):
                 # Get the center of the projection for this plane
                 this_ra, this_dec = self._roi.ra_dec_center
 
-                this_model_map_hpx = self._get_expectation(data_analysis_bin, plane_id, n_point_sources, n_ext_sources)
-
                 # Make a full healpix map for a second
-                whole_map = SparseHealpix(this_model_map_hpx,
-                                          self._active_pixels[plane_id],
-                                          data_analysis_bin.observation_map.nside).as_dense()
+                whole_map = self._get_model_map(plane_id, n_point_sources, n_ext_sources).as_dense()
 
                 # Healpix uses longitude between -180 and 180, while R.A. is between 0 and 360. We need to fix that:
                 longitude = ra_to_longitude(this_ra)
@@ -709,8 +716,8 @@ class HAL(PluginPrototype):
                 # Declination is already between -90 and 90
                 latitude = this_dec
 
-
                 # Background and excess maps
+                bkg_subtracted, _, background_map = self._get_excess(data_analysis_bin, all_maps=True)
 
                 # Make all the projections: model, excess, background, residuals
                 proj_model = self._represent_healpix_map(fig, whole_map,
@@ -718,8 +725,6 @@ class HAL(PluginPrototype):
                                                          xsize, resolution, smoothing_kernel_sigma)
                 # Here we removed the background otherwise nothing is visible
                 # Get background (which is in a way "part of the model" since the uncertainties are neglected)
-                background_map = data_analysis_bin.background_map.as_dense()
-                bkg_subtracted = data_analysis_bin.observation_map.as_dense() - background_map
                 proj_data = self._represent_healpix_map(fig, bkg_subtracted,
                                                         longitude, latitude,
                                                         xsize, resolution, smoothing_kernel_sigma)
@@ -817,7 +822,8 @@ class HAL(PluginPrototype):
 
         proj = self._represent_healpix_map(fig, total, longitude, latitude, xsize, resolution, smoothing_kernel_sigma)
 
-        sub.imshow(proj, origin='lower')
+        cax = sub.imshow(proj, origin='lower')
+        fig.colorbar(cax)
         sub.axis('off')
 
         hp.graticule(delta_coord, delta_coord)
@@ -848,3 +854,102 @@ class HAL(PluginPrototype):
             n_points += self._maptree[bin_id].observation_map.as_partial().shape[0]
 
         return n_points
+
+    def _get_model_map(self, plane_id, n_pt_src, n_ext_src):
+        """
+        This function returns a model map for a particular bin
+        """
+
+        if plane_id not in self._active_planes:
+            raise ValueError("{0} not a plane in the current model".format(plane_id))
+
+        model_map = SparseHealpix(self._get_expectation(self._maptree[plane_id], plane_id, n_pt_src, n_ext_src),
+                                  self._active_pixels[plane_id],
+                                  self._maptree[plane_id].observation_map.nside)
+
+        return model_map
+
+    def _get_excess(self, data_analysis_bin, all_maps=True):
+        """
+        This function returns the excess counts for a particular bin
+        if all_maps=True, also returns the data and background maps
+        """
+        data_map = data_analysis_bin.observation_map.as_dense()
+        bkg_map = data_analysis_bin.background_map.as_dense()
+        excess = data_map - bkg_map
+
+        if all_maps:
+            return excess, data_map, bkg_map
+        return excess
+
+    def _write_a_map(self, file_name, which, fluctuate=False, return_map=False):
+        """
+        This writes either a model map or a residual map, depending on which one is preferred
+        """
+        which = which.lower()
+        assert which in ['model', 'residual']
+
+        n_pt = self._likelihood_model.get_number_of_point_sources()
+        n_ext = self._likelihood_model.get_number_of_extended_sources()
+
+        map_analysis_bins = collections.OrderedDict()
+
+        if fluctuate:
+            poisson_set = self.get_simulated_dataset("model map")
+
+        for plane_id in self._active_planes:
+
+            data_analysis_bin = self._maptree[plane_id]
+
+            bkg = data_analysis_bin.background_map
+            obs = data_analysis_bin.observation_map
+
+            if fluctuate:
+                model_excess = poisson_set._maptree[plane_id].observation_map \
+                               - poisson_set._maptree[plane_id].background_map
+            else:
+                model_excess = self._get_model_map(plane_id, n_pt, n_ext)
+
+            if which == 'residual':
+                bkg += model_excess
+
+            if which == 'model':
+                obs = model_excess + bkg
+
+            this_bin = DataAnalysisBin(plane_id,
+                                       observation_hpx_map=obs,
+                                       background_hpx_map=bkg,
+                                       active_pixels_ids=self._active_pixels[plane_id],
+                                       n_transits=data_analysis_bin.n_transits,
+                                       scheme='RING')
+
+            map_analysis_bins[plane_id] = this_bin
+
+        # save the file
+        new_map_tree = MapTree(map_analysis_bins, self._roi)
+        new_map_tree.write(file_name)
+
+        if return_map:
+            return new_map_tree
+
+    def write_model_map(self, file_name, poisson_fluctuate=False, test_return_map=False):
+        """
+        This function writes the model map to a file. (it is currently not implemented)
+        The interface is based off of HAWCLike for consistency
+        """
+        if test_return_map:
+            print("You should only return a model map here for testing purposes!")
+            return self._write_a_map(file_name, 'model', poisson_fluctuate, test_return_map)
+        else:
+            self._write_a_map(file_name, 'model', poisson_fluctuate, test_return_map)
+
+    def write_residual_map(self, file_name, test_return_map=False):
+        """
+        This function writes the residual map to a file. (it is currently not implemented)
+        The interface is based off of HAWCLike for consistency
+        """
+        if test_return_map:
+            print("You should only return a residual map here for testing purposes!")
+            return self._write_a_map(file_name, 'residual', False, test_return_map)
+        else:
+            self._write_a_map(file_name, 'residual', False, test_return_map)
