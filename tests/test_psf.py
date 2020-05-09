@@ -1,3 +1,4 @@
+from __future__ import print_function
 import copy
 import pytest
 from hawc_hal.psf_fast import InvalidPSF, InvalidPSFError
@@ -11,4 +12,4 @@ def test_invalid_psf():
 
     # Check that another method raises the desired error
     with pytest.raises(InvalidPSFError):
-        print cpsf.repr()
+        print(cpsf.repr())

@@ -1,3 +1,5 @@
+from __future__ import division
+from past.utils import old_div
 import pytest
 from os.path import dirname
 from hawc_hal import HealpixConeROI, HAL
@@ -40,7 +42,7 @@ def test_model_residual_maps(geminga_maptree, geminga_response, geminga_roi):
     spectrum1 = Powerlaw()
     source1 = PointSource("point", ra=ra_src + pt_shift, dec=dec_src, spectral_shape=spectrum1)
 
-    spectrum1.K = 1e-12 / (u.TeV * u.cm ** 2 * u.s)
+    spectrum1.K = old_div(1e-12, (u.TeV * u.cm ** 2 * u.s))
     spectrum1.piv = 1 * u.TeV
     spectrum1.index = -2.3
 
@@ -53,7 +55,7 @@ def test_model_residual_maps(geminga_maptree, geminga_response, geminga_roi):
     spectrum2 = Powerlaw()
     source2 = ExtendedSource("extended", spatial_shape=shape, spectral_shape=spectrum2)
 
-    spectrum2.K = 1e-12 / (u.TeV * u.cm ** 2 * u.s) 
+    spectrum2.K = old_div(1e-12, (u.TeV * u.cm ** 2 * u.s)) 
     spectrum2.piv = 1 * u.TeV
     spectrum2.index = -2.0  
 
