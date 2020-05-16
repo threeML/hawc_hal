@@ -105,3 +105,6 @@ ENV/
 
 # ROOT files
 .root
+
+# baks from futurize
+*.bak
