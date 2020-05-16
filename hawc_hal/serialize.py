@@ -1,3 +1,4 @@
+from builtins import object
 from pandas import HDFStore
 
 
@@ -30,7 +31,7 @@ class Serialization(object):
     @property
     def keys(self):
 
-        return self._store.keys()
+        return list(self._store.keys())
 
     def store_pandas_object(self, path, obj, **metadata):
 
