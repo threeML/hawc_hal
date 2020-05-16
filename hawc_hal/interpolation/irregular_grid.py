@@ -1,3 +1,4 @@
+from builtins import object
 import numpy as np
 from ..util import cartesian
 import scipy.spatial.qhull as qhull
