@@ -1,3 +1,4 @@
+from __future__ import print_function
 from hawc_hal import HAL
 import matplotlib.pyplot as plt
 from threeML import *
@@ -147,7 +148,7 @@ def test_bayesian_analysis(test_fit):
     pts_model.pts.position.dec.free = False
 
     # For this quick example, let's use a uniform prior for all parameters
-    for parameter in pts_model.parameters.values():
+    for parameter in list(pts_model.parameters.values()):
 
         if parameter.fix:
             continue

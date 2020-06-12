@@ -1,3 +1,5 @@
+from __future__ import print_function
+from builtins import range
 from hawc_hal.maptree import map_tree_factory
 from astropy.io import fits
 

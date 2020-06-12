@@ -1,3 +1,7 @@
+from __future__ import absolute_import
+from builtins import map
+from builtins import str
+from builtins import range
 import os
 import socket
 import collections
@@ -7,7 +11,7 @@ from threeML.io.file_utils import file_existing_and_readable, sanitize_filename
 from threeML.exceptions.custom_exceptions import custom_warnings
 
 from ..region_of_interest import HealpixROIBase
-from data_analysis_bin import DataAnalysisBin
+from .data_analysis_bin import DataAnalysisBin
 
 from ..healpix_handling import SparseHealpix, DenseHealpix
 
@@ -82,7 +86,7 @@ def from_root_file(map_tree_file, roi):
             except ValueError:
                 
                 # Give a useful error message
-                raise ValueError, "Maptree has no Branch: 'id' or 'name' "
+                raise ValueError("Maptree has no Branch: 'id' or 'name' ")
 
             # If the old style, we need to make them strings
             data_bins_labels = [ str(i) for i in data_bins_labels ]
@@ -181,7 +185,7 @@ def _read_partial_tree(ttree_instance, elements_to_read):
         entrylist = ROOT.TEntryList()
 
         # Add the selections
-        _ = map(entrylist.Enter, elements_to_read)
+        _ = list(map(entrylist.Enter, elements_to_read))
 
         # Apply the EntryList to the tree
         ttree_instance.SetEntryList(entrylist)

@@ -1,3 +1,6 @@
+from __future__ import division
+from __future__ import print_function
+from past.utils import old_div
 import matplotlib
 matplotlib.use("Agg")
 
@@ -94,12 +97,12 @@ def check_responses(r1, r2):
 
     assert len(r1.response_bins) == len(r2.response_bins)
 
-    for resp_key in r1.response_bins.keys():
+    for resp_key in list(r1.response_bins.keys()):
 
         rbb1 = r1.response_bins[resp_key]
         rbb2 = r2.response_bins[resp_key]
 
-        assert len(rbb1.keys()) == len(rbb2.keys())
+        assert len(list(rbb1.keys())) == len(list(rbb2.keys()))
 
         for rb_key in rbb1:
 
@@ -214,7 +217,7 @@ def point_source_model(ra=83.6279, dec=22.14):
 
     spectrum.piv.fix = True
 
-    spectrum.K = 3.15e-11 / (u.TeV * u.cm ** 2 * u.s)  # norm (in 1/(keV cm2 s))
+    spectrum.K = old_div(3.15e-11, (u.TeV * u.cm ** 2 * u.s))  # norm (in 1/(keV cm2 s))
     spectrum.K.bounds = (1e-23, 1e-17)  # without units energies are in keV
 
     spectrum.index = -2.0

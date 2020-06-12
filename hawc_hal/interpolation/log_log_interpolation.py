@@ -1,3 +1,4 @@
+from builtins import object
 import numpy as np
 from numpy import log10
 from math import log10 as mlog10

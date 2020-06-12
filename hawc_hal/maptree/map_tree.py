@@ -1,3 +1,8 @@
+from __future__ import division
+from __future__ import print_function
+from __future__ import absolute_import
+from builtins import object
+from past.utils import old_div
 import os
 import numpy as np
 import pandas as pd
@@ -6,8 +11,8 @@ from threeML.io.rich_display import display
 from threeML.io.file_utils import sanitize_filename
 
 from ..serialize import Serialization
-from from_root_file import from_root_file
-from from_hdf5_file import from_hdf5_file
+from .from_root_file import from_root_file
+from .from_hdf5_file import from_hdf5_file
 
 import astropy.units as u
 
@@ -94,13 +99,13 @@ class MapTree(object):
     @property
     def analysis_bins_labels(self):
 
-        return self._analysis_bins.keys()
+        return list(self._analysis_bins.keys())
 
     def display(self):
 
         df = pd.DataFrame()
 
-        df['Bin'] = self._analysis_bins.keys()
+        df['Bin'] = list(self._analysis_bins.keys())
         df['Nside'] = [self._analysis_bins[bin_id].nside for bin_id in self._analysis_bins]
         df['Scheme'] = [self._analysis_bins[bin_id].scheme for bin_id in self._analysis_bins]
 
@@ -132,13 +137,13 @@ class MapTree(object):
 
         df['Obs counts'] = obs_counts
         df['Bkg counts'] = bkg_counts
-        df['obs/bkg'] = obs_counts / bkg_counts
+        df['obs/bkg'] = old_div(obs_counts, bkg_counts)
         df['Pixels in ROI'] = n_pixels
         df['Area (deg^2)'] = sky_area
 
         display(df)
 
-        first_bin_id = self._analysis_bins.keys()[0]
+        first_bin_id = list(self._analysis_bins.keys())[0]
         print("This Map Tree contains %.3f transits in the first bin" \
             % self._analysis_bins[first_bin_id].n_transits)
         print("Total data size: %.2f Mb" % (size * u.byte).to(u.megabyte).value)

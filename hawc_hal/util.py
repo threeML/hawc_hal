@@ -1,3 +1,6 @@
+from __future__ import division
+from builtins import range
+from past.utils import old_div
 import numpy as np
 
 
@@ -23,7 +26,7 @@ def cartesian_(arrays, out=None):
 
         out = np.zeros([n, len(arrays)], dtype=dtype)
 
-    m = n / arrays[0].size
+    m = old_div(n, arrays[0].size)
     out[:,0] = np.repeat(arrays[0], m)
 
     if arrays[1:]:

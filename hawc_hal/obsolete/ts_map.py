@@ -1,3 +1,8 @@
+from __future__ import division
+from __future__ import print_function
+from builtins import range
+from builtins import object
+from past.utils import old_div
 from threeML import *
 import numpy as np
 import warnings
@@ -14,7 +19,7 @@ from threeML.parallel.parallel_client import ParallelClient, is_parallel_computa
 from threeML.io.progress_bar import progress_bar
 from threeML.io.fits_file import FITSFile
 
-crab_diff_flux_at_1_TeV = 2.65e-11 / (u.TeV * u.cm**2 * u.s)
+crab_diff_flux_at_1_TeV = old_div(2.65e-11, (u.TeV * u.cm**2 * u.s))
 
 
 class ParallelTSmap(object):
@@ -136,7 +141,7 @@ class ParallelTSmap(object):
                 
                 warnings.warn("The number of Dec bands is not a multiple of the number of engine. Make it so for optimal performances.", RuntimeWarning)
             
-            res = client.execute_with_progress_bar(self.worker, range(len(self._points)), chunk_size=self._n_ras)
+            res = client.execute_with_progress_bar(self.worker, list(range(len(self._points))), chunk_size=self._n_ras)
         
         else:
             

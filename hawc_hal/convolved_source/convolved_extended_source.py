@@ -1,3 +1,8 @@
+from __future__ import division
+from __future__ import print_function
+from builtins import zip
+from past.utils import old_div
+from builtins import object
 import numpy as np
 
 from astromodels import use_astromodels_memoization
@@ -45,9 +50,9 @@ class ConvolvedExtendedSource(object):
         dec_max = min(max([dec1, dec2, dec3, dec4]), lat_stop)
 
         # Get the defined dec bins lower edges
-        lower_edges = np.array(map(lambda x: x[0], response.dec_bins))
-        upper_edges = np.array(map(lambda x: x[-1], response.dec_bins))
-        centers = np.array(map(lambda x: x[1], response.dec_bins))
+        lower_edges = np.array([x[0] for x in response.dec_bins])
+        upper_edges = np.array([x[-1] for x in response.dec_bins])
+        centers = np.array([x[1] for x in response.dec_bins])
 
         dec_bins_to_consider_idx = np.flatnonzero((upper_edges >= dec_min) & (lower_edges <= dec_max))
 
@@ -58,7 +63,7 @@ class ConvolvedExtendedSource(object):
         # Add one dec bin to cover the first part
         dec_bins_to_consider_idx = np.insert(dec_bins_to_consider_idx, 0, [dec_bins_to_consider_idx[0] - 1])
 
-        self._dec_bins_to_consider = map(lambda x: response.response_bins[centers[x]], dec_bins_to_consider_idx)
+        self._dec_bins_to_consider = [response.response_bins[centers[x]] for x in dec_bins_to_consider_idx]
 
         print("Considering %i dec bins for extended source %s" % (len(self._dec_bins_to_consider),
                                                                   self._name))
@@ -82,7 +87,7 @@ class ConvolvedExtendedSource(object):
         assert np.sum(self._active_flat_sky_mask) > 0, "Mismatch between source %s and ROI" % self._name
 
         # Get the energies needed for the computation of the flux
-        self._energy_centers_keV = self._central_response_bins[self._central_response_bins.keys()[0]].sim_energy_bin_centers * 1e9
+        self._energy_centers_keV = self._central_response_bins[list(self._central_response_bins.keys())[0]].sim_energy_bin_centers * 1e9
 
         # Prepare array for fluxes
         self._all_fluxes = np.zeros((self._flat_sky_projection.ras.shape[0],
@@ -93,7 +98,7 @@ class ConvolvedExtendedSource(object):
         # Register call back with all free parameters and all linked parameters. If a parameter is linked to another
         # one, the other one might be in a different source, so we add a callback to that one so that we recompute
         # this source when needed.
-        for parameter in self._source.parameters.values():
+        for parameter in list(self._source.parameters.values()):
 
             if parameter.free:
                 parameter.add_callback(callback)
@@ -179,11 +184,11 @@ class ConvolvedExtendedSource3D(ConvolvedExtendedSource):
                 # NOTE: the scale is the same because the sim_differential_photon_fluxes are the same (the simulation
                 # used to make the response used the same spectrum for each bin). What changes between the two bins
                 # is the observed signal per bin (the .sim_signal_events_per_bin member)
-                scale = (self._all_fluxes[idx, :] * pixel_area_rad2) / this_response_bin1.sim_differential_photon_fluxes
+                scale = old_div((self._all_fluxes[idx, :] * pixel_area_rad2), this_response_bin1.sim_differential_photon_fluxes)
 
                 # Compute the interpolation weights for the two responses
-                w1 = (self._flat_sky_projection.decs[idx] - c2) / (c1 - c2)
-                w2 = (self._flat_sky_projection.decs[idx] - c1) / (c2 - c1)
+                w1 = old_div((self._flat_sky_projection.decs[idx] - c2), (c1 - c2))
+                w2 = old_div((self._flat_sky_projection.decs[idx] - c1), (c2 - c1))
 
                 this_model_image[idx] = (w1 * np.sum(scale * this_response_bin1.sim_signal_events_per_bin, axis=1) +
                                          w2 * np.sum(scale * this_response_bin2.sim_signal_events_per_bin, axis=1)) * \
