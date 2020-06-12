@@ -53,15 +53,12 @@ class HAL(PluginPrototype):
         self._roi = roi
 
         # Set up the flat-sky projection
-
         self._flat_sky_projection = roi.get_flat_sky_projection(flat_sky_pixels_size)
 
         # Read map tree (data)
-
         self._maptree = map_tree_factory(maptree, roi=roi)
 
         # Read detector response_file
-
         self._response = hawc_response_factory(response_file)
 
         # Use a renormalization of the background as nuisance parameter
