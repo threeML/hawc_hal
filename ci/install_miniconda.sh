@@ -1,5 +1,8 @@
 #!/usr/bin/env bash
 
+# Make sure we fail in case of errors
+set -e
+
 if [ ! -d "$HOME/miniconda/envs/test-environment" ]; then
 
     # Rebuilding the cache
@@ -26,12 +29,18 @@ if [ ! -d "$HOME/miniconda/envs/test-environment" ]; then
 
     # Install miniconda and all the packages
 
+    if [[ ${TRAVIS_PYTHON_VERSION} == 2.7 ]]; then
+        PKGS="readline=6.2 root5"
+    else
+        PKGS="root"
+    fi
+
     bash miniconda.sh -b -p $HOME/miniconda
     export PATH="$HOME/miniconda/bin:$PATH"
     hash -r
     conda config --set always_yes yes --set changeps1 no
     conda update -q conda
-    conda create -q -n test-environment -c conda-forge -c threeml python=$TRAVIS_PYTHON_VERSION root5 numba numpy scipy astropy healpy astromodels threeml
+    conda create -q -n test-environment -c conda-forge -c threeml python=$TRAVIS_PYTHON_VERSION astromodels threeml numba numpy scipy astropy healpy $PKGS
 
     set +x
 
