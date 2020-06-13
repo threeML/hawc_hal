@@ -28,6 +28,7 @@ before_install:
   - echo "listing home"
   - ls $HOME
   - echo "end of listing"
+  - while sleep 540; do echo "=====[ $SECONDS seconds still running ]====="; done &
   - source ci/install_miniconda.sh
 
 install:

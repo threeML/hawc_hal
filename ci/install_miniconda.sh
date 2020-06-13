@@ -3,53 +3,53 @@
 # Make sure we fail in case of errors
 set -e
 
-if [ ! -d "$HOME/miniconda/envs/test-environment" ]; then
+#if [ ! -d "$HOME/miniconda/envs/test-environment" ]; then
 
-    # Rebuilding the cache
+# Rebuilding the cache
 
-    echo "########################################"
-    echo "INSTALLATION CACHE NOT FOUND. REBUILDING"
-    echo "########################################"
+echo "########################################"
+echo "INSTALLATION CACHE NOT FOUND. REBUILDING"
+echo "########################################"
 
-    set -x
+set -x
 
-    rm -rf $HOME/miniconda
+rm -rf $HOME/miniconda
 
-    # Install Miniconda appropriate for the system (Mac or Linux)
+# Install Miniconda appropriate for the system (Mac or Linux)
 
-    if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then
+if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then
 
-        wget https://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh -O miniconda.sh
-
-    else
-
-        wget https://repo.continuum.io/miniconda/Miniconda3-latest-MacOSX-x86_64.sh -O miniconda.sh
-
-    fi
-
-    # Install miniconda and all the packages
-
-    if [[ ${TRAVIS_PYTHON_VERSION} == 2.7 ]]; then
-        PKGS="readline=6.2 root5"
-    else
-        PKGS="root"
-    fi
-
-    bash miniconda.sh -b -p $HOME/miniconda
-    export PATH="$HOME/miniconda/bin:$PATH"
-    hash -r
-    conda config --set always_yes yes --set changeps1 no
-    conda update -q conda
-    conda create -q -n test-environment -c conda-forge -c threeml python=$TRAVIS_PYTHON_VERSION astromodels threeml numba numpy scipy astropy healpy $PKGS
-
-    set +x
+    wget https://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh -O miniconda.sh
 
 else
 
-    # Using cache
-
-    echo "##################################"
-    echo "INSTALLATION CACHE FOUND. REUSING"
-    echo "##################################"
+    wget https://repo.continuum.io/miniconda/Miniconda3-latest-MacOSX-x86_64.sh -O miniconda.sh
 
 fi
+
+# Install miniconda and all the packages
+
+if [[ ${TRAVIS_PYTHON_VERSION} == 2.7 ]]; then
+    PKGS="readline=6.2 root5"
+else
+    PKGS="root"
+fi
+
+bash miniconda.sh -b -p $HOME/miniconda
+export PATH="$HOME/miniconda/bin:$PATH"
+hash -r
+conda config --set always_yes yes --set changeps1 no
+conda update -q conda
+conda create -q -n test-environment -c conda-forge -c threeml python=$TRAVIS_PYTHON_VERSION astromodels threeml numba numpy scipy astropy healpy $PKGS
+
+set +x
+
+#else
+
+    # Using cache
+
+#    echo "##################################"
+#    echo "INSTALLATION CACHE FOUND. REUSING"
+#    echo "##################################"
+
+#fi
