@@ -2,7 +2,6 @@ from __future__ import division
 from __future__ import absolute_import
 from builtins import range
 from builtins import object
-from past.utils import old_div
 import numpy as np
 from numpy.fft import rfftn, irfftn
 #from scipy.signal import fftconvolve
@@ -25,7 +24,7 @@ class PSFConvolutor(object):
         psf_stamp = interpolator.point_source_image(flat_sky_proj.ra_center, flat_sky_proj.dec_center)
 
         # Crop the kernel at the appropriate radius for this PSF (making sure is divisible by 2)
-        kernel_radius_px = int(np.ceil(old_div(self._psf.kernel_radius, flat_sky_proj.pixel_size)))
+        kernel_radius_px = int(np.ceil(self._psf.kernel_radius / flat_sky_proj.pixel_size))
         pixels_to_keep = kernel_radius_px * 2
 
         assert pixels_to_keep <= psf_stamp.shape[0] and \
@@ -40,7 +39,7 @@ class PSFConvolutor(object):
         assert np.isclose(self._kernel.sum(), 1.0, rtol=1e-2), "Failed to generate proper kernel normalization: got _kernel.sum() = %f; expected 1.0+-0.01." % self._kernel.sum()
 
         # Renormalize to exactly 1
-        self._kernel = old_div(self._kernel, self._kernel.sum())
+        self._kernel = self._kernel / self._kernel.sum()
 
         self._expected_shape = (flat_sky_proj.npix_height, flat_sky_proj.npix_width)
 

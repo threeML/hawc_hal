@@ -1,6 +1,5 @@
 from __future__ import division
 from builtins import object
-from past.utils import old_div
 import numpy as np
 import collections
 from hawc_hal import flat_sky_projection
@@ -39,7 +38,7 @@ class PSFInterpolator(object):
 
         # First we obtain an image with a flat sky projection centered exactly on the point source
         ancillary_image_pixel_size = 0.05
-        pixel_side = 2 * int(np.ceil(old_div(self._psf.truncation_radius, ancillary_image_pixel_size)))
+        pixel_side = 2 * int(np.ceil(self._psf.truncation_radius / ancillary_image_pixel_size))
         ancillary_flat_sky_proj = flat_sky_projection.FlatSkyProjection(ra, dec, ancillary_image_pixel_size,
                                                                         pixel_side, pixel_side)
 
