@@ -1,6 +1,5 @@
 from __future__ import division
 from builtins import object
-from past.utils import old_div
 import numpy as np
 
 from numba import jit
@@ -64,10 +63,10 @@ class FastBilinearInterpolation(object):
 
         bs = np.zeros((xx.shape[0], 4), np.float64)
 
-        bs[:, 0] = old_div((x2 - xx) * (y2 - yy), (x2 - x1) * (y2 - y1))
-        bs[:, 1] = old_div((xx - x1) * (y2 - yy), (x2 - x1) * (y2 - y1))
-        bs[:, 2] = old_div((x2 - xx) * (yy - y1), (x2 - x1) * (y2 - y1))
-        bs[:, 3] = old_div((xx - x1) * (yy - y1), (x2 - x1) * (y2 - y1))
+        bs[:, 0] = (x2 - xx) * (y2 - yy) / (x2 - x1) * (y2 - y1)
+        bs[:, 1] = (xx - x1) * (y2 - yy) / (x2 - x1) * (y2 - y1)
+        bs[:, 2] = (x2 - xx) * (yy - y1) / (x2 - x1) * (y2 - y1)
+        bs[:, 3] = (xx - x1) * (yy - y1) / (x2 - x1) * (y2 - y1)
 
         # Get the flat indexing for all the corners of the bounding boxes
         flat_upper_left = np.ravel_multi_index((x1, y1), self._data_shape)
