@@ -2,7 +2,6 @@ from __future__ import division
 from __future__ import print_function
 from __future__ import absolute_import
 from builtins import object
-from past.utils import old_div
 import os
 import numpy as np
 import pandas as pd
@@ -137,7 +136,7 @@ class MapTree(object):
 
         df['Obs counts'] = obs_counts
         df['Bkg counts'] = bkg_counts
-        df['obs/bkg'] = old_div(obs_counts, bkg_counts)
+        df['obs/bkg'] = obs_counts / bkg_counts
         df['Pixels in ROI'] = n_pixels
         df['Area (deg^2)'] = sky_area
 
