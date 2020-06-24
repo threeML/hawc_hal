@@ -127,7 +127,7 @@ class ConvolvedPointSource(object):
         else:
 
             # Transform from keV^-1 cm^-2 s^-1 to TeV^-1 cm^-2 s^-1 and re-weight the detected counts
-            scale = old_div(source_diff_spectrum, response_energy_bin.sim_differential_photon_fluxes * 1e9)
+            scale = old_div(source_diff_spectrum, response_energy_bin.sim_differential_photon_fluxes) * 1e9
 
         # Now return the map multiplied by the scale factor
         return np.sum(scale * response_energy_bin.sim_signal_events_per_bin) * this_map

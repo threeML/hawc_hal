@@ -221,7 +221,7 @@ def point_source_model(ra=83.6279, dec=22.14):
     spectrum.K.bounds = (1e-23, 1e-17)  # without units energies are in keV
 
     spectrum.index = -2.0
-    spectrum.bounds = (-5, 0.0)
+    spectrum.index.bounds = (-5, 0.0)
 
     spectrum.xc = 42.7 * u.TeV
     spectrum.xc.fix = False
