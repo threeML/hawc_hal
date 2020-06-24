@@ -3,7 +3,6 @@ from __future__ import division
 
 from builtins import str
 from builtins import range
-from past.utils import old_div
 import copy
 import collections
 
@@ -398,9 +397,9 @@ class HAL(PluginPrototype):
                 yerr_low[i] = mean-y_low
                 yerr_high[i] = y_high-mean
 
-        residuals = old_div((total_counts - total_model), np.sqrt(total_model))
-        residuals_err = [old_div(yerr_high, np.sqrt(total_model)),
-                         old_div(yerr_low, np.sqrt(total_model))]
+        residuals = (total_counts - total_model) / np.sqrt(total_model)
+        residuals_err = [yerr_high / np.sqrt(total_model),
+                         yerr_low / np.sqrt(total_model)]
 
         yerr = [yerr_high, yerr_low]
 
@@ -632,7 +631,7 @@ class HAL(PluginPrototype):
         if this_model_map is not None:
 
             # First divide for the pixel area because we need to interpolate brightness
-            this_model_map = old_div(this_model_map, self._flat_sky_projection.project_plane_pixel_area)
+            this_model_map = this_model_map / self._flat_sky_projection.project_plane_pixel_area
 
             this_model_map_hpx = self._flat_sky_to_healpix_transform[energy_bin_id](this_model_map, fill_value=0.0)
 
@@ -658,7 +657,7 @@ class HAL(PluginPrototype):
         if smoothing_kernel_sigma is not None:
 
             # Get the sigma in pixels
-            sigma = old_div(smoothing_kernel_sigma * 60, resolution)
+            sigma = smoothing_kernel_sigma * 60 / resolution
 
             proj = convolve(list(proj),
                             Gaussian2DKernel(sigma),
