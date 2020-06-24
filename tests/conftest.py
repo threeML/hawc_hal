@@ -1,6 +1,5 @@
 from __future__ import division
 from __future__ import print_function
-from past.utils import old_div
 import matplotlib
 matplotlib.use("Agg")
 
@@ -217,7 +216,8 @@ def point_source_model(ra=83.6279, dec=22.14):
 
     spectrum.piv.fix = True
 
-    spectrum.K = old_div(3.15e-11, (u.TeV * u.cm ** 2 * u.s))  # norm (in 1/(keV cm2 s))
+    spectrum.K = 3.15e-11 / (u.TeV * u.cm ** 2 * u.s)  # norm (in 1/(keV cm2 s))
+
     spectrum.K.bounds = (1e-23, 1e-17)  # without units energies are in keV
 
     spectrum.index = -2.0
