@@ -1,7 +1,6 @@
 from __future__ import division
 from __future__ import print_function
 from builtins import zip
-from past.utils import old_div
 from builtins import object
 import numpy as np
 
@@ -184,11 +183,11 @@ class ConvolvedExtendedSource3D(ConvolvedExtendedSource):
                 # NOTE: the scale is the same because the sim_differential_photon_fluxes are the same (the simulation
                 # used to make the response used the same spectrum for each bin). What changes between the two bins
                 # is the observed signal per bin (the .sim_signal_events_per_bin member)
-                scale = old_div((self._all_fluxes[idx, :] * pixel_area_rad2), this_response_bin1.sim_differential_photon_fluxes)
+                scale = (self._all_fluxes[idx, :] * pixel_area_rad2) / this_response_bin1.sim_differential_photon_fluxes
 
                 # Compute the interpolation weights for the two responses
-                w1 = old_div((self._flat_sky_projection.decs[idx] - c2), (c1 - c2))
-                w2 = old_div((self._flat_sky_projection.decs[idx] - c1), (c2 - c1))
+                w1 = (self._flat_sky_projection.decs[idx] - c2) / (c1 - c2)
+                w2 = (self._flat_sky_projection.decs[idx] - c1) / (c2 - c1)
 
                 this_model_image[idx] = (w1 * np.sum(scale * this_response_bin1.sim_signal_events_per_bin, axis=1) +
                                          w2 * np.sum(scale * this_response_bin2.sim_signal_events_per_bin, axis=1)) * \
