@@ -4,7 +4,6 @@ from __future__ import absolute_import
 from builtins import zip
 from builtins import range
 from builtins import object
-from past.utils import old_div
 import numpy as np
 import pandas as pd
 import os
@@ -293,8 +292,8 @@ class HAWCResponse(object):
             # Now linearly interpolate between them
 
             # Compute the weights according to the distance to the source
-            w1 = old_div((dec - dec_bin_two), (dec_bin_one - dec_bin_two))
-            w2 = old_div((dec - dec_bin_one), (dec_bin_two - dec_bin_one))
+            w1 = (dec - dec_bin_two) / (dec_bin_one - dec_bin_two)
+            w2 = (dec - dec_bin_one) / (dec_bin_two - dec_bin_one)
 
             new_responses = collections.OrderedDict()
 
