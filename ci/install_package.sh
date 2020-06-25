@@ -9,7 +9,7 @@ conda config --set always_yes yes --set changeps1 no
 conda info -a
 source activate test-environment
 hash -r
-conda update -c conda-forge -c threeml threeml astromodels
+#conda update -c conda-forge -c threeml threeml astromodels
 conda install -c conda-forge pytest-cov codecov cython
 #pip install root_numpy
 if [[ ${TRAVIS_PYTHON_VERSION} == 3.7 ]]; then
