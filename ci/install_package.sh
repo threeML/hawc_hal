@@ -15,7 +15,8 @@ conda install -c conda-forge pytest-cov codecov cython
 if [[ ${TRAVIS_PYTHON_VERSION} == 3.7 ]]; then
     pip install "astropy==3.2" "pytest==3.6"
 elif [[ "$OSTYPE" == darwin* ]]; then
-    conda update -c conda-forge -c threeml threeml astromodels
+    #conda update -c conda-forge -c threeml threeml astromodels
+    conda install -c conda-forge libgcc lapack
 fi
 pip install .
 
