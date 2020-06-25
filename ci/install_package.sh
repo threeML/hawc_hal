@@ -10,10 +10,11 @@ conda info -a
 source activate test-environment
 hash -r
 conda update -c conda-forge -c threeml threeml astromodels
-conda install -c conda-forge pytest-cov codecov
+conda install -c conda-forge pytest-cov codecov cython
 #pip install root_numpy
-conda install -c conda-forge root_numpy cython
-#pip install ChainConsumer
+if [[ ${TRAVIS_PYTHON_VERSION} == 3.7 ]]; then
+    pip install "astropy==3.2" "pytest==3.6"
+fi
 pip install .
 
 set +x
