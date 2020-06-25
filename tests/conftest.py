@@ -61,7 +61,7 @@ def fit_point_source(roi,
 
     beg = time.time()
 
-    jl.set_minimizer("ROOT")
+    jl.set_minimizer("minuit")
 
     param_df, like_df = jl.fit()
 
@@ -194,7 +194,7 @@ def maptree():
 @pytest.fixture(scope="session", autouse=True)
 def response():
 
-    return os.path.join(test_data_path, 'detector_response.root')
+    return os.path.join(test_data_path, 'detector_response.hd5')
 
 
 @pytest.fixture(scope="function", autouse=True)

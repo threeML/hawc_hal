@@ -10,6 +10,18 @@ from astromodels import PointSource, ExtendedSource, Powerlaw, Gaussian_on_spher
 
 from conftest import check_map_trees
 
+try:
+    import ROOT
+except:
+    has_root = False
+else:
+    has_root = True
+
+skip_if_ROOT_is_not_available = pytest.mark.skipif(
+    not has_root, reason="No ROOT available"
+)
+
+@skip_if_ROOT_is_not_available
 def test_model_residual_maps(geminga_maptree, geminga_response, geminga_roi):
 
     #data_radius = 5.0
