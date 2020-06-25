@@ -1,25 +1,18 @@
 from __future__ import print_function
-import pytest
 from hawc_hal import HAL, HealpixConeROI
 
 try:
     import ROOT
     ROOT.PyConfig.IgnoreCommandLineOptions = True
 except:
-    has_root = False
-else:
-    has_root = True
-
-skip_if_ROOT_is_not_available = pytest.mark.skipif(
-    not has_root, reason="No ROOT available"
-)
+    pass
 
 from threeML import *
 import argparse
 from collections import namedtuple
 import pytest
 
-@skip_if_ROOT_is_not_available
+@pytest.mark.xfail
 def test_geminga_paper(geminga_maptree, geminga_response):
 
     Args_fake = namedtuple('args', 'mtfile,rsfile,startBin,stopBin,RA,Dec,uratio,delta,ROI,output,plugin')
