@@ -163,7 +163,9 @@ def test_bayesian_analysis(test_fit):
 
     # Let's execute our bayes analysis
     bs = BayesianAnalysis(pts_model, data)
-    _ = bs.sample(30, 20, 20)
+    bs.set_sampler("emcee")
+    bs.sampler.setup(n_iterations=20, n_burn_in=20, n_walkers=30)
+    _ = bs.sample()
     fig = bs.results.corner_plot()
 
     fig.savefig("hal_corner_plot.png")

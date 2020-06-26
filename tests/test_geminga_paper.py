@@ -2,13 +2,9 @@ from __future__ import print_function
 from hawc_hal import HAL, HealpixConeROI
 
 try:
-
     import ROOT
-
     ROOT.PyConfig.IgnoreCommandLineOptions = True
-
-except ImportError:
-
+except:
     pass
 
 from threeML import *

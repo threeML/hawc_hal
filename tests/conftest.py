@@ -61,7 +61,7 @@ def fit_point_source(roi,
 
     beg = time.time()
 
-    jl.set_minimizer("ROOT")
+    jl.set_minimizer("minuit")
 
     param_df, like_df = jl.fit()
 
@@ -194,7 +194,7 @@ def maptree():
 @pytest.fixture(scope="session", autouse=True)
 def response():
 
-    return os.path.join(test_data_path, 'detector_response.root')
+    return os.path.join(test_data_path, 'detector_response.hd5')
 
 
 @pytest.fixture(scope="function", autouse=True)
@@ -221,7 +221,7 @@ def point_source_model(ra=83.6279, dec=22.14):
     spectrum.K.bounds = (1e-23, 1e-17)  # without units energies are in keV
 
     spectrum.index = -2.0
-    spectrum.bounds = (-5, 0.0)
+    spectrum.index.bounds = (-5, 0.0)
 
     spectrum.xc = 42.7 * u.TeV
     spectrum.xc.fix = False
