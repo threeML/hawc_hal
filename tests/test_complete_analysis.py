@@ -6,7 +6,7 @@ import pytest
 from conftest import point_source_model
 
 
-@pytest.fixture(scope='module', name="test_fit")
+@pytest.fixture(scope='module')
 def test_fit(roi, maptree, response, point_source_model):
 
     pts_model = point_source_model
@@ -36,19 +36,15 @@ def test_fit(roi, maptree, response, point_source_model):
 
 def test_simulation(test_fit):
 
-    #jl, hawc, pts_model, param_df, like_df, data = test_fit
+    jl, hawc, pts_model, param_df, like_df, data = test_fit
     
-    hawc = test_fit[1]
-
     sim = hawc.get_simulated_dataset("HAWCsim")
     sim.write("sim_resp.hd5", "sim_maptree.hd5")
 
 
 def test_plots(test_fit):
 
-    #jl, hawc, pts_model, param_df, like_df, data = test_fit
-
-    hawc = test_fit[1]
+    jl, hawc, pts_model, param_df, like_df, data = test_fit
 
     # See the model in counts space and the residuals
     fig = hawc.display_spectrum()
@@ -70,11 +66,7 @@ def test_plots(test_fit):
 
 def test_compute_TS(test_fit):
 
-    #jl, hawc, pts_model, param_df, like_df, data = test_fit
-
-    pts_model = test_fit[2]
-    jl = test_fit[0]
-    like_df = test_fit[4]
+    jl, hawc, pts_model, param_df, like_df, data = test_fit
 
     # Compute TS
     src_name = pts_model.pts.name
@@ -83,10 +75,7 @@ def test_compute_TS(test_fit):
 
 def test_goodness(test_fit):
 
-    #jl, hawc, pts_model, param_df, like_df, data = test_fit
-
-    jl = test_fit[0]
-    
+    jl, hawc, pts_model, param_df, like_df, data = test_fit
 
     # Compute goodness of fit with Monte Carlo
     gf = GoodnessOfFit(jl)
@@ -112,11 +101,7 @@ def test_goodness(test_fit):
 
 def test_fit_with_free_position(test_fit):
 
-    #jl, hawc, pts_model, param_df, like_df, data = test_fit
-
-    hawc = test_fit[1]
-    pts_model = test_fit[2]
-    jl = test_fit[0]
+    jl, hawc, pts_model, param_df, like_df, data = test_fit
 
     hawc.psf_integration_method = 'fast'
 
