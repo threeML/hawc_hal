@@ -5,16 +5,16 @@ from hawc_hal import HAL, HealpixConeROI
 from threeML import *
 import astromodels
 
-from conftest import point_source_model, maptree, response
+from conftest import maptree, response
 
-def deepcopy_hal(extended=False):
+def deepcopy_hal(theMaptree, theResponse, extended=False):
 
     src_ra, src_dec = 82.628, 22.640
     src_name = 'test_source'
 
     roi = HealpixConeROI(data_radius=5., model_radius=8., ra=src_ra, dec=src_dec)
 
-    hawc = HAL('HAWC', maptree(), response(), roi)
+    hawc = HAL('HAWC', theMaptree, theResponse, roi)
     hawc.set_active_measurements(1, 9)
     data = DataList(hawc)
 
@@ -32,9 +32,9 @@ def deepcopy_hal(extended=False):
 
     hawc_copy = copy.deepcopy(hawc)
 
-def test_deepcopy_point_source():
-    deepcopy_hal(extended=False)
+def test_deepcopy_point_source(maptree, response):
+    deepcopy_hal(maptree, response, extended=False)
 
 @pytest.mark.xfail
-def test_deepcopy_extended_source():
-    deepcopy_hal(extended=True)
+def test_deepcopy_extended_source(maptree, response):
+    deepcopy_hal(maptree, response, extended=True)

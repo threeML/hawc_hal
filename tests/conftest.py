@@ -197,7 +197,7 @@ def response():
     return os.path.join(test_data_path, 'detector_response.hd5')
 
 
-@pytest.fixture(scope="function", autouse=True)
+@pytest.fixture(scope="module", autouse=True)
 def point_source_model(ra=83.6279, dec=22.14):
 
     spectrum = Cutoff_powerlaw()
