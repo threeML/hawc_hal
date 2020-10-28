@@ -13,6 +13,8 @@ If you have `conda` installed, it is highly reccomended that you install `numba`
 > conda install -c conda-forge numba
 ```
 
+You also need `root` (whether installed through conda or not) and `threeML/astromodels` and its dependencies.
+
 Then:
 
 ```bash
