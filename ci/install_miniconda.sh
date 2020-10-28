@@ -30,10 +30,9 @@ fi
 # Install miniconda and all the packages
 
 if [[ ${TRAVIS_PYTHON_VERSION} == 2.7 ]]; then
-    PKGS="readline root5 root_numpy"
+    PKGS="readline root5"
 else
-    #root not supported yet
-    PKGS="root root_numpy"
+    PKGS="root"
 fi
 
 bash miniconda.sh -b -p $HOME/miniconda
