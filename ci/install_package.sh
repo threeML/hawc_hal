@@ -12,8 +12,8 @@ hash -r
 #conda update -c conda-forge -c threeml threeml astromodels
 conda install -c conda-forge pytest-cov codecov cython
 #pip install root_numpy
-if [[ ${TRAVIS_PYTHON_VERSION} == 3.7 ]]; then
-    pip install "astropy==3.2" "pytest==3.6"
+#if [[ ${TRAVIS_PYTHON_VERSION} == 3.7 ]]; then
+#    pip install astropy pytest
 elif [[ "$OSTYPE" == darwin* ]]; then
     #conda update -c conda-forge -c threeml threeml astromodels
     conda install -c conda-forge libgcc lapack
