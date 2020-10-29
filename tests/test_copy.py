@@ -35,6 +35,6 @@ def deepcopy_hal(theMaptree, theResponse, extended=False):
 def test_deepcopy_point_source(maptree, response):
     deepcopy_hal(maptree, response, extended=False)
 
-@pytest.mark.xfail
+#@pytest.mark.xfail
 def test_deepcopy_extended_source(maptree, response):
     deepcopy_hal(maptree, response, extended=True)
