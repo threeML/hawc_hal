@@ -30,7 +30,7 @@ fi
 # Install miniconda and all the packages
 
 if [[ ${TRAVIS_PYTHON_VERSION} == 2.7 ]]; then
-    PKGS="readline root5"
+    PKGS="readline root"
 else
     PKGS="root"
 fi
