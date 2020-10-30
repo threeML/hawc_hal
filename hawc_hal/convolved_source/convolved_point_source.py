@@ -1,3 +1,7 @@
+from __future__ import division
+from builtins import zip
+from builtins import object
+from past.utils import old_div
 import os
 import collections
 import numpy as np
@@ -118,12 +122,12 @@ class ConvolvedPointSource(object):
             sim_spectrum = [interp_sim_spectrum.integral(a, b) for (a, b) in zip(response_energy_bin.sim_energy_bin_low,
                                                                                  response_energy_bin.sim_energy_bin_hi)]
 
-            scale = np.array(src_spectrum) / np.array(sim_spectrum)
+            scale = old_div(np.array(src_spectrum), np.array(sim_spectrum))
 
         else:
 
             # Transform from keV^-1 cm^-2 s^-1 to TeV^-1 cm^-2 s^-1 and re-weight the detected counts
-            scale = source_diff_spectrum / response_energy_bin.sim_differential_photon_fluxes * 1e9
+            scale = old_div(source_diff_spectrum, response_energy_bin.sim_differential_photon_fluxes) * 1e9
 
         # Now return the map multiplied by the scale factor
         return np.sum(scale * response_energy_bin.sim_signal_events_per_bin) * this_map

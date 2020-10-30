@@ -1,6 +1,8 @@
 #!/usr/bin/env python
 
 # If ROOT is active, we need to skip its own command line parsing
+from builtins import map
+from builtins import range
 try:
 
     import ROOT
@@ -63,7 +65,7 @@ if __name__ == "__main__":
     parser.add_argument("--params", help="Parameter specification. For example, for the Power_law spectrum, "
                                          "you can use: '2e.5e-11 1/(TeV cm2 s)' '-2.0'", required=True)
     parser.add_argument("--bin_list", help="Bin list to use for analysis", required=False,
-                        default=map(str, range(1, 10)),
+                        default=list(map(str, list(range(1, 10)))),
                         nargs='+')
     parser.add_argument("--display_model", help="Whether to display or not the model before fitting",
                         action="store_true", default=False)

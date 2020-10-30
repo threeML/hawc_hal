@@ -1,3 +1,4 @@
+from builtins import range
 from hawc_hal import serialize
 import pandas as pd
 import numpy as np
@@ -6,7 +7,7 @@ import os
 
 def test_serialization():
 
-    my_obj = pd.Series(range(100))
+    my_obj = pd.Series(list(range(100)))
     my_ob2 = pd.DataFrame.from_dict({'one': np.random.uniform(0, 1, 10), 'two': np.random.uniform(0, 1, 10)})
 
     meta = {'meta1': 1.0, 'meta2': 2.0}

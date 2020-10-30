@@ -1,5 +1,9 @@
 from __future__ import print_function
+from __future__ import division
 
+from builtins import str
+from builtins import range
+from past.utils import old_div
 import copy
 import collections
 
@@ -49,15 +53,12 @@ class HAL(PluginPrototype):
         self._roi = roi
 
         # Set up the flat-sky projection
-
         self._flat_sky_projection = roi.get_flat_sky_projection(flat_sky_pixels_size)
 
         # Read map tree (data)
-
         self._maptree = map_tree_factory(maptree, roi=roi)
 
         # Read detector response_file
-
         self._response = hawc_response_factory(response_file)
 
         # Use a renormalization of the background as nuisance parameter
@@ -305,7 +306,7 @@ class HAL(PluginPrototype):
 
         # For each point source in the model, build the convolution class
 
-        for source in self._likelihood_model.point_sources.values():
+        for source in list(self._likelihood_model.point_sources.values()):
 
             this_convolved_point_source = ConvolvedPointSource(source, self._response, self._flat_sky_projection)
 
@@ -313,7 +314,7 @@ class HAL(PluginPrototype):
 
         # Samewise for extended sources
 
-        ext_sources = self._likelihood_model.extended_sources.values()
+        ext_sources = list(self._likelihood_model.extended_sources.values())
 
         # NOTE: ext_sources evaluate to False if empty
         if ext_sources:
@@ -397,9 +398,9 @@ class HAL(PluginPrototype):
                 yerr_low[i] = mean-y_low
                 yerr_high[i] = y_high-mean
 
-        residuals = (total_counts - total_model) / np.sqrt(total_model)
-        residuals_err = [yerr_high / np.sqrt(total_model),
-                         yerr_low / np.sqrt(total_model)]
+        residuals = old_div((total_counts - total_model), np.sqrt(total_model))
+        residuals_err = [old_div(yerr_high, np.sqrt(total_model)),
+                         old_div(yerr_low, np.sqrt(total_model))]
 
         yerr = [yerr_high, yerr_low]
 
@@ -408,12 +409,12 @@ class HAL(PluginPrototype):
     def _plot_spectrum(self, net_counts, yerr, model_only, residuals, residuals_err):
 
         fig, subs = plt.subplots(2, 1, gridspec_kw={'height_ratios': [2, 1], 'hspace': 0})
-
-        subs[0].errorbar(self._active_planes, net_counts, yerr=yerr,
+        planes = np.array(self._active_planes, dtype=int)
+        subs[0].errorbar(planes, net_counts, yerr=yerr,
                          capsize=0,
                          color='black', label='Net counts', fmt='.')
 
-        subs[0].plot(self._active_planes, model_only, label='Convolved model')
+        subs[0].plot(planes, model_only, label='Convolved model')
 
         subs[0].legend(bbox_to_anchor=(1.0, 1.0), loc="upper right",
                        numpoints=1)
@@ -422,7 +423,7 @@ class HAL(PluginPrototype):
         subs[1].axhline(0, linestyle='--')
 
         subs[1].errorbar(
-            self._active_planes, residuals,
+            planes, residuals,
             yerr=residuals_err,
             capsize=0, fmt='.'
         )
@@ -435,7 +436,7 @@ class HAL(PluginPrototype):
 
         subs[1].set_xlabel("Analysis bin")
         subs[1].set_ylabel(r"$\frac{{cts - mod - bkg}}{\sqrt{mod + bkg}}$")
-        subs[1].set_xticks(self._active_planes)
+        subs[1].set_xticks(planes)
         subs[1].set_xticklabels(self._active_planes)
 
         subs[0].set_ylim(y_limits)
@@ -466,7 +467,7 @@ class HAL(PluginPrototype):
             this_model_map_hpx = self._get_expectation(data_analysis_bin, bin_id, n_point_sources, n_ext_sources)
 
             # Now compare with observation
-            bkg_renorm = self._nuisance_parameters.values()[0].value
+            bkg_renorm = list(self._nuisance_parameters.values())[0].value
 
             obs = data_analysis_bin.observation_map.as_partial()  # type: np.array
             bkg = data_analysis_bin.background_map.as_partial() * bkg_renorm  # type: np.array
@@ -556,7 +557,7 @@ class HAL(PluginPrototype):
         # Now change name and return
         self._clone[0]._name = name
         # Adjust the name of the nuisance parameter
-        old_name = self._clone[0]._nuisance_parameters.keys()[0]
+        old_name = list(self._clone[0]._nuisance_parameters.keys())[0]
         new_name = old_name.replace(self.name, name)
         self._clone[0]._nuisance_parameters[new_name] = self._clone[0]._nuisance_parameters.pop(old_name)
 
@@ -631,7 +632,7 @@ class HAL(PluginPrototype):
         if this_model_map is not None:
 
             # First divide for the pixel area because we need to interpolate brightness
-            this_model_map = this_model_map / self._flat_sky_projection.project_plane_pixel_area
+            this_model_map = old_div(this_model_map, self._flat_sky_projection.project_plane_pixel_area)
 
             this_model_map_hpx = self._flat_sky_to_healpix_transform[energy_bin_id](this_model_map, fill_value=0.0)
 
@@ -657,7 +658,7 @@ class HAL(PluginPrototype):
         if smoothing_kernel_sigma is not None:
 
             # Get the sigma in pixels
-            sigma = smoothing_kernel_sigma * 60 / resolution
+            sigma = old_div(smoothing_kernel_sigma * 60, resolution)
 
             proj = convolve(list(proj),
                             Gaussian2DKernel(sigma),

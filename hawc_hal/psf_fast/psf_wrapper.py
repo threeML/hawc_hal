@@ -1,3 +1,7 @@
+from __future__ import division
+from builtins import zip
+from builtins import object
+from past.utils import old_div
 import numpy as np
 import scipy.interpolate
 import scipy.optimize
@@ -58,9 +62,7 @@ class PSFWrapper(object):
         interp_x = (self._xs[1:] + self._xs[:-1]) / 2.0
 
         # Compute the density
-
-        interp_y = np.array(map(lambda (a, b): self.integral(a, b) / (np.pi * (b ** 2 - a ** 2)) / self._total_integral,
-                                zip(self._xs[:-1], self._xs[1:])))
+        interp_y = np.array([(self.integral(a_b[0], a_b[1]) / (np.pi * (a_b[1] ** 2 - a_b[0] ** 2)) / self._total_integral) for a_b in zip(self._xs[:-1], self._xs[1:])])
 
         # Add zero at r = _INTEGRAL_OUTER_RADIUS so that the extrapolated values will be correct
         interp_x = np.append(interp_x, [_INTEGRAL_OUTER_RADIUS])
@@ -70,7 +72,7 @@ class PSFWrapper(object):
 
     def find_eef_radius(self, fraction):
 
-        f = lambda r: fraction - self.integral(1e-4, r) / self._total_integral
+        f = lambda r: fraction - old_div(self.integral(1e-4, r), self._total_integral)
 
         radius, status = scipy.optimize.brentq(f, 0.005, _INTEGRAL_OUTER_RADIUS, full_output = True)
 
@@ -156,7 +158,7 @@ class PSFWrapper(object):
 
         # Make interpolation
         xs = np.logspace(-3, np.log10(_INTEGRAL_OUTER_RADIUS), 500)
-        ys = np.array(map(lambda x:tf1_instance.Eval(x), xs), float)
+        ys = np.array([tf1_instance.Eval(x) for x in xs], float)
 
         assert np.all(np.isfinite(xs))
         assert np.all(np.isfinite(ys))

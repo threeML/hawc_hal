@@ -1,3 +1,6 @@
+from __future__ import division
+from __future__ import print_function
+from past.utils import old_div
 import numpy as np
 import astropy.units as u
 import healpy as hp
@@ -151,7 +154,7 @@ class HealpixMapROI(HealpixROIBase):
         # Decide side for image
 
         # Compute number of pixels, making sure it is going to be even (by approximating up)
-        npix_per_side = 2 * int(np.ceil(np.rad2deg(self._model_radius_radians) / pixel_size_deg))
+        npix_per_side = 2 * int(np.ceil(old_div(np.rad2deg(self._model_radius_radians), pixel_size_deg)))
 
         # Get lon, lat of center
         ra, dec = self._get_ra_dec()
