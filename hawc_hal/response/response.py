@@ -72,6 +72,7 @@ class HAWCResponse(object):
         
         if len(dec_bins) < 2:
           custom_warnings.warn("Only {0} dec bins given in {1}, will not try to interpolate.".format(len(dec_bins), response_file_name))
+          custom_warnings.warn("Single-dec-bin mode is intended for development work only at this time and may not work with extended sources.")
 
     @classmethod
     def from_hdf5(cls, response_file_name):
