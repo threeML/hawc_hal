@@ -29,7 +29,7 @@ def get_gnomonic_projection(figure, hpx_map, **kwargs):
                 'cmap': None,
                 'norm': None}
 
-    for key, default_value in defaults.items():
+    for key, default_value in list(defaults.items()):
 
         if key not in kwargs:
 

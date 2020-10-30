@@ -1,3 +1,5 @@
+from __future__ import division
+from past.utils import old_div
 import pytest
 from os.path import dirname
 from hawc_hal import HealpixConeROI, HAL
@@ -8,6 +10,18 @@ from astromodels import PointSource, ExtendedSource, Powerlaw, Gaussian_on_spher
 
 from conftest import check_map_trees
 
+try:
+    import ROOT
+except:
+    has_root = False
+else:
+    has_root = True
+
+skip_if_ROOT_is_not_available = pytest.mark.skipif(
+    not has_root, reason="No ROOT available"
+)
+
+@skip_if_ROOT_is_not_available
 def test_model_residual_maps(geminga_maptree, geminga_response, geminga_roi):
 
     #data_radius = 5.0
@@ -53,7 +67,7 @@ def test_model_residual_maps(geminga_maptree, geminga_response, geminga_roi):
     spectrum2 = Powerlaw()
     source2 = ExtendedSource("extended", spatial_shape=shape, spectral_shape=spectrum2)
 
-    spectrum2.K = 1e-12 / (u.TeV * u.cm ** 2 * u.s) 
+    spectrum2.K = 1e-12 / (u.TeV * u.cm ** 2 * u.s)
     spectrum2.piv = 1 * u.TeV
     spectrum2.index = -2.0  
 

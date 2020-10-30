@@ -1,3 +1,10 @@
+from __future__ import division
+from __future__ import print_function
+from __future__ import absolute_import
+from builtins import zip
+from builtins import range
+from builtins import object
+from past.utils import old_div
 import numpy as np
 import pandas as pd
 import os
@@ -9,7 +16,7 @@ from threeML.io.file_utils import file_existing_and_readable, sanitize_filename
 from threeML.exceptions.custom_exceptions import custom_warnings
 
 from ..psf_fast import PSFWrapper
-from response_bin import ResponseBin
+from .response_bin import ResponseBin
 
 _instances = {}
 
@@ -141,7 +148,7 @@ class HAWCResponse(object):
 
             response_bins[dec_center] = these_response_bins
 
-        dec_bins = zip(min_decs, declination_centers, max_decs)
+        dec_bins = list(zip(min_decs, declination_centers, max_decs))
 
         return cls(response_file_name, dec_bins, response_bins)
 
@@ -189,7 +196,7 @@ class HAWCResponse(object):
             dec_bins_upper_edge = dec_bins_['upperEdge']  # type: np.ndarray
             dec_bins_center = dec_bins_['simdec']  # type: np.ndarray
 
-            dec_bins = zip(dec_bins_lower_edge, dec_bins_center, dec_bins_upper_edge)
+            dec_bins = list(zip(dec_bins_lower_edge, dec_bins_center, dec_bins_upper_edge))
 
             # Read in the ids of the response bins ("analysis bins" in LiFF jargon)
             try:
@@ -229,7 +236,7 @@ class HAWCResponse(object):
 
                     n_energy_bins = root_file.Get(dec_id_label).GetNkeys()
 
-                    response_bins_ids = range(n_energy_bins)
+                    response_bins_ids = list(range(n_energy_bins))
 
                 for response_bin_id in response_bins_ids:
                     this_response_bin = ResponseBin.from_ttree(root_file, dec_id, response_bin_id, log_log_spectrum,
@@ -257,7 +264,7 @@ class HAWCResponse(object):
         """
 
         # Sort declination bins by distance to the provided declination
-        dec_bins_keys = self._response_bins.keys()
+        dec_bins_keys = list(self._response_bins.keys())
         dec_bins_by_distance = sorted(dec_bins_keys, key=lambda x: abs(x - dec))
 
         if not interpolate:
@@ -286,8 +293,8 @@ class HAWCResponse(object):
             # Now linearly interpolate between them
 
             # Compute the weights according to the distance to the source
-            w1 = (dec - dec_bin_two) / (dec_bin_one - dec_bin_two)
-            w2 = (dec - dec_bin_one) / (dec_bin_two - dec_bin_one)
+            w1 = old_div((dec - dec_bin_two), (dec_bin_one - dec_bin_two))
+            w2 = old_div((dec - dec_bin_one), (dec_bin_two - dec_bin_one))
 
             new_responses = collections.OrderedDict()
 
@@ -311,7 +318,7 @@ class HAWCResponse(object):
     @property
     def n_energy_planes(self):
 
-        return len(self._response_bins.values()[0])
+        return len(list(self._response_bins.values())[0])
 
     def display(self, verbose=False):
         """
@@ -323,10 +330,10 @@ class HAWCResponse(object):
         print("Response file: %s" % self._response_file_name)
         print("Number of dec bins: %s" % len(self._dec_bins))
         if verbose:
-            print self._dec_bins
+            print(self._dec_bins)
         print("Number of energy/nHit planes per dec bin_name: %s" % (self.n_energy_planes))
         if verbose:
-            print self._response_bins.values()[0].keys()
+            print(list(self._response_bins.values())[0].keys())
 
     def write(self, filename):
         """
@@ -339,7 +346,7 @@ class HAWCResponse(object):
         filename = sanitize_filename(filename)
 
         # Unravel the dec bins
-        min_decs, center_decs, max_decs = zip(*self._dec_bins)
+        min_decs, center_decs, max_decs = list(zip(*self._dec_bins))
 
         # We get the definition of the response bins, as well as their coordinates (the dec center) and store them
         # in lists. Later on we will use these to make 3 dataframes containing all the needed data

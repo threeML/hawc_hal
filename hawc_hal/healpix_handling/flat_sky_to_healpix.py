@@ -1,3 +1,4 @@
+from builtins import object
 import healpy as hp
 import numpy as np
 import six

@@ -1,21 +1,18 @@
+from __future__ import print_function
 from hawc_hal import HAL, HealpixConeROI
 import pytest
 
 try:
-
     import ROOT
-
     ROOT.PyConfig.IgnoreCommandLineOptions = True
-
-except ImportError:
-
+except:
     pass
 
 from threeML import *
 import argparse
 from collections import namedtuple
+import pytest
 
-@pytest.mark.xfail
 def test_geminga_paper(geminga_maptree, geminga_response):
 
     Args_fake = namedtuple('args', 'mtfile,rsfile,startBin,stopBin,RA,Dec,uratio,delta,ROI,output,plugin')
@@ -161,11 +158,12 @@ def go(args):
         roi = HealpixConeROI(data_radius=rad,
                              model_radius=rad + 10.0,
                              ra=ra_c, dec=dec_c)
-
+    
         llh = HAL("HAWC",
                   args.mtfile,
                   args.rsfile,
                   roi)
+            
         llh.set_active_measurements(args.startBin, args.stopBin)
 
     print(lm)
@@ -225,9 +223,18 @@ def go(args):
         TS = llh.calc_TS()
 
     else:
-
+    
+        if "B0656" in lm and "Geminga" in lm:
+            lm.unlink(lm.B0656.spatial_shape.rdiff0)
+        
         TS_df = jl.compute_TS("Geminga", like_df)
         TS = TS_df.loc['HAWC', 'TS']
+        
+        TS_df2 = jl.compute_TS("B0656", like_df)
+        TS2 = TS_df2.loc['HAWC', 'TS']
+        
+        print (TS_df)
+        print (TS_df2)
 
     print("Test statistic: %g" % TS)
 

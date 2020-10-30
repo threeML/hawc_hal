@@ -1,3 +1,4 @@
+from builtins import object
 class TF1Wrapper(object):
 
     def __init__(self, tf1_instance):

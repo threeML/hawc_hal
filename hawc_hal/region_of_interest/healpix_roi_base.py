@@ -1,3 +1,4 @@
+from builtins import object
 _EQUATORIAL = 'equatorial'
 _GALACTIC = 'galactic'
 

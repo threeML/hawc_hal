@@ -1,9 +1,21 @@
 from hawc_hal.maptree.map_tree import map_tree_factory
 from hawc_hal.response import hawc_response_factory
 import os
+import pytest
 from conftest import check_map_trees, check_responses
 
+try:
+    import ROOT
+except:
+    has_root = False
+else:
+    has_root = True
 
+skip_if_ROOT_is_not_available = pytest.mark.skipif(
+    not has_root, reason="No ROOT available"
+)
+
+@skip_if_ROOT_is_not_available
 def test_root_to_hdf_response(response):
 
     r = hawc_response_factory(response)
@@ -22,7 +34,6 @@ def test_root_to_hdf_response(response):
     check_responses(r, r2)
 
     os.remove(test_filename)
-
 
 def do_one_test_maptree(geminga_roi,
                         geminga_maptree,
@@ -53,14 +64,14 @@ def do_one_test_maptree(geminga_roi,
 
     os.remove(test_filename)
 
-
+@skip_if_ROOT_is_not_available
 def test_root_to_hdf_maptree_roi(geminga_roi,
                                  geminga_maptree):
     do_one_test_maptree(geminga_roi,
                         geminga_maptree,
                         fullsky=False)
 
-
+@skip_if_ROOT_is_not_available
 def test_root_to_hdf_maptree_full_sky(geminga_roi,
                                       geminga_maptree):
     do_one_test_maptree(geminga_roi,

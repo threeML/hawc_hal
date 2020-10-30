@@ -1,9 +1,13 @@
+from __future__ import division
+from __future__ import absolute_import
+from builtins import object
+from past.utils import old_div
 from astropy.io import fits
 from astropy.wcs import WCS
 from astropy.wcs.utils import proj_plane_pixel_area
 import numpy as np
 
-from util import cartesian
+from .util import cartesian
 from hawc_hal.sphere_dist import sphere_dist
 
 
@@ -30,8 +34,8 @@ def _get_header(ra, dec, pixel_size, coordsys, h, w):
     assert 0 <= ra <= 360
 
     header = fits.Header.fromstring(_fits_header % (h, w,
-                                                    h / 2, ra, pixel_size,
-                                                    w / 2, dec, pixel_size,
+                                                    old_div(h, 2), ra, pixel_size,
+                                                    old_div(w, 2), dec, pixel_size,
                                                     coordsys),
                                     sep='\n')
 
