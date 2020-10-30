@@ -30,10 +30,9 @@ fi
 # Install miniconda and all the packages
 
 if [[ ${TRAVIS_PYTHON_VERSION} == 2.7 ]]; then
-    PKGS="readline=6.2 root5 root_numpy"
+    PKGS="readline root"
 else
-    #root not supported yet
-    PKGS=""
+    PKGS="root"
 fi
 
 bash miniconda.sh -b -p $HOME/miniconda
@@ -41,7 +40,7 @@ export PATH="$HOME/miniconda/bin:$PATH"
 hash -r
 conda config --set always_yes yes --set changeps1 no
 conda update -q conda
-conda config --add channels conda-forge/label/cf201901
+conda config --add channels conda-forge
 conda create -q -n test-environment -c conda-forge -c threeml python=$TRAVIS_PYTHON_VERSION astromodels threeml numba numpy scipy astropy healpy $PKGS
 
 set +x

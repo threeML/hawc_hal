@@ -7,9 +7,9 @@ from conftest import point_source_model
 
 
 @pytest.fixture(scope='module')
-def test_fit(roi, maptree, response):
+def test_fit(roi, maptree, response, point_source_model):
 
-    pts_model = point_source_model()
+    pts_model = point_source_model
 
     hawc = HAL("HAWC",
                maptree,
@@ -37,7 +37,7 @@ def test_fit(roi, maptree, response):
 def test_simulation(test_fit):
 
     jl, hawc, pts_model, param_df, like_df, data = test_fit
-
+    
     sim = hawc.get_simulated_dataset("HAWCsim")
     sim.write("sim_resp.hd5", "sim_maptree.hd5")
 
@@ -136,7 +136,6 @@ def test_fit_with_free_position(test_fit):
 
     pts_model.pts.position.ra.free = False
     pts_model.pts.position.dec.free = False
-
 
 def test_bayesian_analysis(test_fit):
 
