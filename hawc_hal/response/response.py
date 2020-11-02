@@ -69,6 +69,10 @@ class HAWCResponse(object):
         self._response_file_name = response_file_name
         self._dec_bins = dec_bins
         self._response_bins = response_bins
+        
+        if len(dec_bins) < 2:
+          custom_warnings.warn("Only {0} dec bins given in {1}, will not try to interpolate.".format(len(dec_bins), response_file_name))
+          custom_warnings.warn("Single-dec-bin mode is intended for development work only at this time and may not work with extended sources.")
 
     @classmethod
     def from_hdf5(cls, response_file_name):
@@ -266,6 +270,10 @@ class HAWCResponse(object):
         # Sort declination bins by distance to the provided declination
         dec_bins_keys = list(self._response_bins.keys())
         dec_bins_by_distance = sorted(dec_bins_keys, key=lambda x: abs(x - dec))
+        
+        #never try to interpolate if only one dec bin is given
+        if len(dec_bins_keys) < 2:
+          interpolate = False
 
         if not interpolate:
 
