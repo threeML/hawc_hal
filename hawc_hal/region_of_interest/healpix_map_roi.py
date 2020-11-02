@@ -15,7 +15,7 @@ from ..flat_sky_projection import FlatSkyProjection
 
 class HealpixMapROI(HealpixROIBase):
 
-    def __init__(self, model_radius, roimap=None, roifile=None, threshold=0.5, *args, **kwargs):
+    def __init__(self, data_radius, model_radius, roimap=None, roifile=None, threshold=0.5, *args, **kwargs):
         """
         A cone Region of Interest defined by a healpix map (can be read from a fits file).
         User needs to supply a cone region (center and radius) defining the plane projection for the model map.
@@ -25,15 +25,17 @@ class HealpixMapROI(HealpixROIBase):
             Model map centered on (R.A., Dec) = (1.23, 4.56) in J2000 ICRS coordinate system,
             with a radius of 5 degrees, ROI defined in healpix map in fitsfile:
 
-            > roi = HealpixMapROI(5.0, ra=1.23, dec=4.56, file = "myROI.fits" )
+            > roi = HealpixMapROI(model_radius=5.0, data_radius=4.0, ra=1.23, dec=4.56, file = "myROI.fits" )
 
             Model map centered on (L, B) = (1.23, 4.56) (Galactic coordiantes)
             with a radius of 30 arcmin, ROI defined on-the-fly in healpix map:
 
-            > roi = HealpixMapROI(30.0 * u.arcmin, l=1.23, dec=4.56, map = my_roi)
+            > roi = HealpixMapROI(model_radius=30.0 * u.arcmin, data_radius=20.0 * u.arcmin, l=1.23, dec=4.56, map = my_roi)
 
         :param model_radius: radius of the model cone. Either an astropy.Quantity instance, or a float, in which case it
         is assumed to be the radius in degrees
+        :param data_radius: radius used for displaying maps. Either an astropy.Quantity instance, or a float, in which case it
+        is assumed to be the radius in degrees. Note: THIS RADIUS IS JUST USED FOR PLOTTING, DOES NOT AFFECT THE FIT.
         :param map: healpix map containing the ROI.
         :param file: fits file containing a healpix map with the ROI.
         :param threshold: value below which pixels in the map will be set inactive (=not in ROI).
@@ -46,6 +48,8 @@ class HealpixMapROI(HealpixROIBase):
         self._center = SkyDirection(*args, **kwargs)
 
         self._model_radius_radians = _get_radians(model_radius)
+
+        self._data_radius_radians = _get_radians(data_radius)
 
         self._threshold = threshold
 
@@ -93,6 +97,7 @@ class HealpixMapROI(HealpixROIBase):
              'ra': ra,
              'dec': dec,
              'model_radius_deg': np.rad2deg(self._model_radius_radians),
+             'data_radius_deg': np.rad2deg(self._data_radius_radians),
              'roimap': self._roimaps[self._original_nside],
              'threshold': self._threshold,
              'roifile': self._filename }
@@ -102,15 +107,15 @@ class HealpixMapROI(HealpixROIBase):
     @classmethod
     def from_dict(cls, data):
 
-        return cls(data['model_radius_deg'], threshold=data['threshold'],
+        return cls(data['data_radius_deg'], data['model_radius_deg'], threshold=data['threshold'],
                    roimap=data['roimap'], ra=data['ra'],
                    dec=data['dec'], roifile=data['roifile'])
 
     def __str__(self):
 
-        s = ("%s: Center (R.A., Dec) = (%.3f, %.3f), model radius: %.3f deg, threshold = %.2f" %
+        s = ("%s: Center (R.A., Dec) = (%.3f, %.3f), model radius: %.3f deg, display radius: %.3f deg, threshold = %.2f" %
               (type(self).__name__, self.ra_dec_center[0], self.ra_dec_center[1],
-               self.model_radius.to(u.deg).value, self._threshold))
+               self.model_radius.to(u.deg).value, self.data_radius.to(u.deg).value, self._threshold))
 
         if self._filename is not None: 
             s = "%s, data ROI from %s" % (s, self._filename)
@@ -129,6 +134,10 @@ class HealpixMapROI(HealpixROIBase):
     @property
     def model_radius(self):
         return self._model_radius_radians * u.rad
+
+    @property
+    def data_radius(self):
+        return self._data_radius_radians * u.rad
 
     @property
     def threshold(self):

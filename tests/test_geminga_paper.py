@@ -1,5 +1,6 @@
 from __future__ import print_function
 from hawc_hal import HAL, HealpixConeROI
+import pytest
 
 try:
     import ROOT
