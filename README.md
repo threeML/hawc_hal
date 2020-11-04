@@ -7,13 +7,28 @@
 
 ## Installation
 
-If you have `conda` installed, it is highly reccomended that you install `numba` through conda like this (simply skip this step if you are not running in a `conda` environment):
+`hawc_hal` depends on `astromodels`, `threeML` as well as some additional packages (`numba`, `root`, `root_numpy`). 
+
+For install in a new conda environment, we recommend to use the following precoedure:
+
+```
+conda create --name new_hal -c conda-forge -c threeml numpy scipy matplotlib ipython numba reproject "astromodels>=2" "threeml>=2" root
+conda activate new_hal
+pip install --no-binary :all: root_numpy
+pip install git+https://github.com/threeml/hawc_hal.git
+```
+
+In particular, we recommend not to install the `root_numpy` binaries via conda or pip. 
+
+The above will install a new python 3 environment. There seem to be version conflicts that currently prevent installing `hawc_hal` with the newer (>=2.0) versions of `threeML` and `astromodels`.
+
+You can also add `hawc_hal` to an existing environment. If you have `conda` installed, it is highly reccomended that you install `numba` through conda like this (simply skip this step if you are not running in a `conda` environment):
 
 ```bash
 > conda install -c conda-forge numba
 ```
 
-You also need `root` (whether installed through conda or not) and `threeML/astromodels` and its dependencies.
+You also need `root` (whether installed through conda or not) and `threeML`/`astromodels` and their dependencies.
 
 Then:
 
@@ -24,7 +39,12 @@ Then:
 
 ## Examples
 
-### Simple analysis
+You can find a worked example relying only on publicly accessible data on the [threeML documentation](https://threeml.readthedocs.io/en/latest/notebooks/hal_example.html) 
+(or download the [notebook](https://github.com/threeML/threeML/blob/master/docs/notebooks/hal_example.ipynb)).
+
+### Mrk 421 analysis example
+
+(This example assumes you have access to an all-sky HAWC dataset)
 
 ```python
 from hawc_hal import HAL, HealpixConeROI
