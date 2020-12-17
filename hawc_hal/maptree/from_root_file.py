@@ -41,12 +41,13 @@ def _get_bin_object(f, bin_name, suffix):
     return bin_tobject
 
 
-def from_root_file(map_tree_file, roi):
+def from_root_file(map_tree_file, roi, n_transits):
     """
     Create a MapTree object from a ROOT file and a ROI. Do not use this directly, use map_tree_factory instead.
 
     :param map_tree_file:
     :param roi:
+    :param n_transits:
     :return:
     """
 
@@ -93,15 +94,17 @@ def from_root_file(map_tree_file, roi):
 
 
         # A transit is defined as 1 day, and totalDuration is in hours
-        # Get the number of transit from bin 0 (as LiFF does)
-
-        n_transits = root_numpy.tree2array(f.Get("BinInfo"), "totalDuration") / 24.0
+        # Get the number of transits from bin 0 (as LiFF does)
+        map_transits = root_numpy.tree2array(f.Get("BinInfo"), "totalDuration") / 24.0
 
         # The map-maker underestimate the livetime of bins with low statistic by removing time intervals with
         # zero events. Therefore, the best estimate of the livetime is the maximum of n_transits, which normally
         # happen in the bins with high statistic
-        n_transits = max(n_transits)
-
+        # Alternatively, specify n_transits
+        use_transits = max(map_transits)
+        if n_transits != None:
+            use_transits = n_transits
+        
         n_bins = len(data_bins_labels)
 
         # These are going to be Healpix maps, one for each data analysis bin_name
@@ -145,7 +148,7 @@ def from_root_file(map_tree_file, roi):
                                                          counts_hpx,
                                                          bkg_hpx,
                                                          active_pixels_ids=active_pixels,
-                                                         n_transits=n_transits,
+                                                         n_transits=use_transits,
                                                          scheme='RING')
 
             else:
@@ -159,7 +162,7 @@ def from_root_file(map_tree_file, roi):
                                                          DenseHealpix(counts),
                                                          DenseHealpix(bkg),
                                                          active_pixels_ids=None,
-                                                         n_transits=n_transits,
+                                                         n_transits=use_transits,
                                                          scheme='RING')
 
             data_analysis_bins[name] = this_data_analysis_bin
