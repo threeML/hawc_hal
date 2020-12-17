@@ -46,7 +46,7 @@ class MapTree(object):
         return cls(data_analysis_bins, roi)
 
     @classmethod
-    def from_root_file(cls, map_tree_file, roi):
+    def from_root_file(cls, map_tree_file, roi, n_transits):
         """
         Create a MapTree object from a ROOT file and a ROI. Do not use this directly, use map_tree_factory instead.
 
