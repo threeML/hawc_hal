@@ -10,12 +10,13 @@ from ..healpix_handling import SparseHealpix, DenseHealpix
 from .data_analysis_bin import DataAnalysisBin
 
 
-def from_hdf5_file(map_tree_file, roi):
+def from_hdf5_file(map_tree_file, roi, n_transits):
     """
     Create a MapTree object from a HDF5 file and a ROI. Do not use this directly, use map_tree_factory instead.
 
     :param map_tree_file:
     :param roi:
+    :param n_transits:
     :return:
     """
 
@@ -88,12 +89,17 @@ def from_hdf5_file(map_tree_file, roi):
             # This signals the DataAnalysisBin that we are dealing with a full sky map
             active_pixels_user = None
 
+        # Specify n_transits (or not), default value contained in map is this_meta['n_transits']
+        use_transits=this_meta['n_transits']
+        if n_transits!=None:
+            use_transits=n_transits
+            
         # Let's now build the instance
         this_bin = DataAnalysisBin(bin_name,
                                    observation_hpx_map=observation_hpx_map,
                                    background_hpx_map=background_hpx_map,
                                    active_pixels_ids=active_pixels_user,
-                                   n_transits=this_meta['n_transits'],
+                                   n_transits=use_transits,
                                    scheme='RING' if this_meta['scheme'] == 0 else 'NEST')
 
         data_analysis_bins[bin_name] = this_bin
