@@ -16,7 +16,7 @@ from astropy.io import fits as pyfits
 import matplotlib.pyplot as plt
 
 from threeML.parallel.parallel_client import ParallelClient, is_parallel_computation_active
-from threeML.io.progress_bar import progress_bar
+from tqdm.auto import tqdm
 from threeML.io.fits_file import FITSFile
 
 crab_diff_flux_at_1_TeV = old_div(2.65e-11, (u.TeV * u.cm**2 * u.s))
@@ -147,15 +147,15 @@ class ParallelTSmap(object):
             
             n_points = len(self._points)
             
-            with progress_bar(n_points) as p:
+            p = tqdm(total=n_points)
+            
+            res = np.zeros(n_points)
                 
-                res = np.zeros(n_points)
-                
-                for i, point in enumerate(self._points):
-                    
-                    res[i] = self.worker(i)
-                    
-                    p.increase()
+            for i, point in enumerate(self._points):
+
+                res[i] = self.worker(i)
+
+                p.update(1)
         
         TS = 2 * (-np.array(res) - self._like0)
         
