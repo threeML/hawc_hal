@@ -40,7 +40,7 @@ jobs:
             - name: Install dependencies
               run: |
                   python -m pip install --upgrade pip
-                  pip install --upgrade astromodels threeml numpy scipy matplotlib ipython numba reproject root
+                  pip install --upgrade astromodels threeml numpy scipy matplotlib ipython numba reproject
                   pip install --upgrade flake8 coverage pytest-cov cython
                   pip install --no-binary :all: root_numpy
                   pip install -e .
