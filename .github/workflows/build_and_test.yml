@@ -28,7 +28,7 @@ jobs:
         if: ${{ needs.skip_duplicate.outputs.should_skip == 'false' }}
         strategy:
             matrix:
-                python-version: 3.7
+                python-version: [ 3.7 ]
         runs-on: ubuntu-latest
         steps:
             - name: Checkout
