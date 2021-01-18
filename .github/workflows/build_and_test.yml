@@ -196,7 +196,7 @@ jobs:
                   conda install ${PKG} codecov pytest-cov git ${MATPLOTLIB} ${NUMPY} ${XSPEC} astropy ${compilers} scipy astropy astromodels threeML numba reproject root emcee pymultinest ultranest flake8
                   pip install --no-binary :all: root_numpy
                   pip uninstall astromodels threeML -y
-                  pip install git+https://github.com/threeml/astrmodels.git
+                  pip install git+https://github.com/threeml/astromodels.git
                   pip install git+https://github.com/threeml/threeML.git
             - name: Conda list
               shell: bash -l {0}
