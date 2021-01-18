@@ -122,7 +122,7 @@ jobs:
                   NUMEXPR_NUM_THREADS: 1
                   MPLBACKEND: "Agg"
 
-    test-conda:
+    test-master:
         name: Test with master threeML/astromodels
         needs: skip_duplicate
         if: ${{ needs.skip_duplicate.outputs.should_skip == 'false' }}
