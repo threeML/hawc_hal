@@ -170,7 +170,7 @@ def go(args):
 
     # we fit a common diffusion coefficient so parameters are linked
     if "B0656" in lm and "Geminga" in lm:
-        law = Line(a=250. / 288., b=0.)
+        law = Line(b=250. / 288., a=0.)
         lm.link(lm.B0656.spatial_shape.rdiff0,
                 lm.Geminga.spatial_shape.rdiff0,
                 law)
@@ -185,7 +185,7 @@ def go(args):
     TS = 0.
 
     try:
-
+    
         lm.Geminga.spatial_shape.rdiff0 = 5.5
         lm.Geminga.spatial_shape.rdiff0.fix = False
         lm.Geminga.spectrum.main.Powerlaw.K = 1.36e-23

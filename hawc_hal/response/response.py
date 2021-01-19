@@ -179,7 +179,7 @@ class HAWCResponse(object):
 
         # Read response
 
-        with open_ROOT_file(response_file_name) as root_file:
+        with open_ROOT_file( str(response_file_name) ) as root_file:
 
             # Get the name of the trees
             object_names = get_list_of_keys(root_file)
