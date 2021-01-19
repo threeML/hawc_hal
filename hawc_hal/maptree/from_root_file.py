@@ -68,8 +68,7 @@ def from_root_file(map_tree_file, roi):
         custom_warnings.warn("You have set roi=None, so you are reading the entire sky")
 
     # Read map tree
-
-    with open_ROOT_file(map_tree_file) as f:
+    with open_ROOT_file(str(map_tree_file)) as f:
 
         # Newer maps use "name" rather than "id"
         try:
