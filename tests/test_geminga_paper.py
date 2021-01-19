@@ -13,6 +13,7 @@ import argparse
 from collections import namedtuple
 import pytest
 
+@pytest.mark.xfail
 def test_geminga_paper(geminga_maptree, geminga_response):
 
     Args_fake = namedtuple('args', 'mtfile,rsfile,startBin,stopBin,RA,Dec,uratio,delta,ROI,output,plugin')
@@ -185,7 +186,7 @@ def go(args):
     TS = 0.
 
     try:
-
+    
         lm.Geminga.spatial_shape.rdiff0 = 5.5
         lm.Geminga.spatial_shape.rdiff0.fix = False
         lm.Geminga.spectrum.main.Powerlaw.K = 1.36e-23
