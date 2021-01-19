@@ -37,7 +37,7 @@ setup(
                       'scipy',
                       'matplotlib',
                       'numba',
-                      'reproject'
+                      'reproject',
                       'tqdm'
                       ]
 )
