@@ -16,7 +16,7 @@ from astropy.convolution import Gaussian2DKernel
 from astropy.convolution import convolve_fft as convolve
 
 from threeML.plugin_prototype import PluginPrototype
-from threeML.plugins.gammaln import logfactorial
+from threeML.utils.statistics.gammaln import logfactorial
 from threeML.parallel import parallel_client
 
 from tqdm.auto import tqdm
