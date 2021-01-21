@@ -1,11 +1,13 @@
 from __future__ import division
-from __future__ import print_function
 from builtins import zip
 from past.utils import old_div
 from builtins import object
 import numpy as np
 
 from astromodels import use_astromodels_memoization
+from threeML.io.logging import setup_logger
+log = setup_logger(__name__)
+log.propagate = False
 
 
 def _select_with_wrap_around(arr, start, stop, wrap=(360, 0)):
@@ -65,7 +67,7 @@ class ConvolvedExtendedSource(object):
 
         self._dec_bins_to_consider = [response.response_bins[centers[x]] for x in dec_bins_to_consider_idx]
 
-        print("Considering %i dec bins for extended source %s" % (len(self._dec_bins_to_consider),
+        log.info("Considering %i dec bins for extended source %s" % (len(self._dec_bins_to_consider),
                                                                   self._name))
 
         # Find central bin for the PSF
@@ -74,7 +76,7 @@ class ConvolvedExtendedSource(object):
         #
         self._central_response_bins = response.get_response_dec_bin(dec_center, interpolate=False)
 
-        print("Central bin is bin at Declination = %.3f" % dec_center)
+        log.info("Central bin is bin at Declination = %.3f" % dec_center)
 
         # Take note of the pixels within the flat sky projection that actually need to be computed. If the extended
         # source is significantly smaller than the flat sky projection, this gains a substantial amount of time

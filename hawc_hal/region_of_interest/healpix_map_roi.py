@@ -1,5 +1,4 @@
 from __future__ import division
-from __future__ import print_function
 from past.utils import old_div
 import numpy as np
 import astropy.units as u
@@ -126,7 +125,7 @@ class HealpixMapROI(HealpixROIBase):
 
     def display(self):
 
-        print(self)
+        log.info(self)
 
     @property
     def ra_dec_center(self):

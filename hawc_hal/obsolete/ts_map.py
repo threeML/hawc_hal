@@ -1,5 +1,4 @@
 from __future__ import division
-from __future__ import print_function
 from builtins import range
 from builtins import object
 from past.utils import old_div
@@ -67,7 +66,7 @@ class ParallelTSmap(object):
                      
                      max_d = d
                  
-        print("Maximum distance from center: %.3f deg" % np.rad2deg(max_d))  
+        log.info("Maximum distance from center: %.3f deg" % np.rad2deg(max_d))
         
         # We keep track of how many ras we have so that when running in parallel all
         # the ras will run on the same engine with the same dec, maximizing the use
@@ -169,7 +168,7 @@ class ParallelTSmap(object):
         idx = TS.argmax()
         self._max_ts = (TS[idx], self._points[idx])
         
-        print("Maximum TS is %.2f at (R.A., Dec) = (%.3f, %.3f)" % (self._max_ts[0], self._max_ts[1][0], self._max_ts[1][1]))
+        log.info("Maximum TS is %.2f at (R.A., Dec) = (%.3f, %.3f)" % (self._max_ts[0], self._max_ts[1][0], self._max_ts[1][1]))
          
         self._ts_map = TS.reshape(self._n_decs, self._n_ras)
         

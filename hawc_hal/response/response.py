@@ -1,5 +1,4 @@
 from __future__ import division
-from __future__ import print_function
 from __future__ import absolute_import
 from builtins import zip
 from builtins import range
@@ -39,7 +38,7 @@ def hawc_response_factory(response_file_name):
 
     if not response_file_name in _instances:
 
-        print("Creating singleton for %s" % response_file_name)
+        log.info("Creating singleton for %s" % response_file_name)
 
         # Use the extension of the file to figure out which kind of response it is (ROOT or HDF)
 
@@ -338,13 +337,13 @@ class HAWCResponse(object):
         :param verbose bool: Prints the full list of declinations and analysis bins.
         """
 
-        print("Response file: %s" % self._response_file_name)
-        print("Number of dec bins: %s" % len(self._dec_bins))
+        log.info("Response file: %s" % self._response_file_name)
+        log.info("Number of dec bins: %s" % len(self._dec_bins))
         if verbose:
-            print(self._dec_bins)
-        print("Number of energy/nHit planes per dec bin_name: %s" % (self.n_energy_planes))
+            log.info(self._dec_bins)
+        log.info("Number of energy/nHit planes per dec bin_name: %s" % (self.n_energy_planes))
         if verbose:
-            print(list(self._response_bins.values())[0].keys())
+            log.info(list(self._response_bins.values())[0].keys())
 
     def write(self, filename):
         """
