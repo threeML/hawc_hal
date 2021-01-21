@@ -3,8 +3,6 @@ from builtins import object
 import numpy as np
 import pandas as pd
 
-from threeML.exceptions.custom_exceptions import custom_warnings
-
 from ..psf_fast import PSFWrapper, InvalidPSF, InvalidPSFError
 
 

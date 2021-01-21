@@ -13,7 +13,10 @@ import collections
 from ..serialize import Serialization
 
 from threeML.io.file_utils import file_existing_and_readable, sanitize_filename
-from threeML.exceptions.custom_exceptions import custom_warnings
+
+from threeML.io.logging import setup_logger
+log = setup_logger(__name__)
+log.propagate = False
 
 from ..psf_fast import PSFWrapper
 from .response_bin import ResponseBin
@@ -71,8 +74,8 @@ class HAWCResponse(object):
         self._response_bins = response_bins
         
         if len(dec_bins) < 2:
-          custom_warnings.warn("Only {0} dec bins given in {1}, will not try to interpolate.".format(len(dec_bins), response_file_name))
-          custom_warnings.warn("Single-dec-bin mode is intended for development work only at this time and may not work with extended sources.")
+          log.warning("Only {0} dec bins given in {1}, will not try to interpolate.".format(len(dec_bins), response_file_name))
+          log.warning("Single-dec-bin mode is intended for development work only at this time and may not work with extended sources.")
 
     @classmethod
     def from_hdf5(cls, response_file_name):
@@ -216,7 +219,7 @@ class HAWCResponse(object):
                 except ValueError:
 
                     # Some old response files (or energy responses) have no "name" branch
-                    custom_warnings.warn("Response %s has no AnalysisBins 'id' or 'name' branch. "
+                    log.warning("Response %s has no AnalysisBins 'id' or 'name' branch. "
                                          "Will try with default names" % response_file_name)
 
                     response_bins_ids = None

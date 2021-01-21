@@ -5,7 +5,11 @@ from builtins import object
 from past.utils import old_div
 from threeML import *
 import numpy as np
-import warnings
+
+from threeML.io.logging import setup_logger
+log = setup_logger(__name__)
+log.propagate = False
+
 from hawc_hal.HAL import HAL
 from hawc_hal.region_of_interest import HealpixConeROI
 
@@ -139,7 +143,7 @@ class ParallelTSmap(object):
             
             if self._n_decs % client.get_number_of_engines() != 0:
                 
-                warnings.warn("The number of Dec bands is not a multiple of the number of engine. Make it so for optimal performances.", RuntimeWarning)
+                log.warning("The number of Dec bands is not a multiple of the number of engine. Make it so for optimal performances.", RuntimeWarning)
             
             res = client.execute_with_progress_bar(self.worker, list(range(len(self._points))), chunk_size=self._n_ras)
         
