@@ -16,7 +16,7 @@ from astropy.convolution import Gaussian2DKernel
 from astropy.convolution import convolve_fft as convolve
 
 from threeML.plugin_prototype import PluginPrototype
-from threeML.plugins.gammaln import logfactorial
+from threeML.utils.statistics.gammaln import logfactorial
 from threeML.parallel import parallel_client
 
 from tqdm.auto import tqdm
@@ -183,7 +183,7 @@ class HAL(PluginPrototype):
 
             data_analysis_bin = self._maptree[bin_label]
 
-            this_log_factorial = np.sum(logfactorial(data_analysis_bin.observation_map.as_partial()))
+            this_log_factorial = np.sum(logfactorial(data_analysis_bin.observation_map.as_partial().astype(int)))
             self._log_factorials[bin_label] = this_log_factorial
 
             # As bias we use the likelihood value for the saturated model
