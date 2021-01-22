@@ -942,7 +942,7 @@ class HAL(PluginPrototype):
         """
         if test_return_map:
             log.warning("test_return_map=True should only be used for testing purposes!")
-        self._write_a_map(file_name, 'model', poisson_fluctuate, test_return_map)
+        return self._write_a_map(file_name, 'model', poisson_fluctuate, test_return_map)
 
     def write_residual_map(self, file_name, test_return_map=False):
         """
@@ -951,4 +951,4 @@ class HAL(PluginPrototype):
         """
         if test_return_map:
             log.warning("test_return_map=True should only be used for testing purposes!")
-        self._write_a_map(file_name, 'residual', False, test_return_map)
+        return self._write_a_map(file_name, 'residual', False, test_return_map)
