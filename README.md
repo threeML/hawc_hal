@@ -1,4 +1,4 @@
-[![CI]](https://github.com/threeML/hawc_hal/workflows/CI/badge.svg)
+![CI](https://github.com/threeML/hawc_hal/workflows/CI/badge.svg)
 [![codecov](https://codecov.io/gh/giacomov/hawc_hal/branch/master/graph/badge.svg)](https://codecov.io/gh/giacomov/hawc_hal)
 [![Maintainability](https://api.codeclimate.com/v1/badges/7a1c8e60a5cde4275292/maintainability)](https://codeclimate.com/github/giacomov/hawc_hal/maintainability)
 [![Scrutinizer Code Quality](https://scrutinizer-ci.com/g/giacomov/hawc_hal/badges/quality-score.png?b=master)](https://scrutinizer-ci.com/g/giacomov/hawc_hal/?branch=master)
