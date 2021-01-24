@@ -8,6 +8,7 @@ import copy
 import collections
 
 import numpy as np
+import numba as nb
 import healpy as hp
 import matplotlib.pyplot as plt
 from scipy.stats import poisson
@@ -183,7 +184,7 @@ class HAL(PluginPrototype):
 
             data_analysis_bin = self._maptree[bin_label]
 
-            this_log_factorial = np.sum(logfactorial(data_analysis_bin.observation_map.as_partial().astype(int)))
+            this_log_factorial = _nb_sum(logfactorial(data_analysis_bin.observation_map.as_partial().astype(int)))
             self._log_factorials[bin_label] = this_log_factorial
 
             # As bias we use the likelihood value for the saturated model
@@ -200,7 +201,7 @@ class HAL(PluginPrototype):
 
         :return:
         """
-        return sum(self._saturated_model_like_per_maptree.values())
+        return _nb_sum(self._saturated_model_like_per_maptree.values())
 
     def set_active_measurements(self, bin_id_min=None, bin_id_max=None, bin_list=None):
         """
@@ -363,10 +364,10 @@ class HAL(PluginPrototype):
 
             this_model_map_hpx = self._get_expectation(data_analysis_bin, energy_id, n_point_sources, n_ext_sources)
 
-            this_model_tot = np.sum(this_model_map_hpx)
+            this_model_tot = _nb_sum(this_model_map_hpx)
 
-            this_data_tot = np.sum(data_analysis_bin.observation_map.as_partial())
-            this_bkg_tot = np.sum(data_analysis_bin.background_map.as_partial())
+            this_data_tot = _nb_sum(data_analysis_bin.observation_map.as_partial())
+            this_bkg_tot = _nb_sum(data_analysis_bin.background_map.as_partial())
 
             total_counts[i] = this_data_tot
             net_counts[i] = this_data_tot - this_bkg_tot
@@ -954,3 +955,7 @@ class HAL(PluginPrototype):
             return self._write_a_map(file_name, 'residual', False, test_return_map)
         else:
             self._write_a_map(file_name, 'residual', False, test_return_map)
+
+@nb.njit(fastmath=True)
+def _nb_sum(x):
+    return np.sum(x)
