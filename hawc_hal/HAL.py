@@ -268,12 +268,12 @@ class HAL(PluginPrototype):
         """
 
         log.info("Region of Interest: ")
-        log.info("-------------------\n")
+        log.info("-------------------")
         self._roi.display()
 
         log.info("")
         log.info("Flat sky projection: ")
-        log.info("--------------------\n")
+        log.info("--------------------")
 
         log.info("Width x height: %s x %s px" % (self._flat_sky_projection.npix_width,
                                               self._flat_sky_projection.npix_height))
@@ -281,19 +281,19 @@ class HAL(PluginPrototype):
 
         log.info("")
         log.info("Response: ")
-        log.info("---------\n")
+        log.info("---------")
 
         self._response.display(verbose)
 
         log.info("")
         log.info("Map Tree: ")
-        log.info("----------\n")
+        log.info("----------")
 
         self._maptree.display()
         
         log.info("")
         log.info("Active energy/nHit planes ({}):".format(len(self._active_planes)))
-        log.info("-------------------------------\n")
+        log.info("-------------------------------")
         log.info(self._active_planes)
 
     def set_model(self, likelihood_model_instance):
