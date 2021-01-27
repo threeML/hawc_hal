@@ -1,4 +1,3 @@
-from __future__ import print_function
 from __future__ import division
 
 from builtins import str
@@ -18,6 +17,9 @@ from astropy.convolution import convolve_fft as convolve
 from threeML.plugin_prototype import PluginPrototype
 from threeML.utils.statistics.gammaln import logfactorial
 from threeML.parallel import parallel_client
+from threeML.io.logging import setup_logger
+log = setup_logger(__name__)
+log.propagate = False
 
 from tqdm.auto import tqdm
 
@@ -265,34 +267,34 @@ class HAL(PluginPrototype):
         Prints summary of the current object content.
         """
 
-        print("Region of Interest: ")
-        print("-------------------\n")
+        log.info("Region of Interest: ")
+        log.info("-------------------")
         self._roi.display()
 
-        print("")
-        print("Flat sky projection: ")
-        print("--------------------\n")
+        log.info("")
+        log.info("Flat sky projection: ")
+        log.info("--------------------")
 
-        print("Width x height: %s x %s px" % (self._flat_sky_projection.npix_width,
+        log.info("Width x height: %s x %s px" % (self._flat_sky_projection.npix_width,
                                               self._flat_sky_projection.npix_height))
-        print("Pixel sizes: %s deg" % self._flat_sky_projection.pixel_size)
+        log.info("Pixel sizes: %s deg" % self._flat_sky_projection.pixel_size)
 
-        print("")
-        print("Response: ")
-        print("---------\n")
+        log.info("")
+        log.info("Response: ")
+        log.info("---------")
 
         self._response.display(verbose)
 
-        print("")
-        print("Map Tree: ")
-        print("----------\n")
+        log.info("")
+        log.info("Map Tree: ")
+        log.info("----------")
 
         self._maptree.display()
-
-        print("")
-        print("Active energy/nHit planes ({}):".format(len(self._active_planes)))
-        print("-------------------------------\n")
-        print(self._active_planes)
+        
+        log.info("")
+        log.info("Active energy/nHit planes ({}):".format(len(self._active_planes)))
+        log.info("-------------------------------")
+        log.info(self._active_planes)
 
     def set_model(self, likelihood_model_instance):
         """
@@ -935,22 +937,18 @@ class HAL(PluginPrototype):
 
     def write_model_map(self, file_name, poisson_fluctuate=False, test_return_map=False):
         """
-        This function writes the model map to a file. (it is currently not implemented)
+        This function writes the model map to a file.
         The interface is based off of HAWCLike for consistency
         """
         if test_return_map:
-            print("You should only return a model map here for testing purposes!")
-            return self._write_a_map(file_name, 'model', poisson_fluctuate, test_return_map)
-        else:
-            self._write_a_map(file_name, 'model', poisson_fluctuate, test_return_map)
+            log.warning("test_return_map=True should only be used for testing purposes!")
+        return self._write_a_map(file_name, 'model', poisson_fluctuate, test_return_map)
 
     def write_residual_map(self, file_name, test_return_map=False):
         """
-        This function writes the residual map to a file. (it is currently not implemented)
+        This function writes the residual map to a file.
         The interface is based off of HAWCLike for consistency
         """
         if test_return_map:
-            print("You should only return a residual map here for testing purposes!")
-            return self._write_a_map(file_name, 'residual', False, test_return_map)
-        else:
-            self._write_a_map(file_name, 'residual', False, test_return_map)
+            log.warning("test_return_map=True should only be used for testing purposes!")
+        return self._write_a_map(file_name, 'residual', False, test_return_map)

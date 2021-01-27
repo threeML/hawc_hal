@@ -10,7 +10,9 @@ from astromodels import PointSource
 from ..psf_fast import PSFInterpolator
 from ..interpolation.log_log_interpolation import LogLogInterpolator
 
-from threeML.exceptions.custom_exceptions import custom_warnings
+from threeML.io.logging import setup_logger
+log = setup_logger(__name__)
+log.propagate = False
 
 
 class ConvolvedPointSource(object):
@@ -83,7 +85,7 @@ class ConvolvedPointSource(object):
 
         if not np.isclose(map_sum, 1.0, rtol=1e-2):
 
-            custom_warnings.warn("PSF for source %s is not entirely contained "
+            log.warning("PSF for source %s is not entirely contained "
                                  "in ROI for response bin %s. Fraction is %.2f instead of 1.0. "
                                  "Consider enlarging your model ROI." % (self._name,
                                                                          response_bin_id,
