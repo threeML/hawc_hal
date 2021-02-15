@@ -195,7 +195,7 @@ class MapTree(object):
             # Write the ROI
             if self._roi is not None:
 
-                 if self._roi.to_dict()['ROI type']=='HealpixMapROI':
+                if self._roi.to_dict()['ROI type']=='HealpixMapROI':
                     ROIDict = self._roi.to_dict()
                     roimap = ROIDict['roimap']
                     ROIDict.pop('roimap',None)
