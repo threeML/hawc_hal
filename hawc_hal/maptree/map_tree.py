@@ -199,7 +199,7 @@ class MapTree(object):
                     ROIDict = self._roi.to_dict()
                     roimap = ROIDict['roimap']
                     ROIDict.pop('roimap',None)
-                    serializer.store_pandas_object('/ROI', pd.DataFrame({'roimap':roimap}), **ROIDict)
+                    serializer.store_pandas_object('/ROI', pd.Series(roimap), **ROIDict)
 
                 else:
 
