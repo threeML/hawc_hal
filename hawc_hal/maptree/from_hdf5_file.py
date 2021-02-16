@@ -27,7 +27,10 @@ def from_hdf5_file(map_tree_file, roi):
 
         analysis_bins_df, _ = serializer.retrieve_pandas_object('/analysis_bins')
         meta_df, _ = serializer.retrieve_pandas_object('/analysis_bins_meta')
-        _, roi_meta = serializer.retrieve_pandas_object('/ROI')
+        roimap, roi_meta = serializer.retrieve_pandas_object('/ROI')
+        
+    if len(roimap)>0:
+        roi_meta['roimap']=roimap.values
 
     # Let's see if the file contains the definition of an ROI
     if len(roi_meta) > 0:
@@ -74,7 +77,7 @@ def from_hdf5_file(map_tree_file, roi):
         if roi is not None:
 
             # Get the active pixels for this plane
-            active_pixels_user = roi.active_pixels(this_meta['nside'])
+            active_pixels_user = roi.active_pixels(int(this_meta['nside']))
 
             # Read only the pixels that the user wants
             observation_hpx_map = SparseHealpix(this_df.loc[active_pixels_user, 'observation'].values,
