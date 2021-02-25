@@ -18,6 +18,13 @@ pip install --no-binary :all: root_numpy
 pip install git+https://github.com/threeml/hawc_hal.git
 ```
 
+**For the time being, we recommend updating to the master version of astromodels and threeML from github:**
+
+```
+pip install --upgrade git+https://github.com/threeml/astromodels.git
+pip install --upgrade git+https://github.com/threeml/threeML.git
+```
+
 In particular, we recommend not to install the `root_numpy` binaries via conda or pip. 
 
 The above will install a new python 3 environment. There seem to be version conflicts that currently prevent installing `hawc_hal` with the newer (>=2.0) versions of `threeML` and `astromodels`.
@@ -36,6 +43,23 @@ Then:
 > pip install --no-binary :all: root_numpy 
 > pip uninstall hawc_hal -y ; pip install git+https://github.com/threeml/hawc_hal.git
 ```
+
+## Check installation
+
+Use the following commands to check if your installation was successful. You should be inside your conda environment for this.
+
+* To test threeML: `pytest --pyargs threeML`
+* To test astromodels: `pytest --pyargs astromodels`
+* To test HAL:
+```
+git clone git@github.com:threeML/hawc_hal.git
+cd hawc_hal/tests
+pytest
+```
+
+If you are interested in more detailed output from the tests, learn more about pytest command line options [here](https://docs.pytest.org/en/reorganize-docs/new-docs/user/commandlineuseful.html#).
+
+
 
 ## Examples
 
