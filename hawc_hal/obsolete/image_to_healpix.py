@@ -5,6 +5,8 @@ import numpy as np
 import six
 from scipy.ndimage import map_coordinates
 
+from astropy import units as u
+
 def image_to_healpix(data, wcs_in, coord_system_out,
                      nside, pixels_id, order='bilinear', nested=False,
                      fill_value=UNSEEN, pixels_to_be_zeroed=None, full=False):

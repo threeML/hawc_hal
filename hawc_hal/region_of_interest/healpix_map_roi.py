@@ -1,11 +1,12 @@
 from __future__ import division
-from __future__ import print_function
 from past.utils import old_div
 import numpy as np
 import astropy.units as u
 import healpy as hp
 
-from threeML.exceptions.custom_exceptions import custom_warnings
+from threeML.io.logging import setup_logger
+log = setup_logger(__name__)
+log.propagate = False
 from astromodels.core.sky_direction import SkyDirection
 
 from hawc_hal.region_of_interest.healpix_roi_base import HealpixROIBase
@@ -87,7 +88,7 @@ class HealpixMapROI(HealpixROIBase):
         model_pixels = temp_roi.active_pixels( self._original_nside )
 
         if not all(p in model_pixels for p in active_pixels):
-            custom_warnings.warn("Some pixels inside your ROI are not contained in the model map.")
+            log.warning("Some pixels inside your ROI are not contained in the model map.")
 
     def to_dict(self):
 
@@ -124,7 +125,7 @@ class HealpixMapROI(HealpixROIBase):
 
     def display(self):
 
-        print(self)
+        log.info(self)
 
     @property
     def ra_dec_center(self):

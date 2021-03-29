@@ -1,4 +1,3 @@
-from __future__ import print_function
 from __future__ import division
 
 from builtins import str
@@ -16,9 +15,13 @@ from astropy.convolution import Gaussian2DKernel
 from astropy.convolution import convolve_fft as convolve
 
 from threeML.plugin_prototype import PluginPrototype
-from threeML.plugins.gammaln import logfactorial
+from threeML.utils.statistics.gammaln import logfactorial
 from threeML.parallel import parallel_client
-from threeML.io.progress_bar import progress_bar
+from threeML.io.logging import setup_logger
+log = setup_logger(__name__)
+log.propagate = False
+
+from tqdm.auto import tqdm
 
 from astromodels import Parameter
 
@@ -185,7 +188,7 @@ class HAL(PluginPrototype):
 
             data_analysis_bin = self._maptree[bin_label]
 
-            this_log_factorial = np.sum(logfactorial(data_analysis_bin.observation_map.as_partial()))
+            this_log_factorial = np.sum(logfactorial(data_analysis_bin.observation_map.as_partial().astype(int)))
             self._log_factorials[bin_label] = this_log_factorial
 
             # As bias we use the likelihood value for the saturated model
@@ -267,34 +270,34 @@ class HAL(PluginPrototype):
         Prints summary of the current object content.
         """
 
-        print("Region of Interest: ")
-        print("-------------------\n")
+        log.info("Region of Interest: ")
+        log.info("-------------------")
         self._roi.display()
 
-        print("")
-        print("Flat sky projection: ")
-        print("--------------------\n")
+        log.info("")
+        log.info("Flat sky projection: ")
+        log.info("--------------------")
 
-        print("Width x height: %s x %s px" % (self._flat_sky_projection.npix_width,
+        log.info("Width x height: %s x %s px" % (self._flat_sky_projection.npix_width,
                                               self._flat_sky_projection.npix_height))
-        print("Pixel sizes: %s deg" % self._flat_sky_projection.pixel_size)
+        log.info("Pixel sizes: %s deg" % self._flat_sky_projection.pixel_size)
 
-        print("")
-        print("Response: ")
-        print("---------\n")
+        log.info("")
+        log.info("Response: ")
+        log.info("---------")
 
         self._response.display(verbose)
 
-        print("")
-        print("Map Tree: ")
-        print("----------\n")
+        log.info("")
+        log.info("Map Tree: ")
+        log.info("----------")
 
         self._maptree.display()
-
-        print("")
-        print("Active energy/nHit planes ({}):".format(len(self._active_planes)))
-        print("-------------------------------\n")
-        print(self._active_planes)
+        
+        log.info("")
+        log.info("Active energy/nHit planes ({}):".format(len(self._active_planes)))
+        log.info("-------------------------------")
+        log.info(self._active_planes)
 
     def set_model(self, likelihood_model_instance):
         """
@@ -697,73 +700,75 @@ class HAL(PluginPrototype):
         fig, subs = plt.subplots(n_active_planes, n_columns,
                                  figsize=(2.7 * n_columns, n_active_planes * 2), squeeze=False)
 
-        with progress_bar(len(self._active_planes), title='Smoothing maps') as prog_bar:
 
-            images = ['None'] * n_columns
 
-            for i, plane_id in enumerate(self._active_planes):
+        prog_bar = tqdm(total = len(self._active_planes), desc="Smoothing planes")
 
-                data_analysis_bin = self._maptree[plane_id]
+        images = ['None'] * n_columns
 
-                # Get the center of the projection for this plane
-                this_ra, this_dec = self._roi.ra_dec_center
+        for i, plane_id in enumerate(self._active_planes):
 
-                # Make a full healpix map for a second
-                whole_map = self._get_model_map(plane_id, n_point_sources, n_ext_sources).as_dense()
+            data_analysis_bin = self._maptree[plane_id]
 
-                # Healpix uses longitude between -180 and 180, while R.A. is between 0 and 360. We need to fix that:
-                longitude = ra_to_longitude(this_ra)
+            # Get the center of the projection for this plane
+            this_ra, this_dec = self._roi.ra_dec_center
 
-                # Declination is already between -90 and 90
-                latitude = this_dec
+            # Make a full healpix map for a second
+            whole_map = self._get_model_map(plane_id, n_point_sources, n_ext_sources).as_dense()
 
-                # Background and excess maps
-                bkg_subtracted, _, background_map = self._get_excess(data_analysis_bin, all_maps=True)
+            # Healpix uses longitude between -180 and 180, while R.A. is between 0 and 360. We need to fix that:
+            longitude = ra_to_longitude(this_ra)
 
-                # Make all the projections: model, excess, background, residuals
-                proj_model = self._represent_healpix_map(fig, whole_map,
-                                                         longitude, latitude,
-                                                         xsize, resolution, smoothing_kernel_sigma)
-                # Here we removed the background otherwise nothing is visible
-                # Get background (which is in a way "part of the model" since the uncertainties are neglected)
-                proj_data = self._represent_healpix_map(fig, bkg_subtracted,
-                                                        longitude, latitude,
-                                                        xsize, resolution, smoothing_kernel_sigma)
-                # No smoothing for this one (because a goal is to check it is smooth).
-                proj_bkg = self._represent_healpix_map(fig, background_map,
-                                                       longitude, latitude,
-                                                       xsize, resolution, None)
-                proj_residuals = proj_data - proj_model
+            # Declination is already between -90 and 90
+            latitude = this_dec
 
-                # Common color scale range for model and excess maps
-                vmin = min(np.nanmin(proj_model), np.nanmin(proj_data))
-                vmax = max(np.nanmax(proj_model), np.nanmax(proj_data))
+            # Background and excess maps
+            bkg_subtracted, _, background_map = self._get_excess(data_analysis_bin, all_maps=True)
 
-                # Plot model
-                images[0] = subs[i][0].imshow(proj_model, origin='lower', vmin=vmin, vmax=vmax)
-                subs[i][0].set_title('model, bin {}'.format(data_analysis_bin.name))
+            # Make all the projections: model, excess, background, residuals
+            proj_model = self._represent_healpix_map(fig, whole_map,
+                                                     longitude, latitude,
+                                                     xsize, resolution, smoothing_kernel_sigma)
+            # Here we removed the background otherwise nothing is visible
+            # Get background (which is in a way "part of the model" since the uncertainties are neglected)
+            proj_data = self._represent_healpix_map(fig, bkg_subtracted,
+                                                    longitude, latitude,
+                                                    xsize, resolution, smoothing_kernel_sigma)
+            # No smoothing for this one (because a goal is to check it is smooth).
+            proj_bkg = self._represent_healpix_map(fig, background_map,
+                                                   longitude, latitude,
+                                                   xsize, resolution, None)
+            proj_residuals = proj_data - proj_model
 
-                # Plot data map
-                images[1] = subs[i][1].imshow(proj_data, origin='lower', vmin=vmin, vmax=vmax)
-                subs[i][1].set_title('excess, bin {}'.format(data_analysis_bin.name))
+            # Common color scale range for model and excess maps
+            vmin = min(np.nanmin(proj_model), np.nanmin(proj_data))
+            vmax = max(np.nanmax(proj_model), np.nanmax(proj_data))
 
-                # Plot background map.
-                images[2] = subs[i][2].imshow(proj_bkg, origin='lower')
-                subs[i][2].set_title('background, bin {}'.format(data_analysis_bin.name))
+            # Plot model
+            images[0] = subs[i][0].imshow(proj_model, origin='lower', vmin=vmin, vmax=vmax)
+            subs[i][0].set_title('model, bin {}'.format(data_analysis_bin.name))
 
-                # Now residuals
-                images[3] = subs[i][3].imshow(proj_residuals, origin='lower')
-                subs[i][3].set_title('residuals, bin {}'.format(data_analysis_bin.name))
+            # Plot data map
+            images[1] = subs[i][1].imshow(proj_data, origin='lower', vmin=vmin, vmax=vmax)
+            subs[i][1].set_title('excess, bin {}'.format(data_analysis_bin.name))
 
-                # Remove numbers from axis
-                for j in range(n_columns):
-                    subs[i][j].axis('off')
+            # Plot background map.
+            images[2] = subs[i][2].imshow(proj_bkg, origin='lower')
+            subs[i][2].set_title('background, bin {}'.format(data_analysis_bin.name))
 
-                if display_colorbar:
-                    for j, image in enumerate(images):
-                        plt.colorbar(image, ax=subs[i][j])
+            # Now residuals
+            images[3] = subs[i][3].imshow(proj_residuals, origin='lower')
+            subs[i][3].set_title('residuals, bin {}'.format(data_analysis_bin.name))
 
-                prog_bar.increase()
+            # Remove numbers from axis
+            for j in range(n_columns):
+                subs[i][j].axis('off')
+
+            if display_colorbar:
+                for j, image in enumerate(images):
+                    plt.colorbar(image, ax=subs[i][j])
+
+            prog_bar.update(1)
 
         fig.set_tight_layout(True)
 
@@ -935,22 +940,18 @@ class HAL(PluginPrototype):
 
     def write_model_map(self, file_name, poisson_fluctuate=False, test_return_map=False):
         """
-        This function writes the model map to a file. (it is currently not implemented)
+        This function writes the model map to a file.
         The interface is based off of HAWCLike for consistency
         """
         if test_return_map:
-            print("You should only return a model map here for testing purposes!")
-            return self._write_a_map(file_name, 'model', poisson_fluctuate, test_return_map)
-        else:
-            self._write_a_map(file_name, 'model', poisson_fluctuate, test_return_map)
+            log.warning("test_return_map=True should only be used for testing purposes!")
+        return self._write_a_map(file_name, 'model', poisson_fluctuate, test_return_map)
 
     def write_residual_map(self, file_name, test_return_map=False):
         """
-        This function writes the residual map to a file. (it is currently not implemented)
+        This function writes the residual map to a file.
         The interface is based off of HAWCLike for consistency
         """
         if test_return_map:
-            print("You should only return a residual map here for testing purposes!")
-            return self._write_a_map(file_name, 'residual', False, test_return_map)
-        else:
-            self._write_a_map(file_name, 'residual', False, test_return_map)
+            log.warning("test_return_map=True should only be used for testing purposes!")
+        return self._write_a_map(file_name, 'residual', False, test_return_map)

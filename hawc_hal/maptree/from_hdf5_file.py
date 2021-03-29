@@ -4,7 +4,10 @@ import collections
 from hawc_hal.serialize import Serialization
 from hawc_hal.region_of_interest import get_roi_from_dict
 
-from threeML.exceptions.custom_exceptions import custom_warnings
+
+from threeML.io.logging import setup_logger
+log = setup_logger(__name__)
+log.propagate = False
 
 from ..healpix_handling import SparseHealpix, DenseHealpix
 from .data_analysis_bin import DataAnalysisBin
@@ -49,7 +52,7 @@ def from_hdf5_file(map_tree_file, roi, n_transits):
         else:
 
             # The user has provided no ROI, but the file contains one. Let's issue a warning
-            custom_warnings.warn("You did not provide any ROI but the map tree %s contains "
+            log.warning("You did not provide any ROI but the map tree %s contains "
                                  "only data within the ROI %s. "
                                  "Only those will be used." % (map_tree_file, file_roi))
 

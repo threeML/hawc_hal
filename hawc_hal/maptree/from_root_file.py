@@ -8,7 +8,10 @@ import collections
 import numpy as np
 
 from threeML.io.file_utils import file_existing_and_readable, sanitize_filename
-from threeML.exceptions.custom_exceptions import custom_warnings
+
+from threeML.io.logging import setup_logger
+log = setup_logger(__name__)
+log.propagate = False
 
 from ..region_of_interest import HealpixROIBase
 from .data_analysis_bin import DataAnalysisBin
@@ -66,11 +69,10 @@ def from_root_file(map_tree_file, roi, n_transits):
                                                            "available ROIs in the region_of_interest module"
 
     if roi is None:
-        custom_warnings.warn("You have set roi=None, so you are reading the entire sky")
+        log.warning("You have set roi=None, so you are reading the entire sky")
 
     # Read map tree
-
-    with open_ROOT_file(map_tree_file) as f:
+    with open_ROOT_file(str(map_tree_file)) as f:
 
         # Newer maps use "name" rather than "id"
         try:

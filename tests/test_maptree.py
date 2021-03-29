@@ -26,8 +26,9 @@ def test_constructor(maptree,
     # Check corner cases
     # This should issue a warning because we saved the maptree with a ROI and we try to use
     # without one
-    with pytest.warns(UserWarning):
-        _ = map_tree_factory(test_filename, None)
+    
+    #with pytest.warns(UserWarning):
+    _ = map_tree_factory(test_filename, None)
 
     # Now try to load with a different ROI than the one used for the file
     ra_c, dec_c = roi.ra_dec_center

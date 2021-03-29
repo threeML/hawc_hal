@@ -1,5 +1,4 @@
 from __future__ import division
-from __future__ import print_function
 from __future__ import absolute_import
 from builtins import object
 from past.utils import old_div
@@ -9,6 +8,9 @@ import pandas as pd
 
 from threeML.io.rich_display import display
 from threeML.io.file_utils import sanitize_filename
+from threeML.io.logging import setup_logger
+log = setup_logger(__name__)
+log.propagate = False
 
 from ..serialize import Serialization
 from .from_root_file import from_root_file
@@ -158,9 +160,9 @@ class MapTree(object):
         display(df)
 
         first_bin_id = list(self._analysis_bins.keys())[0]
-        print("This Map Tree contains %.3f transits in the first bin" \
+        log.info("This Map Tree contains %.3f transits in the first bin" \
             % self._analysis_bins[first_bin_id].n_transits)
-        print("Total data size: %.2f Mb" % (size * u.byte).to(u.megabyte).value)
+        log.info("Total data size: %.2f Mb" % (size * u.byte).to(u.megabyte).value)
 
     def write(self, filename):
         """

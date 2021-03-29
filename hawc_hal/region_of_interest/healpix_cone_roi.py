@@ -1,5 +1,4 @@
 from __future__ import division
-from __future__ import print_function
 from __future__ import absolute_import
 from past.utils import old_div
 import numpy as np
@@ -12,6 +11,9 @@ from astromodels.core.sky_direction import SkyDirection
 from ..healpix_handling import radec_to_vec
 from ..flat_sky_projection import FlatSkyProjection
 
+from threeML.io.logging import setup_logger
+log = setup_logger(__name__)
+log.propagate = False
 
 def _get_radians(my_angle):
 
@@ -82,7 +84,7 @@ class HealpixConeROI(HealpixROIBase):
 
     def display(self):
 
-        print(self)
+        log.info(self)
 
     @property
     def ra_dec_center(self):
