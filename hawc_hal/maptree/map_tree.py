@@ -35,11 +35,22 @@ def map_tree_factory(map_tree_file, roi, n_transits=None):
 
 class MapTree(object):
 
-    def __init__(self, analysis_bins, roi):
+    def __init__(self, analysis_bins, roi, n_transits=None):
 
         self._analysis_bins = analysis_bins
         self._roi = roi
-        self._n_transits = None
+
+        if n_transits != None:
+            self._n_transits = n_transits
+        else:
+            # we need to find the transits in the map
+            transits=[]
+            # loop through bins and get the n_transits in each 
+            for analysis_bin_key in self._analysis_bins:
+                transits.append(self._analysis_bins[analysis_bin_key].n_transits)
+            
+            #Get the largest
+            self._n_transits = np.max(np.array(transits))
 
     @classmethod
     def from_hdf5(cls, map_tree_file, roi, n_transits):
@@ -51,10 +62,9 @@ class MapTree(object):
         :return:
         """
 
-        data_analysis_bins = from_hdf5_file(map_tree_file, roi, n_transits)
-        self._n_transits = n_transits
-
-        return cls(data_analysis_bins, roi)
+        data_analysis_bins, transits = from_hdf5_file(map_tree_file, roi, n_transits)
+        
+        return cls(data_analysis_bins, roi, transits)
 
     @classmethod
     def from_root_file(cls, map_tree_file, roi, n_transits):
@@ -66,10 +76,9 @@ class MapTree(object):
         :return:
         """
 
-        data_analysis_bins = from_root_file(map_tree_file, roi, n_transits)
-        self._n_transits = n_transits
+        data_analysis_bins, transits = from_root_file(map_tree_file, roi, n_transits)
 
-        return cls(data_analysis_bins, roi)
+        return cls(data_analysis_bins, roi, transits)
 
     def __iter__(self):
         """
