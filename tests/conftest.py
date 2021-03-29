@@ -92,6 +92,18 @@ def check_map_trees(m1, m2):
         assert p1.nside == p2.nside
         assert p1.n_transits == p2.n_transits
 
+def check_n_transits(maptree,ntransits):
+    # Should give maptree object and expected ntransits
+
+    #Check maptree is assigned proper transits
+    assert maptree.n_transits == ntransits
+
+    #Check each bin too
+    for bin_key in maptree:
+
+        the_bin = maptree[bin_key]
+        assert the_bin.n_transits == ntransits
+
 
 def check_responses(r1, r2):
 
