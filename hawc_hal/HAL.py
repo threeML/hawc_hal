@@ -50,13 +50,19 @@ class HAL(PluginPrototype):
     :param flat_sky_pixels_size: size of the pixel for the flat sky projection (Hammer Aitoff)
     """
 
-    def __init__(self, name, maptree, response_file, roi, flat_sky_pixels_size=0.17, n_transits=None):
+    def __init__(self, name, maptree, response_file, roi, flat_sky_pixels_size=0.17, set_transits=-1):
 
         # Store ROI
         self._roi = roi
 
         # optionally specify n_transits
-        assert (n_transits==None or n_transits > 0.0), "You must specify n_transits >0"
+        if (num_transits > 0.0):
+            log.info("Setting Transits to {0}".format(set_transits))
+            n_transits=set_transits
+        else:
+            log.info("Using transits contained in the maptree")
+            n_transits=None
+
 
         # Set up the flat-sky projection
         self._flat_sky_projection = roi.get_flat_sky_projection(flat_sky_pixels_size)
