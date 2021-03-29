@@ -12,6 +12,7 @@ log.propagate = False
 from ..healpix_handling import SparseHealpix, DenseHealpix
 from .data_analysis_bin import DataAnalysisBin
 
+import numpy as np
 
 def from_hdf5_file(map_tree_file, roi, n_transits):
     """
@@ -67,6 +68,19 @@ def from_hdf5_file(map_tree_file, roi, n_transits):
 
     data_analysis_bins = collections.OrderedDict()
 
+    # Figure out the transits
+    transits_bins = []
+    for bin_name in bin_names:
+        this_meta = meta_df.loc[bin_name]
+        # Specify n_transits (or not), default value contained in map is this_meta['n_transits']
+        transits_bins.append(this_meta['n_transits'])
+
+    # pick out the transits same as root file
+    use_transits = np.max(transits_bins)
+    if n_transits!=None:
+        use_transits=n_transits
+
+
     for bin_name in bin_names:
 
         this_df = analysis_bins_df.loc[bin_name]
@@ -91,11 +105,6 @@ def from_hdf5_file(map_tree_file, roi, n_transits):
 
             # This signals the DataAnalysisBin that we are dealing with a full sky map
             active_pixels_user = None
-
-        # Specify n_transits (or not), default value contained in map is this_meta['n_transits']
-        use_transits=this_meta['n_transits']
-        if n_transits!=None:
-            use_transits=n_transits
             
         # Let's now build the instance
         this_bin = DataAnalysisBin(bin_name,
@@ -107,4 +116,4 @@ def from_hdf5_file(map_tree_file, roi, n_transits):
 
         data_analysis_bins[bin_name] = this_bin
 
-    return data_analysis_bins
+    return data_analysis_bins, use_transits

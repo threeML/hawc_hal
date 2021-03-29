@@ -103,7 +103,7 @@ def from_root_file(map_tree_file, roi, n_transits):
         # zero events. Therefore, the best estimate of the livetime is the maximum of n_transits, which normally
         # happen in the bins with high statistic
         # Alternatively, specify n_transits
-        use_transits = max(map_transits)
+        use_transits = np.max(map_transits)
         if n_transits != None:
             use_transits = n_transits
         
@@ -169,7 +169,7 @@ def from_root_file(map_tree_file, roi, n_transits):
 
             data_analysis_bins[name] = this_data_analysis_bin
 
-    return data_analysis_bins
+    return data_analysis_bins, use_transits
 
 
 def _read_partial_tree(ttree_instance, elements_to_read):
