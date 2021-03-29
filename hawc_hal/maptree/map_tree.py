@@ -37,11 +37,20 @@ class MapTree(object):
 
         self._analysis_bins = analysis_bins
         self._roi = roi
+        self._n_transits = None
 
     @classmethod
     def from_hdf5(cls, map_tree_file, roi, n_transits):
+        """
+        Create a MapTree object from a HDF5 file and a ROI. Do not use this directly, use map_tree_factory instead.
+
+        :param map_tree_file:
+        :param roi:
+        :return:
+        """
 
         data_analysis_bins = from_hdf5_file(map_tree_file, roi, n_transits)
+        self._n_transits = n_transits
 
         return cls(data_analysis_bins, roi)
 
@@ -56,6 +65,7 @@ class MapTree(object):
         """
 
         data_analysis_bins = from_root_file(map_tree_file, roi, n_transits)
+        self._n_transits = n_transits
 
         return cls(data_analysis_bins, roi)
 
@@ -95,6 +105,10 @@ class MapTree(object):
     def __len__(self):
 
         return len(self._analysis_bins)
+
+    @property
+    def n_transits(self):
+        return self._n_transits
 
     @property
     def analysis_bins_labels(self):
