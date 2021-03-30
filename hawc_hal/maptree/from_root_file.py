@@ -95,16 +95,18 @@ def from_root_file(map_tree_file, roi, n_transits):
             data_bins_labels = [ str(i) for i in data_bins_labels ]
 
 
-        # A transit is defined as 1 day, and totalDuration is in hours
-        # Get the number of transits from bin 0 (as LiFF does)
-        map_transits = root_numpy.tree2array(f.Get("BinInfo"), "totalDuration") / 24.0
 
         # The map-maker underestimate the livetime of bins with low statistic by removing time intervals with
         # zero events. Therefore, the best estimate of the livetime is the maximum of n_transits, which normally
         # happen in the bins with high statistic
         # Alternatively, specify n_transits
-        use_transits = np.max(map_transits)
-        if n_transits != None:
+
+        if n_transits is None:
+            # A transit is defined as 1 day, and totalDuration is in hours
+            # Get the number of transits from bin 0 (as LiFF does)
+            map_transits = root_numpy.tree2array(f.Get("BinInfo"), "totalDuration") / 24.0
+            use_transits = np.max(map_transits)
+        else:
             use_transits = n_transits
         
         n_bins = len(data_bins_labels)

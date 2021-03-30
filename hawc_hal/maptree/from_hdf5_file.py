@@ -64,21 +64,15 @@ def from_hdf5_file(map_tree_file, roi, n_transits):
 
     bin_names = analysis_bins_df.index.levels[0]
 
-    # Loop over them and build a DataAnalysisBin instance for each one
-
     data_analysis_bins = collections.OrderedDict()
 
     # Figure out the transits
-    transits_bins = []
-    for bin_name in bin_names:
-        this_meta = meta_df.loc[bin_name]
-        # Specify n_transits (or not), default value contained in map is this_meta['n_transits']
-        transits_bins.append(this_meta['n_transits'])
-
     # pick out the transits same as root file
-    use_transits = np.max(transits_bins)
-    if n_transits!=None:
-        use_transits=n_transits
+    if n_transits is None:
+        use_transits = meta_df["n_transits"].max()
+    else:
+        # specified n_transits
+        use_transits = n_transits
 
 
     for bin_name in bin_names:
