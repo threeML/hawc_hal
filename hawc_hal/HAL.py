@@ -56,7 +56,7 @@ class HAL(PluginPrototype):
         self._roi = roi
 
         # optionally specify n_transits
-        if (num_transits > 0.0):
+        if (set_transits > 0.0):
             log.info("Setting Transits to {0}".format(set_transits))
             n_transits=set_transits
         else:
