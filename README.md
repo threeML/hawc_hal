@@ -50,12 +50,7 @@ Use the following commands to check if your installation was successful. You sho
 
 * To test threeML: `pytest --pyargs threeML`
 * To test astromodels: `pytest --pyargs astromodels`
-* To test HAL:
-```
-git clone git@github.com:threeML/hawc_hal.git
-cd hawc_hal/tests
-pytest
-```
+* To test HAL:  `pytest --pyargs hawc_hal`
 
 If you are interested in more detailed output from the tests, learn more about pytest command line options [here](https://docs.pytest.org/en/reorganize-docs/new-docs/user/commandlineuseful.html#).
 
