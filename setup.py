@@ -1,4 +1,22 @@
 from setuptools import setup
+import os, os.path
+# Create list of data files
+
+
+def find_data_files(directory):
+
+    paths = []
+
+    for (path, directories, filenames) in os.walk(directory):
+
+        for filename in filenames:
+
+            paths.append(os.path.join("..", path, filename))
+
+    return paths
+
+extra_files = find_data_files("hawc_hal/tests/data")
+
 
 setup(
 
@@ -14,9 +32,10 @@ setup(
               'hawc_hal/maptree',
               'hawc_hal/psf_fast',
               'hawc_hal/region_of_interest',
-              'hawc_hal/convenience_functions'],
+              'hawc_hal/convenience_functions',
+              'hawc_hal/tests'],
 
-    url='https://github.com/giacomov/hawc_hal',
+    url='https://github.com/threeML/hawc_hal',
 
     license='BSD-3.0',
 
@@ -39,5 +58,9 @@ setup(
                       'numba',
                       'reproject',
                       'tqdm'
-                      ]
+                      ],
+                      
+    # NOTE: we use '' as package name because the extra_files already contain the full path from here
+    package_data={"": extra_files,},
+
 )
