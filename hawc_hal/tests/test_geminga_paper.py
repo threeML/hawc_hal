@@ -11,7 +11,7 @@ except:
 from threeML import *
 import argparse
 from collections import namedtuple
-import pytest
+import numpy as np
 
 def test_geminga_paper(geminga_maptree, geminga_response):
 

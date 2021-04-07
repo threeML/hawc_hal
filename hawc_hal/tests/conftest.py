@@ -15,7 +15,7 @@ from hawc_hal import HealpixConeROI
 from threeML import *
 from hawc_hal import HAL
 import time
-
+import numpy as np
 
 # Get data path
 test_data_path = os.path.join(os.path.abspath(os.path.dirname(__file__)), 'data')
