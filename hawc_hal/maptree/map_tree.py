@@ -195,7 +195,15 @@ class MapTree(object):
             # Write the ROI
             if self._roi is not None:
 
-                serializer.store_pandas_object('/ROI', pd.Series(), **self._roi.to_dict())
+                if self._roi.to_dict()['ROI type']=='HealpixMapROI':
+                    ROIDict = self._roi.to_dict()
+                    roimap = ROIDict['roimap']
+                    ROIDict.pop('roimap',None)
+                    serializer.store_pandas_object('/ROI', pd.Series(roimap), **ROIDict)
+
+                else:
+
+                    serializer.store_pandas_object('/ROI', pd.Series(), **self._roi.to_dict())
 
             else:
 
