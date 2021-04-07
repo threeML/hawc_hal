@@ -107,7 +107,7 @@ class HealpixMapROI(HealpixROIBase):
 
     @classmethod
     def from_dict(cls, data):
-        
+ 
         return cls(data['data_radius_deg'], data['model_radius_deg'], threshold=data['threshold'],
                    roimap=data['roimap'], ra=data['ra'],
                    dec=data['dec'], roifile=data['roifile'])
