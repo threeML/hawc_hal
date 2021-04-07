@@ -410,9 +410,9 @@ class HAL(PluginPrototype):
         return self._plot_spectrum(net_counts, yerr, model_only, residuals, residuals_err)
 
     def _plot_spectrum(self, net_counts, yerr, model_only, residuals, residuals_err):
-
+        plt.rcParams["figure.figsize"] = [12, 6]
         fig, subs = plt.subplots(2, 1, gridspec_kw={'height_ratios': [2, 1], 'hspace': 0})
-        planes = np.array(self._active_planes, dtype=int)
+        planes = np.array(self._active_planes)
         subs[0].errorbar(planes, net_counts, yerr=yerr,
                          capsize=0,
                          color='black', label='Net counts', fmt='.')
