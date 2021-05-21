@@ -35,6 +35,9 @@ setup(
               'hawc_hal/convenience_functions',
               'hawc_hal/tests'],
 
+    scripts=['scripts/hal_fit_point_source.py',
+             'scripts/hal_hdf5_to_fits.py'],
+
     url='https://github.com/threeML/hawc_hal',
 
     license='BSD-3.0',
