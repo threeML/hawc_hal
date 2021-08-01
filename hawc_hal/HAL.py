@@ -356,7 +356,7 @@ class HAL(PluginPrototype):
 
                 self._convolved_ext_sources.append(this_convolved_ext_source)
 
-    def get_excess_background(self, radius):
+    def get_excess_background(self, ra, dec, radius):
         """
         Calculates area, excess (data - background) and model counts of source at different
         distance from the source.
@@ -378,7 +378,7 @@ class HAL(PluginPrototype):
         n_point_sources = self._likelihood_model.get_number_of_point_sources()
         n_ext_sources = self._likelihood_model.get_number_of_extended_sources()
 
-        ra,dec = self._roi.ra_dec_center
+        #ra,dec = self._roi.ra_dec_center
         #following the convention of Healpy as longitude for RA to be -180 to 180
         longitude = ra_to_longitude(ra)
         latitude = dec
@@ -424,6 +424,8 @@ class HAL(PluginPrototype):
 
     def get_radial_profile(
         self,
+        ra,
+        dec,
         active_planes=None,
         max_radius=3.0,
         n_radial_bins=30,
@@ -432,6 +434,8 @@ class HAL(PluginPrototype):
     ):
         """
         Calculates radial profiles of data - background & model.
+        :param ra: R.A. of origin for radial profile.
+        :param dec: Declination of origin of radial profile.
         :param active_planes: List of analysis over which to average; if None, use HAWC default (bins 1-9).
         :param: max_radius: Radius up to which the radial profile is evaluated;
         for the disk to calculate the gamma/hadron weights (Default: 3.0).
@@ -460,7 +464,7 @@ class HAL(PluginPrototype):
         #The area of each ring is then given by the difference between two
         #subsequent circe areas.
         area = np.array([
-            self.get_excess_background(r + 0.5*delta_r)[0] for r in radii ]
+            self.get_excess_background(ra, dec, r + 0.5*delta_r)[0] for r in radii ]
         )
         
         #convert to ring area
@@ -470,7 +474,7 @@ class HAL(PluginPrototype):
 
         #signals
         signal = np.array([
-            self.get_excess_background(r + 0.5*delta_r)[1] for r in radii]
+            self.get_excess_background(ra, dec, r + 0.5*delta_r)[1] for r in radii]
         )
 
         temp = signal[1:] - signal[:-1]
@@ -478,7 +482,7 @@ class HAL(PluginPrototype):
 
         #model
         model = np.array(
-            [self.get_excess_background(r+0.5*delta_r)[2] for r in radii]
+            [self.get_excess_background(ra, dec, r+0.5*delta_r)[2] for r in radii]
         )
 
         temp = model[1:] - model[:-1]
@@ -486,7 +490,7 @@ class HAL(PluginPrototype):
 
         #backgrounds
         bkg = np.array(
-            [self.get_excess_background(r+0.5*delta_r)[3] for r in radii]
+            [self.get_excess_background(ra, dec, r+0.5*delta_r)[3] for r in radii]
         )
 
         temp = bkg[1:] - bkg[:-1]
@@ -499,7 +503,7 @@ class HAL(PluginPrototype):
             self.set_model(model_to_subtract)
         
             model_subtract = np.array(
-            [self.get_excess_background(r+0.5*delta_r)[2] for r in radii]
+            [self.get_excess_background(ra, dec, r+0.5*delta_r)[2] for r in radii]
             )
             
             temp = model_subtract[1:] - model_subtract[:-1]
@@ -521,15 +525,15 @@ class HAL(PluginPrototype):
         #datas, excesses, models, backgrounds
 
         total_excess = np.array(
-            self.get_excess_background(max_radius)[1]
+            self.get_excess_background(ra, dec, max_radius)[1]
         )[good_planes]
 
         total_model = np.array(
-            self.get_excess_background(max_radius)[2]
+            self.get_excess_background(ra, dec, max_radius)[2]
         )[good_planes]
 
         total_bkg = np.array(
-            self.get_excess_background(max_radius)[3]
+            self.get_excess_background(ra, dec, max_radius)[3]
         )[good_planes]
 
         w = np.divide(total_model, total_bkg)
@@ -557,6 +561,8 @@ class HAL(PluginPrototype):
 
     def plot_radial_profile(
         self,
+        ra,
+        dec,
         active_planes=None,
         max_radius=3.0,
         n_radial_bins=30,
@@ -566,6 +572,8 @@ class HAL(PluginPrototype):
         """
         Plots radial profiles of data - background & model.
         
+        :param ra: R.A. of origin for radial profile.
+        :param dec: Declination of origin of radial profile.
         :param active_planes: List of analysis bins over which to average;
         if None, use HAWC default (bins 1-9).
         :param max_radius: Radius up to which the radial profile is evaluated; also
