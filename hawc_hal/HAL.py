@@ -388,9 +388,10 @@ class HAL(PluginPrototype):
         for i, energy_id in enumerate(self._active_planes):
 
             data_analysis_bin = self._maptree[energy_id]
+            this_nside = data_analysis_bin.observation_map.nside
 
             selected_pixels = hp.query_disc(
-                                            data_analysis_bin.observation_map.nside,
+                                            this_nside,
                                             center,
                                             radius_radians,
                                             inclusive=False,
@@ -398,7 +399,7 @@ class HAL(PluginPrototype):
 
             #calculate the areas per bin by the product
             #of pixel area by the number of pixels at each radial bin
-            area[i] = hp.nside2pixarea(data_analysis_bin.observation_map.nside)*selected_pixels.size
+            area[i] = hp.nside2pixarea(this_nside)*selected_pixels.size
             
             #NOTE: select active pixels according to each radial bin
             lo = np.where(selected_pixels[0] == self._active_pixels[energy_id])[0][0] 
@@ -451,7 +452,8 @@ class HAL(PluginPrototype):
 
         #delta_r = old_div(1.0*max_radius, n_radial_bins)
         delta_r = 1.0*max_radius/n_radial_bins
-        radii = np.array([delta_r*(r + 0.5) for r in range(0, n_radial_bins)])
+        #radii = np.array([delta_r*(r + 0.5) for r in range(0, n_radial_bins)])
+        radii = np.linspace(delta_r*0.5, max_radius, n_radial_bins)
 
         #Get area of all pixels in a given circle
         #The area of each ring is then given by the difference between two
@@ -460,22 +462,32 @@ class HAL(PluginPrototype):
             self.get_excess_background(ra, dec, r + 0.5*delta_r)[0] for r in radii ]
         )
 
+        temp = area[1:] - area[:-1]
+        area[1:] = temp
+
         #signals
         signal = np.array([
             self.get_excess_background(ra, dec, r + 0.5*delta_r)[1] for r in radii]
         )
 
+        temp = signal[1:] - signal[:-1]
+        signal[1:] = temp
+        
         #model
         model = np.array(
             [self.get_excess_background(ra, dec, r + 0.5*delta_r)[2] for r in radii]
         )
 
+        temp = model[1:] - model[:-1]
+        model[1:] = temp
 
         #backgrounds
         bkg = np.array(
             [self.get_excess_background(ra, dec, r + 0.5*delta_r)[3] for r in radii]
         )
 
+        temp = bkg[1:] - bkg[:-1]
+        bkg[1:] = temp
 
         counts = signal + bkg
 
