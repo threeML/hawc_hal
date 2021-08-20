@@ -399,16 +399,21 @@ class HAL(PluginPrototype):
 
             #calculate the areas per bin by the product
             #of pixel area by the number of pixels at each radial bin
-            area[i] = hp.nside2pixarea(this_nside)*selected_pixels.size
             
             #NOTE: select active pixels according to each radial bin
             lo = np.where(selected_pixels[0] == self._active_pixels[energy_id])[0][0] 
             hi = np.where(selected_pixels[-1] == self._active_pixels[energy_id])[0][0] + 1
 
-            this_model_tot = np.sum(self._get_expectation(data_analysis_bin, energy_id, n_point_sources, n_ext_sources)[lo:hi])
-            this_data_tot = np.sum(data_analysis_bin.observation_map.as_partial()[lo:hi])
-            this_bkg_tot = np.sum(data_analysis_bin.background_map.as_partial()[lo:hi])
+            data = data_analysis_bin.observation_map.as_partial()[lo:hi]
+            bkg = data_analysis_bin.background_map.as_partial()[lo:hi]
+            mdl = self._get_expectation(data_analysis_bin, energy_id, n_point_sources, n_ext_sources)[lo:hi]
 
+            this_model_tot = np.sum(mdl)
+            this_data_tot = np.sum(data)
+            this_bkg_tot = np.sum(bkg)
+
+            #area[i] = hp.nside2pixarea(this_nside)*selected_pixels.size
+            area[i] = hp.nside2pixarea(this_nside)*mdl.size
             background[i] = this_bkg_tot
             observation[i] = this_data_tot
             model[i] = this_model_tot 
@@ -452,8 +457,8 @@ class HAL(PluginPrototype):
 
         #delta_r = old_div(1.0*max_radius, n_radial_bins)
         delta_r = 1.0*max_radius/n_radial_bins
-        #radii = np.array([delta_r*(r + 0.5) for r in range(0, n_radial_bins)])
-        radii = np.linspace(delta_r*0.5, max_radius, n_radial_bins)
+        radii = np.array([delta_r*(r + 0.5) for r in range(0, n_radial_bins + 1)])
+        #radii = np.linspace(0.02, max_radius - 0.02, n_radial_bins)
 
         #Get area of all pixels in a given circle
         #The area of each ring is then given by the difference between two
