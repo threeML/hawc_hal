@@ -2,12 +2,14 @@ from __future__ import division
 
 from builtins import str
 from builtins import range
+from astropy.utils.misc import isiterable
 from past.utils import old_div
 import copy
 import collections
 
 import numpy as np
 import healpy as hp
+import astropy.units as u
 import matplotlib.pyplot as plt
 import matplotlib as mpl
 from scipy.stats import poisson
@@ -378,12 +380,9 @@ class HAL(PluginPrototype):
         n_point_sources = self._likelihood_model.get_number_of_point_sources()
         n_ext_sources = self._likelihood_model.get_number_of_extended_sources()
 
-        #ra,dec = self._roi.ra_dec_center
-        #following the convention of Healpy as longitude for RA to be -180 to 180
         longitude = ra_to_longitude(ra)
         latitude = dec
-        #center = hp.ang2vec(longitude, latitude, lonlat=True)
-        center = hp.dir2vec(longitude, latitude, lonlat=True)
+        center = hp.ang2vec(longitude, latitude, lonlat=True)
 
         for i, energy_id in enumerate(self._active_planes):
 
@@ -397,10 +396,10 @@ class HAL(PluginPrototype):
                                             inclusive=False,
             )
 
-            #calculate the areas per bin by the product
-            #of pixel area by the number of pixels at each radial bin
+            # calculate the areas per bin by the product
+            # of pixel area by the number of pixels at each radial bin
             
-            #NOTE: select active pixels according to each radial bin
+            # NOTE: select active pixels according to each radial bin
             bin_active_pixel_indexes = np.searchsorted(self._active_pixels[energy_id], pixels_at_radius)
 
             data = data_analysis_bin.observation_map.as_partial()
@@ -416,7 +415,6 @@ class HAL(PluginPrototype):
             this_bkg_tot = np.sum(bin_bkg)
             this_model_tot = np.sum(bin_model)
 
-            #area[i] = hp.nside2pixarea(this_nside)*selected_pixels.shape[0]
             area[i] = hp.nside2pixarea(this_nside)*pixels_at_radius.shape[0]
             background[i] = this_bkg_tot
             observation[i] = this_data_tot
@@ -442,7 +440,7 @@ class HAL(PluginPrototype):
         :param active_planes: List of analysis over which to average; if None, use HAWC default (bins 1-9).
         :param: max_radius: Radius up to which the radial profile is evaluated;
         for the disk to calculate the gamma/hadron weights (Default: 3.0).
-        :param n_radial_bins: Number of bins for the radial profile (Defualt: 30).
+        :param n_radial_bins: Number of bins for the radial profile (Default: 30).
         :param model_to_subtract: Another model that is to be subtracted from the data excess (Default: None).
         :param subtract_model_from_model: If True and model_to_subtract is not None,
         subtract model from model too (Defalt: False).
@@ -450,38 +448,30 @@ class HAL(PluginPrototype):
         :return: np.arrays with the radii, model profile, data profile, data uncertainty, and
         list of analysis bins used.
         """
-        #default is to use all active bins
+        # default is to use all active bins
         if active_planes is None:
 
             active_planes = self._active_planes
 
-        #Make sure we use bins with data
+        # Make sure we use bins with data
         good_planes = [plane_id in active_planes for plane_id in self._active_planes]
         plane_ids = set(active_planes) & set(self._active_planes)
 
-        #delta_r = old_div(1.0*max_radius, n_radial_bins)
         delta_r = 1.0*max_radius/n_radial_bins
         radii = np.array([delta_r*(r + 0.5) for r in range(0, n_radial_bins)])
 
-        #Get area of all pixels in a given circle
-        #The area of each ring is then given by the difference between two
-        #subsequent circe areas.
-        area = np.array([
-            self.get_excess_background(ra, dec, r + 0.5*delta_r)[0] for r in radii ]
+        # Get area of all pixels in a given circle
+        # The area of each ring is then given by the difference between two
+        # subsequent circe areas.
+        area = np.array(
+            [self.get_excess_background(ra, dec, r + 0.5*delta_r)[0] for r in radii ]
         )
 
         temp = area[1:] - area[:-1]
         area[1:] = temp
 
-        #signals
-        signal = np.array([
-            self.get_excess_background(ra, dec, r + 0.5*delta_r)[1] for r in radii]
-        )
-
-        temp = signal[1:] - signal[:-1]
-        signal[1:] = temp
-        
-        #model
+        # model
+        # convert 'top hat' excess into 'ring' excesses.
         model = np.array(
             [self.get_excess_background(ra, dec, r + 0.5*delta_r)[2] for r in radii]
         )
@@ -489,7 +479,15 @@ class HAL(PluginPrototype):
         temp = model[1:] - model[:-1]
         model[1:] = temp
 
-        #backgrounds
+        # signals
+        signal = np.array(
+            [self.get_excess_background(ra, dec, r + 0.5*delta_r)[1] for r in radii]
+        )
+
+        temp = signal[1:] - signal[:-1]
+        signal[1:] = temp
+
+        # backgrounds
         bkg = np.array(
             [self.get_excess_background(ra, dec, r + 0.5*delta_r)[3] for r in radii]
         )
@@ -518,12 +516,11 @@ class HAL(PluginPrototype):
 
             self.set_model(this_model)
 
-        #NOTE: weights are calculated as expected number of gamma-rays/number of background counts.
-        #here, use max_radius to evaluate the number of gamma-rays/bkg counts.
-        #The weights do not depend on the radius, but fill a matrix anyway so there's no confusion 
-        # when multiplying them to the data later.
-        #weight is normalized (sum of weights over the bins = 1).
-        #datas, excesses, models, backgrounds
+        # NOTE: weights are calculated as expected number of gamma-rays/number of background counts. 
+        # here, use max_radius to evaluate the number of gamma-rays/bkg counts.
+        # The weights do not depend on the radius, but fill a matrix anyway so 
+        # there's no confusion when multiplying them to the data later.
+        # Weight is normalized (sum of weights over the bins = 1).
 
         total_excess = np.array(
             self.get_excess_background(ra, dec, max_radius)[1]
@@ -540,13 +537,14 @@ class HAL(PluginPrototype):
         w = np.divide(total_model, total_bkg)
         weight = np.array([w/np.sum(w) for r in radii])
 
-        #restric profiles to the user-specified analysis bins
+        # restric profiles to the user-specified analysis bins
         area = area[:, good_planes]
         signal = signal[:, good_planes]
         model = model[:, good_planes]
         counts = counts[:, good_planes]
         bkg = bkg[:, good_planes]
-        #average over the analysis bins
+
+        # average over the analysis bins
         excess_data = np.average(signal/area, weights=weight, axis=1)
         excess_error = np.sqrt(np.sum(counts*weight*weight/(area*area), axis=1))
         excess_model = np.average(model/area, weights=weight, axis=1)
