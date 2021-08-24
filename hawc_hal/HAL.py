@@ -396,12 +396,15 @@ class HAL(PluginPrototype):
                                             inclusive=False,
             )
 
+            
             # calculate the areas per bin by the product
             # of pixel area by the number of pixels at each radial bin
+            area[i] = hp.nside2pixarea(this_nside)*pixels_at_radius.shape[0]
             
             # NOTE: select active pixels according to each radial bin
             bin_active_pixel_indexes = np.searchsorted(self._active_pixels[energy_id], pixels_at_radius)
 
+            # obtain the excess, background, and expected excess at each radial bin
             data = data_analysis_bin.observation_map.as_partial()
             bkg = data_analysis_bin.background_map.as_partial()
             mdl = self._get_expectation(data_analysis_bin, energy_id, n_point_sources, n_ext_sources)
@@ -415,7 +418,7 @@ class HAL(PluginPrototype):
             this_bkg_tot = np.sum(bin_bkg)
             this_model_tot = np.sum(bin_model)
 
-            area[i] = hp.nside2pixarea(this_nside)*pixels_at_radius.shape[0]
+            
             background[i] = this_bkg_tot
             observation[i] = this_data_tot
             model[i] = this_model_tot 
