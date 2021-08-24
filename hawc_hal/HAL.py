@@ -390,7 +390,7 @@ class HAL(PluginPrototype):
             data_analysis_bin = self._maptree[energy_id]
             this_nside = data_analysis_bin.observation_map.nside
 
-            selected_pixels = hp.query_disc(
+            pixels_at_radius = hp.query_disc(
                                             this_nside,
                                             center,
                                             radius_radians,
@@ -401,19 +401,23 @@ class HAL(PluginPrototype):
             #of pixel area by the number of pixels at each radial bin
             
             #NOTE: select active pixels according to each radial bin
-            lo = np.where(selected_pixels[0] == self._active_pixels[energy_id])[0][0] 
-            hi = np.where(selected_pixels[-1] == self._active_pixels[energy_id])[0][0] + 1
+            bin_active_pixel_indexes = np.searchsorted(self._active_pixels[energy_id], pixels_at_radius)
 
-            data = data_analysis_bin.observation_map.as_partial()[lo:hi]
-            bkg = data_analysis_bin.background_map.as_partial()[lo:hi]
-            mdl = self._get_expectation(data_analysis_bin, energy_id, n_point_sources, n_ext_sources)[lo:hi]
+            data = data_analysis_bin.observation_map.as_partial()
+            bkg = data_analysis_bin.background_map.as_partial()
+            mdl = self._get_expectation(data_analysis_bin, energy_id, n_point_sources, n_ext_sources)
+            
+            bin_data = np.array([data[i] for i in bin_active_pixel_indexes])
+            bin_bkg = np.array([bkg[i] for i in bin_active_pixel_indexes])
+            bin_model  = np.array([mdl[i] for i in bin_active_pixel_indexes])
 
-            this_model_tot = np.sum(mdl)
-            this_data_tot = np.sum(data)
-            this_bkg_tot = np.sum(bkg)
 
-            #area[i] = hp.nside2pixarea(this_nside)*selected_pixels.size
-            area[i] = hp.nside2pixarea(this_nside)*mdl.size
+            this_data_tot = np.sum(bin_data)
+            this_bkg_tot = np.sum(bin_bkg)
+            this_model_tot = np.sum(bin_model)
+
+            #area[i] = hp.nside2pixarea(this_nside)*selected_pixels.shape[0]
+            area[i] = hp.nside2pixarea(this_nside)*pixels_at_radius.shape[0]
             background[i] = this_bkg_tot
             observation[i] = this_data_tot
             model[i] = this_model_tot 
@@ -457,8 +461,7 @@ class HAL(PluginPrototype):
 
         #delta_r = old_div(1.0*max_radius, n_radial_bins)
         delta_r = 1.0*max_radius/n_radial_bins
-        radii = np.array([delta_r*(r + 0.5) for r in range(0, n_radial_bins + 1)])
-        #radii = np.linspace(0.02, max_radius - 0.02, n_radial_bins)
+        radii = np.array([delta_r*(r + 0.5) for r in range(0, n_radial_bins)])
 
         #Get area of all pixels in a given circle
         #The area of each ring is then given by the difference between two
@@ -611,7 +614,6 @@ class HAL(PluginPrototype):
             fmt=".",
         )
         
-        #plt.plot(radii[1:], excess_model[1:], color="red", label="Model")
         plt.plot(radii, excess_model, color="red", label="Model")
 
         plt.legend(bbox_to_anchor=(1.0, 1.0), loc="upper right", numpoints=1)
