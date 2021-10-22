@@ -9,10 +9,13 @@
 
 `hawc_hal` depends on `astromodels`, `threeML` as well as some additional packages (`numba`, `root`, `root_numpy`). 
 
+If you don't have `mamba`,install mamba according to the [instruction](https://github.com/mamba-org/mamba) into the `base` environment.
+
 For install in a new conda environment, we recommend to use the following precoedure:
 
+
 ```
-conda create --name new_hal -c conda-forge -c threeml numpy scipy matplotlib ipython numba reproject "astromodels>=2" "threeml>=2" root
+mamba create --name new_hal -c conda-forge -c threeml numpy scipy matplotlib ipython numba reproject "astromodels>=2" "threeml>=2" root
 conda activate new_hal
 pip install --no-binary :all: root_numpy
 pip install git+https://github.com/threeml/hawc_hal.git
