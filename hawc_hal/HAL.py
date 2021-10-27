@@ -407,7 +407,7 @@ class HAL(PluginPrototype):
             # obtain the excess, background, and expected excess at each radial bin
             data = data_analysis_bin.observation_map.as_partial()
             bkg = data_analysis_bin.background_map.as_partial()
-            mdl = self._get_expectation(data_analysis_bin, energy_id, n_point_sources, n_ext_sources)
+            mdl = self._get_model_map(energy_id, n_point_sources, n_ext_sources).as_partial()
             
             bin_data = np.array([data[i] for i in bin_active_pixel_indexes])
             bin_bkg = np.array([bkg[i] for i in bin_active_pixel_indexes])
@@ -595,15 +595,15 @@ class HAL(PluginPrototype):
             subtract_model_from_model,
         )
         
-        font = {
-            "family":"serif",
-            "weight":"regular",
-            "size":12
-        }
+        #font = {
+        #    "family":"serif",
+        #    "weight":"regular",
+        #    "size":12
+        #}
 
-        mpl.rc("font", **font)
+        #mpl.rc("font", **font)
 
-        fig, ax = plt.subplots()
+        fig, ax = plt.subplots(figsize=(10,8))
 
         plt.errorbar(
             radii,
