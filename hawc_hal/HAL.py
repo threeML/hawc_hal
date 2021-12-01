@@ -433,7 +433,7 @@ class HAL(PluginPrototype):
 
         y_limits = [min(net_counts[net_counts > 0]) / 2., max(net_counts) * 2.]
 
-        subs[0].set_yscale("log", nonposy='clip')
+        subs[0].set_yscale("log", nonpositive='clip')
         subs[0].set_ylabel("Counts per bin")
         subs[0].set_xticks([])
 
