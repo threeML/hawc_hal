@@ -48,7 +48,8 @@ jobs:
                   python-version: ${{ matrix.python-version }}
                   channels: conda-forge, xspecmodels, threeml, defaults
                   environment-file: ci/environment.yml
-
+                  mamba-version: "*"
+                  
             - name: Init Env
               shell: bash -l {0}
               run: |
@@ -148,7 +149,8 @@ jobs:
                   python-version: ${{ matrix.python-version }}
                   channels: conda-forge, xspecmodels, threeml, defaults
                   environment-file: ci/environment.yml
-
+                  mamba-version: "*"
+                  
             - name: Init Env
               shell: bash -l {0}
               run: |
