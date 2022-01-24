@@ -172,3 +172,80 @@ jobs:
                   MKL_NUM_THREADS: 1
                   NUMEXPR_NUM_THREADS: 1
                   MPLBACKEND: "Agg"
+
+    test-dev:
+        name: Test with dev threeML/astromodels
+        needs: skip_duplicate
+        if: ${{ needs.skip_duplicate.outputs.should_skip == 'false' }}
+        strategy:
+            matrix:
+                os: ["ubuntu-latest", "macos-latest"]
+                python-version: [3.7]
+            fail-fast: false
+        runs-on: ${{ matrix.os }}
+        steps:
+            - name: Checkout
+              uses: actions/checkout@v2
+            - name: Cache conda
+              uses: actions/cache@v2
+              with:
+                  path: ~/conda_pkgs_dir
+                  key: conda-${{ matrix.os }}-python-${{ matrix.python-version }}-${{ hashFiles('environment-ci-new.yml') }}
+            - name: Setup Miniconda
+              uses: conda-incubator/setup-miniconda@v2
+              with:
+                  auto-update-conda: true
+                  auto-activate-base: false
+                  activate-environment: test_env
+                  python-version: ${{ matrix.python-version }}
+                  channels: conda-forge, xspecmodels, threeml, defaults
+                  environment-file: ci/environment.yml
+                  mamba-version: "*"
+                  
+            - name: Init Env
+              shell: bash -l {0}
+              run: |
+                  # Make sure we fail in case of error
+                  if [[ ${{matrix.os}} == ubuntu-latest ]];
+                  then
+                  miniconda_os=Linux
+                  compilers="gcc_linux-64 gxx_linux-64"
+                  else  # osx
+                  miniconda_os=MacOSX
+                  compilers="clang_osx-64 clangxx_osx-64 gfortran_osx-64"
+                  fi
+
+                  echo "HOME= ${HOME}"
+                  echo "Python version: ${{matrix.python-version}}"
+
+                  mamba install pytest codecov pytest-cov git astromodels threeML numba reproject root flake8
+                  pip install --no-binary :all: root_numpy
+                  pip uninstall astromodels threeML -y
+                  pip install git+https://github.com/threeml/astromodels.git@dev
+                  pip install git+https://github.com/threeml/threeML.git@dev
+            - name: Conda list
+              shell: bash -l {0}
+              run: |
+                  conda list
+            - name: install it
+              shell: bash -l {0}
+              run: |
+                  pip install -e .
+            - name: Lint with flake8
+              shell: bash -l {0}
+              run: |
+                  # stop the build if there are Python syntax errors or undefined names
+                  flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+                  # exit-zero treats all errors as warnings. The GitHub editor is 127 chars wide
+                  flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+
+            - name: test it
+              shell: bash -l {0}
+              run: |
+                  python -m pytest -vv
+
+              env:
+                  OMP_NUM_THREADS: 1
+                  MKL_NUM_THREADS: 1
+                  NUMEXPR_NUM_THREADS: 1
+                  MPLBACKEND: "Agg"
