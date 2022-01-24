@@ -46,6 +46,6 @@ dependencies:
   - tqdm
   - threeml>=2.2.1
   - future
-  - root==6
+  - root>=6.22.6
   - numba
   - reproject
