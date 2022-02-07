@@ -44,7 +44,7 @@ Then:
 
 ```bash
 > pip install --no-binary :all: root_numpy 
-> pip uninstall hawc_hal -y ; pip install git+https://github.com/torresramiro350/hawc_hal.git
+> pip uninstall hawc_hal -y ; pip install git+https://github.com/threeml/hawc_hal.git
 ```
 
 ## Check installation
