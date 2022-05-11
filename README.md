@@ -7,12 +7,11 @@
 
 ## Installation
 
-`hawc_hal` depends on `astromodels`, `threeML` as well as some additional packages (`numba`, `root`, `root_numpy`). 
+`hawc_hal` depends on `astromodels`, `threeML` as well as some additional packages (`numba`, `root`, `root_numpy`).
 
 If you don't have `mamba`,install mamba according to the [instruction](https://github.com/mamba-org/mamba) into the `base` environment.
 
 For install in a new conda environment, we recommend to use the following precoedure:
-
 
 ```
 mamba create --name new_hal -c conda-forge -c threeml numpy scipy matplotlib ipython numba reproject "astromodels>=2" "threeml>=2" root
@@ -28,7 +27,7 @@ pip install --upgrade git+https://github.com/threeml/astromodels.git
 pip install --upgrade git+https://github.com/threeml/threeML.git
 ```
 
-In particular, we recommend not to install the `root_numpy` binaries via conda or pip. 
+In particular, we recommend not to install the `root_numpy` binaries via conda or pip.
 
 The above will install a new python 3 environment. There seem to be version conflicts that currently prevent installing `hawc_hal` with the newer (>=2.0) versions of `threeML` and `astromodels`.
 
@@ -43,7 +42,7 @@ You also need `root` (whether installed through conda or not) and `threeML`/`ast
 Then:
 
 ```bash
-> pip install --no-binary :all: root_numpy 
+> pip install --no-binary :all: root_numpy
 > pip uninstall hawc_hal -y ; pip install git+https://github.com/threeml/hawc_hal.git
 ```
 
@@ -51,17 +50,15 @@ Then:
 
 Use the following commands to check if your installation was successful. You should be inside your conda environment for this.
 
-* To test threeML: `pytest --pyargs threeML`
-* To test astromodels: `pytest --pyargs astromodels`
-* To test HAL:  `pytest --pyargs hawc_hal`
+- To test threeML: `pytest --pyargs threeML`
+- To test astromodels: `pytest --pyargs astromodels`
+- To test HAL: `pytest --pyargs hawc_hal`
 
 If you are interested in more detailed output from the tests, learn more about pytest command line options [here](https://docs.pytest.org/en/reorganize-docs/new-docs/user/commandlineuseful.html#).
 
-
-
 ## Examples
 
-You can find a worked example relying only on publicly accessible data on the [threeML documentation](https://threeml.readthedocs.io/en/latest/notebooks/hal_example.html) 
+You can find a worked example relying only on publicly accessible data on the [threeML documentation](https://threeml.readthedocs.io/en/latest/notebooks/hal_example.html)
 (or download the [notebook](https://github.com/threeML/threeML/blob/master/docs/notebooks/hal_example.ipynb)).
 
 ### Mrk 421 analysis example
@@ -242,6 +239,8 @@ roi = HealpixConeROI(data_radius=data_radius,
                      dec=dec_mkn421)
 
 m = map_tree_factory(root_map_tree, roi)
-m.write("roi_maptree.hd5")                
+m.write("roi_maptree.hd5")
 
 ```
+
+### Radial profile examples will come soon
