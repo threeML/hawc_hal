@@ -11,7 +11,7 @@
 
 If you don't have `mamba`,install mamba according to the [instruction](https://github.com/mamba-org/mamba) into the `base` environment.
 
-For install in a new conda environment, we recommend to use the following precoedure:
+For install in a new conda environment, we recommend to use the following precoedure: 
 
 
 ```
