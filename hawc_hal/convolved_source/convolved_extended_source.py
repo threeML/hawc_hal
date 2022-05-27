@@ -105,7 +105,7 @@ class ConvolvedExtendedSource(object):
             if parameter.free:
                 parameter.add_callback(callback)
 
-            if parameter.has_auxiliary_variable():
+            if parameter.has_auxiliary_variable:
                 # Add a callback to the auxiliary variable so that when that is changed, we need
                 # to recompute the model
                 aux_variable, _ = parameter.auxiliary_variable
