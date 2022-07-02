@@ -163,12 +163,18 @@ class HAWCResponse(object):
         return cls(response_file_name, dec_bins, response_bins)
 
     @classmethod
-    def from_root_file(cls, response_file_name):
-        """
-        Build response from a ROOT file. Do not use directly, use the hawc_response_factory function instead.
+    def from_root_file(cls, response_file_name:str):
+        """Build response from ROOT file. Do not use directly, use the 
+        hawc_response_factory instead.
 
-        :param response_file_name:
-        :return: a HAWCResponse instance
+        Args:
+            response_file_name (str): name of response file name
+
+        Raises:
+            IOError: An IOError is raised if the file is corrupted or unreadable
+
+        Returns:
+            self@HAWCRESPONSE: returns a HAWCResponse instance
         """
 
         from ..root_handler import open_ROOT_file, get_list_of_keys, tree_to_ndarray
@@ -181,18 +187,21 @@ class HAWCResponse(object):
 
         if not file_existing_and_readable(response_file_name):  # pragma: no cover
 
-            raise IOError("Response %s does not exist or is not readable" % response_file_name)
+            # raise IOError("Response %s does not exist or is not readable" % response_file_name)
+            raise IOError(f"Response {response_file_name} does not exist or is not readable")
 
         # Read response
         with uproot.open(str(response_file_name)) as response_file:
+
             print("Reading Response File with uproot! Testing stage!")
+            
             # NOTE: The LogLogSpectrum parameters are extracted from the response file
-            # There is no way to evaluate the loglogspectrum function with uproot, so the 
+            # There is no way to evaluate the loglogspectrum function with uproot, so the
             # parameters are passed for evaluation in response_bin.py
+            log_log_params = response_file['LogLogSpectrum'].member('fParams')
             dec_bins_lower_edge = response_file['DecBins']['lowerEdge'].array(library='np')
             dec_bins_upper_edge = response_file['DecBins']['upperEdge'].array(library='np')
             dec_bins_center = response_file['DecBins']['simdec'].array(library='np')
-            log_log_params = response_file['LogLogSpectrum'].member('fParams')
 
             dec_bins = list(zip(dec_bins_lower_edge, dec_bins_center, dec_bins_upper_edge))
 
@@ -218,18 +227,21 @@ class HAWCResponse(object):
             # Now we create a dictionary of ResponseBin instances for each bin name
             response_bins = collections.OrderedDict()
             for dec_id in range(len(dec_bins)):
+
                 this_response_bins = collections.OrderedDict()
                 min_dec, dec_center, max_dec = dec_bins[dec_id]
 
                 if response_bin_ids is None:
 
                     dec_id_label = f"dec_{dec_id:02}"
-                    
+
                     # count the number of keys if name of bins wasn't obtained before
                     n_energy_bins = len(response_file[dec_id_label].keys(recursive=False))
 
+                    response_bins_ids = list(range(n_energy_bins))
+
                 for response_bin_id in response_bin_ids:
-                    this_response_bin = ResponseBin.from_uproot(
+                    this_response_bin = ResponseBin.from_ttree(
                         response_file,
                         dec_id,
                         response_bin_id,
@@ -240,11 +252,10 @@ class HAWCResponse(object):
 
                     this_response_bins[response_bin_id] = this_response_bin
 
-                
                 response_bins[dec_bins[dec_id][1]] = this_response_bins
 
             del response_file
-                
+
             # with open_ROOT_file( str(response_file_name) ) as root_file:
 
             #     # Get the name of the trees

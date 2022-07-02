@@ -173,34 +173,54 @@ class PSFWrapper(object):
             return cls(xs, ys)
 
     @classmethod
-    def from_uproot_eval(cls, fun_parameters):
+    def psf_eval(cls, fun_parameters):
+        """Evaluate the PSF function
+
+        Args:
+            fun_parameters (list): Best-fit parameters read from response file
+
+        Returns:
+            PSFWrapper: returns an instance os PSF with tuple
+            of (angular distances, expected counts)
+        """
 
         # The analytical form of PSF needs to be declared here given that uproot
         # is simply an I/O framework meant to read the information from TTree objects,
         # with no ROOT functionality
-        def psf_function(x):
+        def psf_function(ang_dist: float):
+            """returns expected counts provided with angular distances as input
+
+            Args:
+                ang_dist (float): angular distances
+
+            Returns:
+                float: returns expected counts
+            """
             return fun_parameters[0] * (
-                x
+                ang_dist
                 * (
-                    (fun_parameters[1] * np.exp(-(x * ((x / 2) / fun_parameters[2]))))
+                    (
+                        fun_parameters[1]
+                        * np.exp(-(ang_dist * ((ang_dist / 2) / fun_parameters[2])))
+                    )
                     + (
                         (1 - fun_parameters[1])
-                        * np.exp(-(x * ((x / 2) / fun_parameters[3])))
+                        * np.exp(-(ang_dist * ((ang_dist / 2) / fun_parameters[3])))
                     )
                 )
             )
 
-        # uproot has no methods to act on histograms. Therefore, I simply used scipy integral
+        # uproot has no methods to act on histograms. Therefore, using scipy for integral
         if scipy.integrate.quad(psf_function, 0, _INTEGRAL_OUTER_RADIUS)[0] <= 0.0:
             return InvalidPSF()
 
-        xs = np.logspace(-3, np.log10(_INTEGRAL_OUTER_RADIUS), 500)
-        ys = np.array([psf_function(x) for x in xs])
+        radial_dists = np.logspace(-3, np.log10(_INTEGRAL_OUTER_RADIUS), 500)
+        expected_cnts = np.array([psf_function(x) for x in radial_dists])
 
-        assert np.all(np.isfinite(xs))
-        assert np.all(np.isfinite(ys))
+        assert np.all(np.isfinite(radial_dists))
+        assert np.all(np.isfinite(expected_cnts))
 
-        instance = cls(xs, ys)
+        instance = cls(radial_dists, expected_cnts)
         new_instance = copy.deepcopy(instance)
 
         return new_instance

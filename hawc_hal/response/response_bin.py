@@ -54,31 +54,52 @@ class ResponseBin(object):
         return this_en_th1d
 
     @classmethod
-    def from_uproot(
+    def from_ttree(
         cls,
         root_file: object,
         dec_id: int,
         analysis_bin_id: str,
         log_log_params: np.ndarray,
-        min_dec,
-        dec_center,
-        max_dec,
+        min_dec: np.ndarray,
+        dec_center: np.ndarray,
+        max_dec: np.ndarray,
     ):
-        def log_log_spectrum(x, parameters: np.ndarray):
-            # TODO: ensure this evaluates to the correct value ranges obtained from the ROOT file
-            # ? uproot is an I/O framework and cannot perform operatons with ROOT functionality
-            # Therefore, the function and parameters need to be provided somehow.
+        """
+        Obtain the information from Response ROOT file
+
+        Args:
+            root_file (object): ROOT object reading information with uproot functionality
+            dec_id (int): declination band id
+            analysis_bin_id (str): data analysis name
+            log_log_params (np.ndarray): params from LogLogSpectrum TF1
+            min_dec (np.ndarray): numpy array with lower declination bin edges
+            dec_center (np.ndarray): numpy array with declination center values
+            max_dec (np.ndarray): numpy array with upper declination bin edges
+        """
+
+        def log_log_spectrum(log_energy: float, parameters: np.ndarray):
+            """Evaluate the differential flux from log10(simulate energy) values
+
+            Args:
+                log_energy (float): simulated energy in log10 scale
+                parameters (np.ndarray): best-fit parameters obtained from response file
+
+            Returns:
+                float: returns differential flux in units (TeV^-1 cm^-2 s^-1) in log10 scale
+            """
+
             return (
                 np.log10(parameters[0])
-                - parameters[1] * x
-                - np.log10(np.exp(1.0)) * pow(10.0, x - np.log10(parameters[2]))
+                - parameters[1] * log_energy
+                - np.log10(np.exp(1.0))
+                * pow(10.0, log_energy - np.log10(parameters[2]))
             )
 
         this_en_sig_th1d = root_file[f"dec_{dec_id:02}"][f"nh_{analysis_bin_id}"][
             f"EnSig_dec{dec_id}_nh{analysis_bin_id}"
         ].to_hist()
 
-        this_en_gb_th1d = root_file[f"dec_{dec_id:02}"][f"nh_{analysis_bin_id}"][
+        this_en_bg_th1d = root_file[f"dec_{dec_id:02}"][f"nh_{analysis_bin_id}"][
             f"EnBg_dec{dec_id}_nh{analysis_bin_id}"
         ].to_hist()
 
@@ -89,37 +110,42 @@ class ResponseBin(object):
         sim_signal_events_per_bin = np.zeros_like(sim_energy_bin_centers)
         sim_differential_photon_fluxes = np.zeros_like(sim_energy_bin_centers)
 
-        sim_n_sig_events = this_en_sig_th1d.sum().value
+        # The sum of the histogram is the total number of simulated events detected
+        # in this analysis bin_name
+        sim_n_sig_events = this_en_sig_th1d.values().sum()
+
+        # Now let's see what has been simulated, i.e., the differential flux
+        # at the center of each bin_name of the en_sig histogram
         bin_lower_edges = this_en_sig_th1d.axes.edges[0][:-1]
         bin_upper_edges = this_en_sig_th1d.axes.edges[0][1:]
         bin_centers = this_en_sig_th1d.axes.centers[0]
         bin_signal_events = this_en_sig_th1d.values()
 
-        # ! Note: Code is broken right now!
-        # uproot: doesn't have the ability to read and evaluate TF1
         for i in range(this_en_sig_th1d.shape[0]):
 
             sim_energy_bin_low[i] = 10 ** bin_lower_edges[i]
             sim_energy_bin_centers[i] = 10 ** bin_centers[i]
             sim_energy_bin_high[i] = 10 ** bin_upper_edges[i]
 
+            # NOTE: doesn't have the ability to read and evaluate TF1
             sim_differential_photon_fluxes[i] = 10 ** (
                 log_log_spectrum(bin_centers[i], log_log_params)
             )
 
             sim_signal_events_per_bin[i] = bin_signal_events[i]
+
         # Read the histogram of the bkg events detected in this bin_name
         # Note: we do not copy this TH1D instance because we don't need it after the file is close
-        sim_n_bg_events = this_en_gb_th1d.sum().value
+        sim_n_bg_events = this_en_bg_th1d.sum().value
 
         # Now read the various TF1(s) for PSF, signal and background
         # Read the PSF and make a copy (so it will stay when we close the file)
-
+        # NOTE: doesn't have the ability to read and evaluate TF1
         psf_tf1_fparams = root_file[f"dec_{dec_id:02}"][f"nh_{analysis_bin_id}"][
             f"PSF_dec{dec_id}_nh{analysis_bin_id}_fit"
         ].member("fParams")
 
-        psf_fun = PSFWrapper.from_uproot_eval(psf_tf1_fparams)
+        psf_fun = PSFWrapper.psf_eval(psf_tf1_fparams)
 
         return cls(
             analysis_bin_id,
@@ -136,93 +162,93 @@ class ResponseBin(object):
             psf_fun,
         )
 
-    @classmethod
-    def from_ttree(
-        cls,
-        open_ttree,
-        dec_id,
-        analysis_bin_id,
-        log_log_spectrum,
-        min_dec,
-        dec_center,
-        max_dec,
-    ):
+    # @classmethod
+    # def from_ttree(
+    #     cls,
+    #     open_ttree,
+    #     dec_id,
+    #     analysis_bin_id,
+    #     log_log_spectrum,
+    #     min_dec,
+    #     dec_center,
+    #     max_dec,
+    # ):
 
-        from ..root_handler import ROOT
+    #     from ..root_handler import ROOT
 
-        # Read the histogram of the simulated events detected in this bin_name
-        # NOTE: we do not copy this TH1D instance because we won't use it after the
-        # file is closed
+    #     # Read the histogram of the simulated events detected in this bin_name
+    #     # NOTE: we do not copy this TH1D instance because we won't use it after the
+    #     # file is closed
 
-        this_en_sig_th1d = cls._get_en_th1d(open_ttree, dec_id, analysis_bin_id, "Sig")
+    #     this_en_sig_th1d = cls._get_en_th1d(open_ttree, dec_id, analysis_bin_id, "Sig")
 
-        # The sum of the histogram is the total number of simulated events detected
-        # in this analysis bin_name
-        sim_n_sig_events = this_en_sig_th1d.Integral()
+    #     # The sum of the histogram is the total number of simulated events detected
+    #     # in this analysis bin_name
+    #     sim_n_sig_events = this_en_sig_th1d.Integral()
 
-        # Now let's see what has been simulated, i.e., the differential flux
-        # at the center of each bin_name of the en_sig histogram
-        sim_energy_bin_low = np.zeros(this_en_sig_th1d.GetNbinsX())
-        sim_energy_bin_centers = np.zeros(this_en_sig_th1d.GetNbinsX())
-        sim_energy_bin_hi = np.zeros(this_en_sig_th1d.GetNbinsX())
-        sim_signal_events_per_bin = np.zeros_like(sim_energy_bin_centers)
-        sim_differential_photon_fluxes = np.zeros_like(sim_energy_bin_centers)
+    #     # Now let's see what has been simulated, i.e., the differential flux
+    #     # at the center of each bin_name of the en_sig histogram
+    #     sim_energy_bin_low = np.zeros(this_en_sig_th1d.GetNbinsX())
+    #     sim_energy_bin_centers = np.zeros(this_en_sig_th1d.GetNbinsX())
+    #     sim_energy_bin_hi = np.zeros(this_en_sig_th1d.GetNbinsX())
+    #     sim_signal_events_per_bin = np.zeros_like(sim_energy_bin_centers)
+    #     sim_differential_photon_fluxes = np.zeros_like(sim_energy_bin_centers)
 
-        for i in range(sim_energy_bin_centers.shape[0]):
-            # Remember: bin_name 0 is the underflow bin_name, that is why there
-            # is a "i+1" and not just "i"
-            bin_lo = this_en_sig_th1d.GetBinLowEdge(i + 1)
-            bin_center = this_en_sig_th1d.GetBinCenter(i + 1)
-            bin_hi = this_en_sig_th1d.GetBinWidth(i + 1) + bin_lo
+    #     for i in range(sim_energy_bin_centers.shape[0]):
+    #         # Remember: bin_name 0 is the underflow bin_name, that is why there
+    #         # is a "i+1" and not just "i"
+    #         bin_lo = this_en_sig_th1d.GetBinLowEdge(i + 1)
+    #         bin_center = this_en_sig_th1d.GetBinCenter(i + 1)
+    #         bin_hi = this_en_sig_th1d.GetBinWidth(i + 1) + bin_lo
 
-            # Store the center of the logarithmic bin_name
-            sim_energy_bin_low[i] = 10**bin_lo  # TeV
-            sim_energy_bin_centers[i] = 10**bin_center  # TeV
-            sim_energy_bin_hi[i] = 10**bin_hi  # TeV
+    #         # Store the center of the logarithmic bin_name
+    #         sim_energy_bin_low[i] = 10**bin_lo  # TeV
+    #         sim_energy_bin_centers[i] = 10**bin_center  # TeV
+    #         sim_energy_bin_hi[i] = 10**bin_hi  # TeV
 
-            # Get from the simulated spectrum the value of the differential flux
-            # at the center energy
-            sim_differential_photon_fluxes[i] = 10 ** log_log_spectrum.Eval(
-                bin_center
-            )  # TeV^-1 cm^-1 s^-1
+    #         # Get from the simulated spectrum the value of the differential flux
+    #         # at the center energy
+    #         sim_differential_photon_fluxes[i] = 10 ** log_log_spectrum.Eval(
+    #             bin_center
+    #         )  # TeV^-1 cm^-1 s^-1
 
-            # Get from the histogram the detected events in each log-energy bin_name
-            sim_signal_events_per_bin[i] = this_en_sig_th1d.GetBinContent(i + 1)
+    #         # Get from the histogram the detected events in each log-energy bin_name
+    #         sim_signal_events_per_bin[i] = this_en_sig_th1d.GetBinContent(i + 1)
 
-        # Read the histogram of the bkg events detected in this bin_name
-        # NOTE: we do not copy this TH1D instance because we won't use it after the
-        # file is closed
+    #     # Read the histogram of the bkg events detected in this bin_name
+    #     # NOTE: we do not copy this TH1D instance because we won't use it after the
+    #     # file is closed
 
-        this_en_bg_th1d = cls._get_en_th1d(open_ttree, dec_id, analysis_bin_id, "Bg")
+    #     this_en_bg_th1d = cls._get_en_th1d(open_ttree, dec_id, analysis_bin_id, "Bg")
 
-        # The sum of the histogram is the total number of simulated events detected
-        # in this analysis bin_name
-        sim_n_bg_events = this_en_bg_th1d.Integral()
+    #     # The sum of the histogram is the total number of simulated events detected
+    #     # in this analysis bin_name
+    #     sim_n_bg_events = this_en_bg_th1d.Integral()
 
-        # Now read the various TF1(s) for PSF, signal and background
+    #     # Now read the various TF1(s) for PSF, signal and background
 
-        # Read the PSF and make a copy (so it will stay when we close the file)
+    #     # Read the PSF and make a copy (so it will stay when we close the file)
 
-        psf_label_tf1 = "PSF_dec%i_nh%s_fit" % (dec_id, analysis_bin_id)
+    #     psf_label_tf1 = "PSF_dec%i_nh%s_fit" % (dec_id, analysis_bin_id)
 
-        tf1 = open_ttree.FindObjectAny(psf_label_tf1)
+    #     tf1 = open_ttree.FindObjectAny(psf_label_tf1)
 
-        psf_fun = PSFWrapper.from_TF1(tf1)
+    #     psf_fun = PSFWrapper.from_TF1(tf1)
 
-        return cls(
-            analysis_bin_id,
-            min_dec,
-            max_dec,
-            dec_center,
-            sim_n_sig_events,
-            sim_n_bg_events,
-            sim_energy_bin_low,
-            sim_energy_bin_centers,
-            sim_energy_bin_hi,
-            sim_differential_photon_fluxes,
-            sim_signal_events_per_bin,
-            psf_fun,
-        )
+    #     return cls(
+    #         analysis_bin_id,
+    #         min_dec,
+    #         max_dec,
+    #         dec_center,
+    #         sim_n_sig_events,
+    #         sim_n_bg_events,
+    #         sim_energy_bin_low,
+    #         sim_energy_bin_centers,
+    #         sim_energy_bin_hi,
+    #         sim_differential_photon_fluxes,
+    #         sim_signal_events_per_bin,
+    #         psf_fun,
+    #     )
 
     def to_pandas(self):
 

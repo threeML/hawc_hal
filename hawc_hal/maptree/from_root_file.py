@@ -52,13 +52,30 @@ def _get_bin_object(f, bin_name, suffix):
     return bin_tobject
 
 
-def from_root_file(map_tree_file, roi):
-    """
-    Create a MapTree object from a ROOT file and a ROI. Do not use this directly, use map_tree_factory instead.
+def from_root_file(
+    map_tree_file: str,
+    roi: HealpixROIBase,
+    nside_cnt: int = 1024,
+    nside_bkg: int = 1024,
+    scheme: int = 0,
+):
+    """Create a Maptree object from a ROOT file and a ROI.
+    Do not use this directly, use map_tree_factory instead.
 
-    :param map_tree_file:
-    :param roi:
-    :return:
+    Args:
+        map_tree_file (str): maptree root file
+        roi (HealpixROIBase): region of interest set with HealpixConeROI
+        nside (int): HEALPix Nside number
+        scheme (int): specify RING or NESTED HEALPix pixel scheme
+
+    Raises:
+        IOError: An IOError is raised if the maptree file is corrupted or unable
+        to be read
+        ValueError: A ValueError is raised if maptree doesn't contain the 'name'
+        or 'id' bin naming scheme
+
+    Returns:
+        dict: returns a dictionary with names of analysis bins found in Maptree
     """
 
     from ..root_handler import open_ROOT_file, root_numpy, tree_to_ndarray
@@ -108,22 +125,27 @@ def from_root_file(map_tree_file, roi):
 
         n_durations = np.divide(map_infile["BinInfo"]["totalDuration"].array(), 24.0)
 
+        # number of transits is obtained from first bin in maptree
         n_transits = n_durations[0]
         n_bins = data_bins_labels.shape[0]
 
-        # These are going to be HEALPix maps, one for each
-        # data analysis bin name
-        data_analysis_bins = collections.OrderedDict()
-        nside = 1024
-        scheme = 0
-        healpix_map_active = np.zeros(hp.nside2npix(nside))
+        # so far, a value of Nside of 1024  (perhaps will change) and a RING HEALPix
+        assert (
+            nside_cnt == nside_bkg
+        ), "Nside value needs to be the same for counts and bkg. maps"
 
+        assert scheme == 0, "NESTED HEALPix is not currently supported."
+
+        data_analysis_bins = collections.OrderedDict()
+
+        healpix_map_active = np.zeros(hp.nside2npix(nside_cnt))
+
+        # HACK: simple way of reading the number of active pixels within the define ROI
         if roi is not None:
             active_pixels = roi.active_pixels(
-                nside, system="equatorial", ordering="RING"
+                nside_cnt, system="equatorial", ordering="RING"
             )
 
-            # only read elements within the ROI
             for pix_id in active_pixels:
 
                 healpix_map_active[pix_id] = 1.0
@@ -141,8 +163,8 @@ def from_root_file(map_tree_file, roi):
                 bkg = map_infile[f"nHit{name}"]["bkg"]["count"].array(library="np")[
                     healpix_map_active > 0
                 ]
-                counts_hpx = SparseHealpix(counts, active_pixels, nside)
-                bkg_hpx = SparseHealpix(bkg, active_pixels, nside)
+                counts_hpx = SparseHealpix(counts, active_pixels, nside_cnt)
+                bkg_hpx = SparseHealpix(bkg, active_pixels, nside_cnt)
 
                 this_data_analysis_bin = DataAnalysisBin(
                     name,
