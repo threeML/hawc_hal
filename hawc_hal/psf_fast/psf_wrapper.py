@@ -2,7 +2,9 @@ from __future__ import division
 from builtins import zip
 from builtins import object
 from past.utils import old_div
+import copy
 import numpy as np
+import scipy.integrate
 import scipy.interpolate
 import scipy.optimize
 import pandas as pd
@@ -16,19 +18,20 @@ class InvalidPSFError(ValueError):
 
 
 class PSFWrapper(object):
-
     def __init__(self, xs, ys, brightness_interp_x=None, brightness_interp_y=None):
 
         self._xs = xs
         self._ys = ys
 
-        self._psf_interpolated = scipy.interpolate.InterpolatedUnivariateSpline(xs, ys, k=2,
-                                                                                ext='raise',
-                                                                                check_finite=True)
+        self._psf_interpolated = scipy.interpolate.InterpolatedUnivariateSpline(
+            xs, ys, k=2, ext="raise", check_finite=True
+        )
 
         # Memorize the total integral (will use it for normalization)
 
-        self._total_integral = self._psf_interpolated.integral(self._xs[0], _INTEGRAL_OUTER_RADIUS)
+        self._total_integral = self._psf_interpolated.integral(
+            self._xs[0], _INTEGRAL_OUTER_RADIUS
+        )
 
         # Now compute the truncation radius, which is a very conservative measurement
         # of the size of the PSF
@@ -45,16 +48,21 @@ class PSFWrapper(object):
 
         if brightness_interp_x is None:
 
-            brightness_interp_x, brightness_interp_y = self._prepare_brightness_interpolation_points()
+            (
+                brightness_interp_x,
+                brightness_interp_y,
+            ) = self._prepare_brightness_interpolation_points()
 
         self._brightness_interp_x = brightness_interp_x
         self._brightness_interp_y = brightness_interp_y
 
-        self._brightness_interpolation = scipy.interpolate.InterpolatedUnivariateSpline(brightness_interp_x,
-                                                                                        brightness_interp_y,
-                                                                                        k=2,
-                                                                                        ext='extrapolate',
-                                                                                        check_finite=True)
+        self._brightness_interpolation = scipy.interpolate.InterpolatedUnivariateSpline(
+            brightness_interp_x,
+            brightness_interp_y,
+            k=2,
+            ext="extrapolate",
+            check_finite=True,
+        )
 
     def _prepare_brightness_interpolation_points(self):
 
@@ -62,7 +70,16 @@ class PSFWrapper(object):
         interp_x = (self._xs[1:] + self._xs[:-1]) / 2.0
 
         # Compute the density
-        interp_y = np.array([(self.integral(a_b[0], a_b[1]) / (np.pi * (a_b[1] ** 2 - a_b[0] ** 2)) / self._total_integral) for a_b in zip(self._xs[:-1], self._xs[1:])])
+        interp_y = np.array(
+            [
+                (
+                    self.integral(a_b[0], a_b[1])
+                    / (np.pi * (a_b[1] ** 2 - a_b[0] ** 2))
+                    / self._total_integral
+                )
+                for a_b in zip(self._xs[:-1], self._xs[1:])
+            ]
+        )
 
         # Add zero at r = _INTEGRAL_OUTER_RADIUS so that the extrapolated values will be correct
         interp_x = np.append(interp_x, [_INTEGRAL_OUTER_RADIUS])
@@ -74,7 +91,9 @@ class PSFWrapper(object):
 
         f = lambda r: fraction - old_div(self.integral(1e-4, r), self._total_integral)
 
-        radius, status = scipy.optimize.brentq(f, 0.005, _INTEGRAL_OUTER_RADIUS, full_output = True)
+        radius, status = scipy.optimize.brentq(
+            f, 0.005, _INTEGRAL_OUTER_RADIUS, full_output=True
+        )
 
         assert status.converged, "Brentq did not converged"
 
@@ -115,15 +134,20 @@ class PSFWrapper(object):
         new_ys = w1 * self.ys + w2 * other_psf.ys
 
         # Also weight the brightness interpolation points
-        new_br_interp_y = w1 * self._brightness_interp_y + w2 * other_psf._brightness_interp_y
+        new_br_interp_y = (
+            w1 * self._brightness_interp_y + w2 * other_psf._brightness_interp_y
+        )
 
-        return PSFWrapper(self.xs, new_ys,
-                          brightness_interp_x=self._brightness_interp_x,
-                          brightness_interp_y=new_br_interp_y)
+        return PSFWrapper(
+            self.xs,
+            new_ys,
+            brightness_interp_x=self._brightness_interp_x,
+            brightness_interp_y=new_br_interp_y,
+        )
 
     def to_pandas(self):
 
-        items = (('xs', self._xs), ('ys', self._ys))
+        items = (("xs", self._xs), ("ys", self._ys))
 
         return pd.DataFrame.from_dict(dict(items))
 
@@ -131,13 +155,15 @@ class PSFWrapper(object):
     def from_pandas(cls, df):
 
         # Check for an invalid PSF
-        xs = df.loc[:, 'xs'].values
-        ys = df.loc[:, 'ys'].values
+        xs = df.loc[:, "xs"].values
+        ys = df.loc[:, "ys"].values
 
         if len(xs) == 0:
 
             # Should never happen
-            assert len(ys) == 0, "Corrupted response file? A PSF has 0 xs values but more than 0 ys values"
+            assert (
+                len(ys) == 0
+            ), "Corrupted response file? A PSF has 0 xs values but more than 0 ys values"
 
             # An invalid PSF
             return InvalidPSF()
@@ -145,6 +171,39 @@ class PSFWrapper(object):
         else:
 
             return cls(xs, ys)
+
+    @classmethod
+    def from_uproot_eval(cls, fun_parameters):
+
+        # The analytical form of PSF needs to be declared here given that uproot
+        # is simply an I/O framework meant to read the information from TTree objects,
+        # with no ROOT functionality
+        def psf_function(x):
+            return fun_parameters[0] * (
+                x
+                * (
+                    (fun_parameters[1] * np.exp(-(x * ((x / 2) / fun_parameters[2]))))
+                    + (
+                        (1 - fun_parameters[1])
+                        * np.exp(-(x * ((x / 2) / fun_parameters[3])))
+                    )
+                )
+            )
+
+        # uproot has no methods to act on histograms. Therefore, I simply used scipy integral
+        if scipy.integrate.quad(psf_function, 0, _INTEGRAL_OUTER_RADIUS)[0] <= 0.0:
+            return InvalidPSF()
+
+        xs = np.logspace(-3, np.log10(_INTEGRAL_OUTER_RADIUS), 500)
+        ys = np.array([psf_function(x) for x in xs])
+
+        assert np.all(np.isfinite(xs))
+        assert np.all(np.isfinite(ys))
+
+        instance = cls(xs, ys)
+        new_instance = copy.deepcopy(instance)
+
+        return new_instance
 
     @classmethod
     def from_TF1(cls, tf1_instance):
@@ -199,7 +258,7 @@ class InvalidPSF(object):
     # This allow the Invalid PSF to be saved in the HDF file
     def to_pandas(self):
 
-        items = (('xs', []), ('ys', []))
+        items = (("xs", []), ("ys", []))
 
         return pd.DataFrame.from_dict(dict(items))
 

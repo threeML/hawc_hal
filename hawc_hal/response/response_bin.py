@@ -11,11 +11,21 @@ class ResponseBin(object):
     Stores detector response for one declination band and one analysis bin (called "name" or "analysis_bin_id" below).
     """
 
-    def __init__(self, name, min_dec, max_dec, dec_center,
-                 sim_n_sig_events, sim_n_bg_events,
-                 sim_energy_bin_low, sim_energy_bin_centers, sim_energy_bin_hi,
-                 sim_differential_photon_fluxes, sim_signal_events_per_bin,
-                 psf):
+    def __init__(
+        self,
+        name,
+        min_dec,
+        max_dec,
+        dec_center,
+        sim_n_sig_events,
+        sim_n_bg_events,
+        sim_energy_bin_low,
+        sim_energy_bin_centers,
+        sim_energy_bin_hi,
+        sim_differential_photon_fluxes,
+        sim_signal_events_per_bin,
+        psf,
+    ):
 
         self._name = name
         self._min_dec = min_dec
@@ -35,7 +45,7 @@ class ResponseBin(object):
 
         en_sig_label = "En%s_dec%i_nh%s" % (prefix, dec_id, analysis_bin_id)
 
-        this_en_th1d = open_ttree.FindObjectAny(en_sig_label) 
+        this_en_th1d = open_ttree.FindObjectAny(en_sig_label)
 
         if not this_en_th1d:
 
@@ -44,7 +54,99 @@ class ResponseBin(object):
         return this_en_th1d
 
     @classmethod
-    def from_ttree(cls, open_ttree, dec_id, analysis_bin_id, log_log_spectrum, min_dec, dec_center, max_dec):
+    def from_uproot(
+        cls,
+        root_file: object,
+        dec_id: int,
+        analysis_bin_id: str,
+        log_log_params: np.ndarray,
+        min_dec,
+        dec_center,
+        max_dec,
+    ):
+        def log_log_spectrum(x, parameters: np.ndarray):
+            # TODO: ensure this evaluates to the correct value ranges obtained from the ROOT file
+            # ? uproot is an I/O framework and cannot perform operatons with ROOT functionality
+            # Therefore, the function and parameters need to be provided somehow.
+            return (
+                np.log10(parameters[0])
+                - parameters[1] * x
+                - np.log10(np.exp(1.0)) * pow(10.0, x - np.log10(parameters[2]))
+            )
+
+        this_en_sig_th1d = root_file[f"dec_{dec_id:02}"][f"nh_{analysis_bin_id}"][
+            f"EnSig_dec{dec_id}_nh{analysis_bin_id}"
+        ].to_hist()
+
+        this_en_gb_th1d = root_file[f"dec_{dec_id:02}"][f"nh_{analysis_bin_id}"][
+            f"EnBg_dec{dec_id}_nh{analysis_bin_id}"
+        ].to_hist()
+
+        total_bins = this_en_sig_th1d.shape[0]
+        sim_energy_bin_low = np.zeros(total_bins)
+        sim_energy_bin_centers = np.zeros(total_bins)
+        sim_energy_bin_high = np.zeros(total_bins)
+        sim_signal_events_per_bin = np.zeros_like(sim_energy_bin_centers)
+        sim_differential_photon_fluxes = np.zeros_like(sim_energy_bin_centers)
+
+        sim_n_sig_events = this_en_sig_th1d.sum().value
+        bin_lower_edges = this_en_sig_th1d.axes.edges[0][:-1]
+        bin_upper_edges = this_en_sig_th1d.axes.edges[0][1:]
+        bin_centers = this_en_sig_th1d.axes.centers[0]
+        bin_signal_events = this_en_sig_th1d.values()
+
+        # ! Note: Code is broken right now!
+        # uproot: doesn't have the ability to read and evaluate TF1
+        for i in range(this_en_sig_th1d.shape[0]):
+
+            sim_energy_bin_low[i] = 10 ** bin_lower_edges[i]
+            sim_energy_bin_centers[i] = 10 ** bin_centers[i]
+            sim_energy_bin_high[i] = 10 ** bin_upper_edges[i]
+
+            sim_differential_photon_fluxes[i] = 10 ** (
+                log_log_spectrum(bin_centers[i], log_log_params)
+            )
+
+            sim_signal_events_per_bin[i] = bin_signal_events[i]
+        # Read the histogram of the bkg events detected in this bin_name
+        # Note: we do not copy this TH1D instance because we don't need it after the file is close
+        sim_n_bg_events = this_en_gb_th1d.sum().value
+
+        # Now read the various TF1(s) for PSF, signal and background
+        # Read the PSF and make a copy (so it will stay when we close the file)
+
+        psf_tf1_fparams = root_file[f"dec_{dec_id:02}"][f"nh_{analysis_bin_id}"][
+            f"PSF_dec{dec_id}_nh{analysis_bin_id}_fit"
+        ].member("fParams")
+
+        psf_fun = PSFWrapper.from_uproot_eval(psf_tf1_fparams)
+
+        return cls(
+            analysis_bin_id,
+            min_dec,
+            max_dec,
+            dec_center,
+            sim_n_sig_events,
+            sim_n_bg_events,
+            sim_energy_bin_low,
+            sim_energy_bin_centers,
+            sim_energy_bin_high,
+            sim_differential_photon_fluxes,
+            sim_signal_events_per_bin,
+            psf_fun,
+        )
+
+    @classmethod
+    def from_ttree(
+        cls,
+        open_ttree,
+        dec_id,
+        analysis_bin_id,
+        log_log_spectrum,
+        min_dec,
+        dec_center,
+        max_dec,
+    ):
 
         from ..root_handler import ROOT
 
@@ -52,7 +154,7 @@ class ResponseBin(object):
         # NOTE: we do not copy this TH1D instance because we won't use it after the
         # file is closed
 
-        this_en_sig_th1d = cls._get_en_th1d(open_ttree, dec_id, analysis_bin_id, 'Sig')
+        this_en_sig_th1d = cls._get_en_th1d(open_ttree, dec_id, analysis_bin_id, "Sig")
 
         # The sum of the histogram is the total number of simulated events detected
         # in this analysis bin_name
@@ -69,18 +171,20 @@ class ResponseBin(object):
         for i in range(sim_energy_bin_centers.shape[0]):
             # Remember: bin_name 0 is the underflow bin_name, that is why there
             # is a "i+1" and not just "i"
-            bin_lo = this_en_sig_th1d.GetBinLowEdge(i+1)
+            bin_lo = this_en_sig_th1d.GetBinLowEdge(i + 1)
             bin_center = this_en_sig_th1d.GetBinCenter(i + 1)
-            bin_hi = this_en_sig_th1d.GetBinWidth(i+1) + bin_lo
+            bin_hi = this_en_sig_th1d.GetBinWidth(i + 1) + bin_lo
 
             # Store the center of the logarithmic bin_name
-            sim_energy_bin_low[i] = 10 ** bin_lo  # TeV
-            sim_energy_bin_centers[i] = 10 ** bin_center  # TeV
-            sim_energy_bin_hi[i] = 10 ** bin_hi  # TeV
+            sim_energy_bin_low[i] = 10**bin_lo  # TeV
+            sim_energy_bin_centers[i] = 10**bin_center  # TeV
+            sim_energy_bin_hi[i] = 10**bin_hi  # TeV
 
             # Get from the simulated spectrum the value of the differential flux
             # at the center energy
-            sim_differential_photon_fluxes[i] = 10 ** log_log_spectrum.Eval(bin_center)  # TeV^-1 cm^-1 s^-1
+            sim_differential_photon_fluxes[i] = 10 ** log_log_spectrum.Eval(
+                bin_center
+            )  # TeV^-1 cm^-1 s^-1
 
             # Get from the histogram the detected events in each log-energy bin_name
             sim_signal_events_per_bin[i] = this_en_sig_th1d.GetBinContent(i + 1)
@@ -89,7 +193,7 @@ class ResponseBin(object):
         # NOTE: we do not copy this TH1D instance because we won't use it after the
         # file is closed
 
-        this_en_bg_th1d = cls._get_en_th1d(open_ttree, dec_id, analysis_bin_id, 'Bg')
+        this_en_bg_th1d = cls._get_en_th1d(open_ttree, dec_id, analysis_bin_id, "Bg")
 
         # The sum of the histogram is the total number of simulated events detected
         # in this analysis bin_name
@@ -105,30 +209,42 @@ class ResponseBin(object):
 
         psf_fun = PSFWrapper.from_TF1(tf1)
 
-        return cls(analysis_bin_id, min_dec, max_dec, dec_center, sim_n_sig_events, sim_n_bg_events,
-                   sim_energy_bin_low,
-                   sim_energy_bin_centers,
-                   sim_energy_bin_hi,
-                   sim_differential_photon_fluxes, sim_signal_events_per_bin,
-                   psf_fun)
+        return cls(
+            analysis_bin_id,
+            min_dec,
+            max_dec,
+            dec_center,
+            sim_n_sig_events,
+            sim_n_bg_events,
+            sim_energy_bin_low,
+            sim_energy_bin_centers,
+            sim_energy_bin_hi,
+            sim_differential_photon_fluxes,
+            sim_signal_events_per_bin,
+            psf_fun,
+        )
 
     def to_pandas(self):
 
         # In the metadata let's save all single values (floats)
-        meta = {'min_dec': self._min_dec,
-                'max_dec': self._max_dec,
-                'declination_center': self._dec_center,
-                'n_sim_signal_events': self._sim_n_sig_events,
-                'n_sim_bkg_events': self._sim_n_bg_events
-                }
+        meta = {
+            "min_dec": self._min_dec,
+            "max_dec": self._max_dec,
+            "declination_center": self._dec_center,
+            "n_sim_signal_events": self._sim_n_sig_events,
+            "n_sim_bkg_events": self._sim_n_bg_events,
+        }
 
         # Now make a dataframe containing the elements of the simulation
         items = (
-            ('sim_energy_bin_low', pd.Series(self.sim_energy_bin_low)),
-            ('sim_energy_bin_centers', pd.Series(self.sim_energy_bin_centers)),
-            ('sim_energy_bin_hi', pd.Series(self.sim_energy_bin_hi)),
-            ('sim_differential_photon_fluxes', pd.Series(self.sim_differential_photon_fluxes)),
-            ('sim_signal_events_per_bin', pd.Series(self.sim_signal_events_per_bin))
+            ("sim_energy_bin_low", pd.Series(self.sim_energy_bin_low)),
+            ("sim_energy_bin_centers", pd.Series(self.sim_energy_bin_centers)),
+            ("sim_energy_bin_hi", pd.Series(self.sim_energy_bin_hi)),
+            (
+                "sim_differential_photon_fluxes",
+                pd.Series(self.sim_differential_photon_fluxes),
+            ),
+            ("sim_signal_events_per_bin", pd.Series(self.sim_signal_events_per_bin)),
         )
 
         df = pd.DataFrame.from_dict(dict(items))
@@ -145,24 +261,34 @@ class ResponseBin(object):
         :return:
         """
 
-        assert np.isclose(w1+w2, 1.0), "Weights are not properly normalized"
+        assert np.isclose(w1 + w2, 1.0), "Weights are not properly normalized"
 
         new_name = "interpolated_%s" % self._name
 
         # Use np.nan as declination boundaries to indicate that this is actually interpolated
         min_dec, max_dec = np.nan, np.nan
 
-        n_sim_signal_events = w1 * self._sim_n_sig_events + w2 * other_response_bin._sim_n_sig_events
-        n_sim_bkg_events = w1 * self._sim_n_bg_events + w2 * other_response_bin._sim_n_bg_events
+        n_sim_signal_events = (
+            w1 * self._sim_n_sig_events + w2 * other_response_bin._sim_n_sig_events
+        )
+        n_sim_bkg_events = (
+            w1 * self._sim_n_bg_events + w2 * other_response_bin._sim_n_bg_events
+        )
 
         # We assume that the bin centers are the same
-        assert np.allclose(self._sim_energy_bin_centers, other_response_bin._sim_energy_bin_centers)
+        assert np.allclose(
+            self._sim_energy_bin_centers, other_response_bin._sim_energy_bin_centers
+        )
 
-        sim_differential_photon_fluxes = w1 * self._sim_differential_photon_fluxes + \
-                                         w2 * other_response_bin._sim_differential_photon_fluxes
+        sim_differential_photon_fluxes = (
+            w1 * self._sim_differential_photon_fluxes
+            + w2 * other_response_bin._sim_differential_photon_fluxes
+        )
 
-        sim_signal_events_per_bin = w1 * self._sim_signal_events_per_bin + \
-                                    w2 * other_response_bin._sim_signal_events_per_bin
+        sim_signal_events_per_bin = (
+            w1 * self._sim_signal_events_per_bin
+            + w2 * other_response_bin._sim_signal_events_per_bin
+        )
 
         # Now interpolate the psf, if none is invalid
         try:
@@ -170,14 +296,20 @@ class ResponseBin(object):
         except InvalidPSFError:
             new_psf = InvalidPSF()
 
-        new_response_bin = ResponseBin(new_name, min_dec, max_dec, dec_center,
-                                       n_sim_signal_events, n_sim_bkg_events,
-                                       self._sim_energy_bin_low,
-                                       self._sim_energy_bin_centers,
-                                       self._sim_energy_bin_hi,
-                                       sim_differential_photon_fluxes,
-                                       sim_signal_events_per_bin,
-                                       new_psf)
+        new_response_bin = ResponseBin(
+            new_name,
+            min_dec,
+            max_dec,
+            dec_center,
+            n_sim_signal_events,
+            n_sim_bkg_events,
+            self._sim_energy_bin_low,
+            self._sim_energy_bin_centers,
+            self._sim_energy_bin_hi,
+            sim_differential_photon_fluxes,
+            sim_signal_events_per_bin,
+            new_psf,
+        )
 
         return new_response_bin
 

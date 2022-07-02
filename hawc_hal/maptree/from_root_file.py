@@ -5,11 +5,16 @@ from builtins import range
 import os
 import socket
 import collections
+from token import N_TOKENS
+import healpy as hp
+from matplotlib.style import library
 import numpy as np
+import uproot
 
 from threeML.io.file_utils import file_existing_and_readable, sanitize_filename
 
 from threeML.io.logging import setup_logger
+
 log = setup_logger(__name__)
 log.propagate = False
 
@@ -26,20 +31,23 @@ def _get_bin_object(f, bin_name, suffix):
     # labels in BinInfo like "00", "01", "02", and still the nHit bin is nHit00, nHit01
     # thus we need to add a 0 to the former case, but not add it to the latter case
 
-    bin_label = "nHit0%s/%s" % (bin_name, suffix)
+    # bin_label = "nHit0%s/%s" % (bin_name, suffix)
+    bin_label = f"nHit0{bin_name}/{suffix}"
 
     bin_tobject = f.Get(bin_label)
 
     if not bin_tobject:
 
         # Try the other way
-        bin_label = "nHit%s/%s" % (bin_name, suffix)
+        # bin_label = "nHit%s/%s" % (bin_name, suffix)
+        bin_label = f"nHit{bin_name}/{suffix}"
 
         bin_tobject = f.Get(bin_label)
 
         if not bin_tobject:
 
-            raise IOError("Could not read bin %s" % bin_label)
+            # raise IOError("Could not read bin %s" % bin_label)
+            raise IOError(f"Could not read bin {bin_label}")
 
     return bin_tobject
 
@@ -60,111 +68,208 @@ def from_root_file(map_tree_file, roi):
     # Check that they exists and can be read
 
     if not file_existing_and_readable(map_tree_file):  # pragma: no cover
-        raise IOError("MapTree %s does not exist or is not readable" % map_tree_file)
+        # raise IOError("MapTree %s does not exist or is not readable" % map_tree_file)
+        raise IOError(f"MapTree {map_tree_file} does not exist or is not readable")
 
     # Make sure we have a proper ROI (or None)
 
-    assert isinstance(roi, HealpixROIBase) or roi is None, "You have to provide an ROI choosing from the " \
-                                                           "available ROIs in the region_of_interest module"
+    assert isinstance(roi, HealpixROIBase) or roi is None, (
+        "You have to provide an ROI choosing from the "
+        "available ROIs in the region_of_interest module"
+    )
 
     if roi is None:
         log.warning("You have set roi=None, so you are reading the entire sky")
 
-    # Read map tree
-    with open_ROOT_file(str(map_tree_file)) as f:
+    # Main motivation: root_numpy has been deprecated and it its no longer supported
+    # uproot seems like an alternative to this challenge
+    # uproot an I/O framework for reading information from ROOT files, so it
+    # NOTE: no direct way of reading Nside and HEALPix scheme from ROOT file
+    # cannot perform operations on histrograms
 
-        # Newer maps use "name" rather than "id"
+    # Read the maptree
+    with uproot.open(str(map_tree_file)) as map_infile:
+
+        print("Reading Maptree with uproot! Testing stage!")
+
         try:
 
-            data_bins_labels = list(root_numpy.tree2array(f.Get("BinInfo"), "name"))
+            data_bins_labels = map_infile["BinInfo"]["name"].array(library="np")
 
         except ValueError:
 
-            # Check to see if its an old style maptree 
             try:
 
-                data_bins_labels = list(root_numpy.tree2array(f.Get("BinInfo"), "id"))
+                data_bins_labels = map_infile["BinInfo"]["id"].array(library="np")
 
-            except ValueError:
-                
-                # Give a useful error message
-                raise ValueError("Maptree has no Branch: 'id' or 'name' ")
+            except ValueError as exc:
 
-            # If the old style, we need to make them strings
-            data_bins_labels = [ str(i) for i in data_bins_labels ]
+                raise ValueError("Maptree has no Branch: 'id' or 'name'") from exc
 
+        n_durations = np.divide(map_infile["BinInfo"]["totalDuration"].array(), 24.0)
 
-        # A transit is defined as 1 day, and totalDuration is in hours
-        # Get the number of transit from bin 0 (as LiFF does)
+        n_transits = n_durations[0]
+        n_bins = data_bins_labels.shape[0]
 
-        n_transits = root_numpy.tree2array(f.Get("BinInfo"), "totalDuration") / 24.0
-
-        # The map-maker underestimate the livetime of bins with low statistic by removing time intervals with
-        # zero events. Therefore, the best estimate of the livetime is the maximum of n_transits, which normally
-        # happen in the bins with high statistic
-        n_transits = max(n_transits)
-
-        n_bins = len(data_bins_labels)
-
-        # These are going to be Healpix maps, one for each data analysis bin_name
-
+        # These are going to be HEALPix maps, one for each
+        # data analysis bin name
         data_analysis_bins = collections.OrderedDict()
+        nside = 1024
+        scheme = 0
+        healpix_map_active = np.zeros(hp.nside2npix(nside))
+
+        if roi is not None:
+            active_pixels = roi.active_pixels(
+                nside, system="equatorial", ordering="RING"
+            )
+
+            # only read elements within the ROI
+            for pix_id in active_pixels:
+
+                healpix_map_active[pix_id] = 1.0
 
         for i in range(n_bins):
 
             name = data_bins_labels[i]
 
-            data_tobject = _get_bin_object(f, name, "data")
-
-            bkg_tobject = _get_bin_object(f, name, "bkg")
-
-            # Get ordering scheme
-            nside = data_tobject.GetUserInfo().FindObject("Nside").GetVal()
-            nside_bkg = bkg_tobject.GetUserInfo().FindObject("Nside").GetVal()
-
-            assert nside == nside_bkg
-
-            scheme = data_tobject.GetUserInfo().FindObject("Scheme").GetVal()
-            scheme_bkg = bkg_tobject.GetUserInfo().FindObject("Scheme").GetVal()
-
-            assert scheme == scheme_bkg
-
-            assert scheme == 0, "NESTED scheme is not supported yet"
-
+            # Read only elements within the ROI
             if roi is not None:
 
-                # Only read the elements in the ROI
-
-                active_pixels = roi.active_pixels(nside, system='equatorial', ordering='RING')
-
-                counts = _read_partial_tree(data_tobject, active_pixels)
-                bkg = _read_partial_tree(bkg_tobject, active_pixels)
-
+                counts = map_infile[f"nHit{name}"]["data"]["count"].array(library="np")[
+                    healpix_map_active > 0
+                ]
+                bkg = map_infile[f"nHit{name}"]["bkg"]["count"].array(library="np")[
+                    healpix_map_active > 0
+                ]
                 counts_hpx = SparseHealpix(counts, active_pixels, nside)
                 bkg_hpx = SparseHealpix(bkg, active_pixels, nside)
 
-                this_data_analysis_bin = DataAnalysisBin(name,
-                                                         counts_hpx,
-                                                         bkg_hpx,
-                                                         active_pixels_ids=active_pixels,
-                                                         n_transits=n_transits,
-                                                         scheme='RING')
+                this_data_analysis_bin = DataAnalysisBin(
+                    name,
+                    counts_hpx,
+                    bkg_hpx,
+                    active_pixels_ids=active_pixels,
+                    n_transits=n_transits,
+                    scheme="RING",
+                )
 
+            # Read the whole sky
             else:
 
-                # Read the entire sky.
+                counts = map_infile[f"nHit{name}"]["data"]["count"].array(library="np")
+                bkg = map_infile[f"nHit{name}"]["bkg"]["count"].array(library="np")
 
-                counts = tree_to_ndarray(data_tobject, "count").astype(np.float64)
-                bkg = tree_to_ndarray(bkg_tobject, "count").astype(np.float64)
-
-                this_data_analysis_bin = DataAnalysisBin(name,
-                                                         DenseHealpix(counts),
-                                                         DenseHealpix(bkg),
-                                                         active_pixels_ids=None,
-                                                         n_transits=n_transits,
-                                                         scheme='RING')
+                this_data_analysis_bin = DataAnalysisBin(
+                    name,
+                    DenseHealpix(counts),
+                    DenseHealpix(bkg),
+                    active_pixels_ids=None,
+                    n_transits=n_transits,
+                    scheme="RING",
+                )
 
             data_analysis_bins[name] = this_data_analysis_bin
+
+            # # Read map tree
+            # with open_ROOT_file(str(map_tree_file)) as f:
+
+            #     # Newer maps use "name" rather than "id"
+            #     try:
+
+            #         data_bins_labels = list(root_numpy.tree2array(f.Get("BinInfo"), "name"))
+
+            #     except ValueError:
+
+            #         # Check to see if its an old style maptree
+            #         try:
+
+            #             data_bins_labels = list(root_numpy.tree2array(f.Get("BinInfo"), "id"))
+
+            #         except ValueError:
+
+            #             # Give a useful error message
+            #             raise ValueError("Maptree has no Branch: 'id' or 'name' ")
+
+            #         # If the old style, we need to make them strings
+            #         data_bins_labels = [str(i) for i in data_bins_labels]
+
+            #     # A transit is defined as 1 day, and totalDuration is in hours
+            #     # Get the number of transit from bin 0 (as LiFF does)
+
+            #     n_transits = root_numpy.tree2array(f.Get("BinInfo"), "totalDuration") / 24.0
+
+            #     # The map-maker underestimate the livetime of bins with low statistic by removing time intervals with
+            #     # zero events. Therefore, the best estimate of the livetime is the maximum of n_transits, which normally
+            #     # happen in the bins with high statistic
+            #     n_transits = max(n_transits)
+
+            #     n_bins = len(data_bins_labels)
+
+            #     # These are going to be Healpix maps, one for each data analysis bin_name
+
+            #     data_analysis_bins = collections.OrderedDict()
+
+            #     for i in range(n_bins):
+
+            #         name = data_bins_labels[i]
+
+            #         data_tobject = _get_bin_object(f, name, "data")
+
+            #         bkg_tobject = _get_bin_object(f, name, "bkg")
+
+            #         # Get ordering scheme
+            #         nside = data_tobject.GetUserInfo().FindObject("Nside").GetVal()
+            #         nside_bkg = bkg_tobject.GetUserInfo().FindObject("Nside").GetVal()
+
+            #         assert nside == nside_bkg
+
+            #         scheme = data_tobject.GetUserInfo().FindObject("Scheme").GetVal()
+            #         scheme_bkg = bkg_tobject.GetUserInfo().FindObject("Scheme").GetVal()
+
+            #         assert scheme == scheme_bkg
+
+            #         assert scheme == 0, "NESTED scheme is not supported yet"
+
+            #         if roi is not None:
+
+            #             # Only read the elements in the ROI
+
+            #             active_pixels = roi.active_pixels(
+            #                 nside, system="equatorial", ordering="RING"
+            #             )
+
+            #             counts = _read_partial_tree(data_tobject, active_pixels)
+            #             bkg = _read_partial_tree(bkg_tobject, active_pixels)
+
+            #             counts_hpx = SparseHealpix(counts, active_pixels, nside)
+            #             bkg_hpx = SparseHealpix(bkg, active_pixels, nside)
+
+            #             this_data_analysis_bin = DataAnalysisBin(
+            #                 name,
+            #                 counts_hpx,
+            #                 bkg_hpx,
+            #                 active_pixels_ids=active_pixels,
+            #                 n_transits=n_transits,
+            #                 scheme="RING",
+            #             )
+
+            #         else:
+
+            #             # Read the entire sky.
+
+            #             counts = tree_to_ndarray(data_tobject, "count").astype(np.float64)
+            #             bkg = tree_to_ndarray(bkg_tobject, "count").astype(np.float64)
+
+            #             this_data_analysis_bin = DataAnalysisBin(
+            #                 name,
+            #                 DenseHealpix(counts),
+            #                 DenseHealpix(bkg),
+            #                 active_pixels_ids=None,
+            #                 n_transits=n_transits,
+            #                 scheme="RING",
+            #             )
+            #
+            # data_analysis_bins[name] = this_data_analysis_bin
 
     return data_analysis_bins
 
@@ -195,7 +300,10 @@ def _read_partial_tree(ttree_instance, elements_to_read):
         # Get copy of the subset
         # We need to create a dumb TFile to silence a lot of warnings from ROOT
         # Get a filename for this process
-        dumb_tfile_name = "__dumb_tfile_%s_%s.root" % (os.getpid(), socket.gethostname())
+        dumb_tfile_name = "__dumb_tfile_%s_%s.root" % (
+            os.getpid(),
+            socket.gethostname(),
+        )
         dumb_tfile = ROOT.TFile(dumb_tfile_name, "RECREATE")
         new_tree = ttree_instance.CopyTree("")
 
@@ -213,7 +321,9 @@ def _read_partial_tree(ttree_instance, elements_to_read):
         # The smart scheme starts to become slower than the brute force approach, so let's read the whole thing
         partial_map = tree_to_ndarray(ttree_instance, "count").astype(np.float64)
 
-        assert partial_map.shape[0] >= elements_to_read.shape[0], "Trying to read more pixels than present in TTree"
+        assert (
+            partial_map.shape[0] >= elements_to_read.shape[0]
+        ), "Trying to read more pixels than present in TTree"
 
         # Unless we have read the whole sky, let's remove the pixels we shouldn't have read
 
