@@ -188,7 +188,8 @@ class PSFWrapper(object):
         # is simply an I/O framework meant to read the information from TTree objects,
         # with no ROOT functionality
         def psf_function(ang_dist: float):
-            """returns expected counts provided with angular distances as input
+            """
+            Returns expected counts provided with angular distances as input
 
             Args:
                 ang_dist (float): angular distances
@@ -210,7 +211,9 @@ class PSFWrapper(object):
                 )
             )
 
-        # uproot has no methods to act on histograms. Therefore, using scipy for integral
+        # uproot has no methods to act on histograms. Therefore, using scipy
+        # to compute integral.
+        # integral returns a tuple with integral result, and absolute error
         if scipy.integrate.quad(psf_function, 0, _INTEGRAL_OUTER_RADIUS)[0] <= 0.0:
             return InvalidPSF()
 

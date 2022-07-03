@@ -78,7 +78,7 @@ def from_root_file(
         dict: returns a dictionary with names of analysis bins found in Maptree
     """
 
-    from ..root_handler import open_ROOT_file, root_numpy, tree_to_ndarray
+    # from ..root_handler import open_ROOT_file, root_numpy, tree_to_ndarray
 
     map_tree_file = sanitize_filename(map_tree_file)
 

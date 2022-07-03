@@ -92,7 +92,7 @@ class ResponseBin(object):
                 np.log10(parameters[0])
                 - parameters[1] * log_energy
                 - np.log10(np.exp(1.0))
-                * pow(10.0, log_energy - np.log10(parameters[2]))
+                * np.power(10.0, log_energy - np.log10(parameters[2]))
             )
 
         this_en_sig_th1d = root_file[f"dec_{dec_id:02}"][f"nh_{analysis_bin_id}"][
@@ -136,7 +136,7 @@ class ResponseBin(object):
 
         # Read the histogram of the bkg events detected in this bin_name
         # Note: we do not copy this TH1D instance because we don't need it after the file is close
-        sim_n_bg_events = this_en_bg_th1d.sum().value
+        sim_n_bg_events = this_en_bg_th1d.values().sum()
 
         # Now read the various TF1(s) for PSF, signal and background
         # Read the PSF and make a copy (so it will stay when we close the file)
