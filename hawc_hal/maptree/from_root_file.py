@@ -98,7 +98,7 @@ def from_root_file(
     if roi is None:
         log.warning("You have set roi=None, so you are reading the entire sky")
 
-    # Main motivation: root_numpy has been deprecated and it its no longer supported
+    # Note: Main motivation: root_numpy has been deprecated and it its no longer supported
     # uproot seems like an alternative to this challenge
     # uproot an I/O framework for reading information from ROOT files, so it
     # NOTE: no direct way of reading Nside and HEALPix scheme from ROOT file
@@ -126,8 +126,8 @@ def from_root_file(
         n_durations = np.divide(map_infile["BinInfo"]["totalDuration"].array(), 24.0)
 
         # number of transits is obtained from first bin in maptree
-        n_transits = n_durations[0]
-        n_bins = data_bins_labels.shape[0]
+        n_transits: float = n_durations[0]
+        n_bins: int = data_bins_labels.shape[0]
 
         # so far, a value of Nside of 1024  (perhaps will change) and a RING HEALPix
         assert (

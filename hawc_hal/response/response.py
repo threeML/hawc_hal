@@ -224,7 +224,7 @@ class HAWCResponse(object):
 
             response_bin_ids = response_bin_ids.astype(str)
 
-            # Now we create a dictionary of ResponseBin instances for each bin name
+            # Now we create a dictionary of ResponseBin instances for each dec bin name
             response_bins = collections.OrderedDict()
             for dec_id in range(len(dec_bins)):
 

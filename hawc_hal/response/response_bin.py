@@ -41,15 +41,20 @@ class ResponseBin(object):
         self._psf = psf  # type: PSFWrapper
 
     @staticmethod
-    def _get_en_th1d(open_ttree, dec_id, analysis_bin_id, prefix):
+    def _get_en_th1d(open_ttree, dec_id: int, analysis_bin_id: str, prefix: str):
 
-        en_sig_label = "En%s_dec%i_nh%s" % (prefix, dec_id, analysis_bin_id)
+        # en_sig_label = "En%s_dec%i_nh%s" % (prefix, dec_id, analysis_bin_id)
+        en_sig_label = f"En{prefix}_dec{dec_id}_nh{analysis_bin_id}"
 
-        this_en_th1d = open_ttree.FindObjectAny(en_sig_label)
+        # this_en_th1d = open_ttree.FindObjectAny(en_sig_label)
+        this_en_th1d = open_ttree[f"dec_{dec_id:02}"][f"nh_{analysis_bin_id}"][
+            en_sig_label
+        ].to_hist()
 
         if not this_en_th1d:
 
-            raise IOError("Could not find TH1D named %s." % en_sig_label)
+            raise IOError(f"Could not find TH1D named {en_sig_label}.")
+            # raise IOError("Could not find TH1D named %s." % en_sig_label)
 
         return this_en_th1d
 
@@ -95,13 +100,21 @@ class ResponseBin(object):
                 * np.power(10.0, log_energy - np.log10(parameters[2]))
             )
 
-        this_en_sig_th1d = root_file[f"dec_{dec_id:02}"][f"nh_{analysis_bin_id}"][
-            f"EnSig_dec{dec_id}_nh{analysis_bin_id}"
-        ].to_hist()
+        # this_en_sig_th1d = root_file[f"dec_{dec_id:02}"][f"nh_{analysis_bin_id}"][
+        # f"EnSig_dec{dec_id}_nh{analysis_bin_id}"
+        # ].to_hist()
 
-        this_en_bg_th1d = root_file[f"dec_{dec_id:02}"][f"nh_{analysis_bin_id}"][
-            f"EnBg_dec{dec_id}_nh{analysis_bin_id}"
-        ].to_hist()
+        # this_en_bg_th1d = root_file[f"dec_{dec_id:02}"][f"nh_{analysis_bin_id}"][
+        # f"EnBg_dec{dec_id}_nh{analysis_bin_id}"
+        # ].to_hist()
+
+        this_en_sig_th1d = cls._get_en_th1d(
+            root_file, dec_id, analysis_bin_id, prefix="Sig"
+        )
+
+        this_en_bg_th1d = cls._get_en_th1d(
+            root_file, dec_id, analysis_bin_id, prefix="Bg"
+        )
 
         total_bins = this_en_sig_th1d.shape[0]
         sim_energy_bin_low = np.zeros(total_bins)
@@ -251,6 +264,12 @@ class ResponseBin(object):
     #     )
 
     def to_pandas(self):
+        """Save the information from Response file into a pandas.DataFrame
+
+        Returns:
+            tuple(pd.DataFrame): returns a tuple of pd.DataFrame, Response function metadata,
+            and PSFWrapper instance
+        """
 
         # In the metadata let's save all single values (floats)
         meta = {
