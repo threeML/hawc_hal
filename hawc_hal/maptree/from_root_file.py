@@ -2,6 +2,7 @@ from __future__ import absolute_import
 from builtins import map
 from builtins import str
 from builtins import range
+from itertools import count
 import os
 import socket
 import collections
@@ -55,8 +56,6 @@ def _get_bin_object(f, bin_name, suffix):
 def from_root_file(
     map_tree_file: str,
     roi: HealpixROIBase,
-    nside_cnt: int = 1024,
-    nside_bkg: int = 1024,
     scheme: int = 0,
 ):
     """Create a Maptree object from a ROOT file and a ROI.
@@ -111,13 +110,13 @@ def from_root_file(
 
         try:
 
-            data_bins_labels = map_infile["BinInfo"]["name"].array(library="np")
+            data_bins_labels = map_infile["BinInfo"]["name"].array().to_numpy()
 
         except ValueError:
 
             try:
 
-                data_bins_labels = map_infile["BinInfo"]["id"].array(library="np")
+                data_bins_labels = map_infile["BinInfo"]["id"].array().to_numpy()
 
             except ValueError as exc:
 
@@ -126,8 +125,27 @@ def from_root_file(
         n_durations = np.divide(map_infile["BinInfo"]["totalDuration"].array(), 24.0)
 
         # number of transits is obtained from first bin in maptree
+        bin_name = data_bins_labels[0]
+        try:
+            npix_cnt = (
+                map_infile[f"nHit{bin_name}"]["data"]["count"].array().to_numpy().size
+            )
+            npix_bkg = (
+                map_infile[f"nHit{bin_name}"]["data"]["count"].array().to_numpy().size
+            )
+
+        except uproot.KeyInFileError:
+            npix_cnt = (
+                map_infile[f"nHit0{bin_name}"]["data"]["count"].array().to_numpy().size
+            )
+            npix_bkg = (
+                map_infile[f"nHit0{bin_name}"]["data"]["count"].array().to_numpy().size
+            )
+
         n_transits: float = n_durations[0]
         n_bins: int = data_bins_labels.shape[0]
+        nside_cnt: int = hp.pixelfunc.npix2nside(npix_cnt)
+        nside_bkg: int = hp.pixelfunc.npix2nside(npix_bkg)
 
         # so far, a value of Nside of 1024  (perhaps will change) and a RING HEALPix
         assert (
@@ -159,23 +177,27 @@ def from_root_file(
                 # Note: first attempt at reading only a partial map specified by the
                 # active pixel ids.
                 try:
-                    counts = map_infile[f"nHit{name}"]["data"]["count"].array(
-                        library="np"
-                    )[healpix_map_active > 0]
-                    bkg = map_infile[f"nHit{name}"]["bkg"]["count"].array(library="np")[
-                        healpix_map_active > 0
-                    ]
-                except uproot.KeyInFileError:
-                    # Sometimes, names of bins carry an extra zero
-                    counts = map_infile[f"nHit0{name}"]["data"]["count"].array(
-                        library="np"
-                    )[healpix_map_active > 0]
-                    bkg = map_infile[f"nHit0{name}"]["bkg"]["count"].array(
-                        library="np"
-                    )[healpix_map_active > 0]
+                    counts = (
+                        map_infile[f"nHit{name}"]["data"]["count"].array().to_numpy()
+                    )
 
-                counts_hpx = SparseHealpix(counts, active_pixels, nside_cnt)
-                bkg_hpx = SparseHealpix(bkg, active_pixels, nside_cnt)
+                    bkg = map_infile[f"nHit{name}"]["bkg"]["count"].array().to_numpy()
+
+                except uproot.KeyInFileError:
+
+                    # Sometimes, names of bins carry an extra zero
+                    counts = (
+                        map_infile[f"nHit0{name}"]["data"]["count"].array().to_numpy()
+                    )
+
+                    bkg = map_infile[f"nHit0{name}"]["bkg"]["count"].array().to_numpy()
+
+                counts_hpx = SparseHealpix(
+                    counts[healpix_map_active > 0], active_pixels, nside_cnt
+                )
+                bkg_hpx = SparseHealpix(
+                    bkg[healpix_map_active > 0], active_pixels, nside_cnt
+                )
 
                 this_data_analysis_bin = DataAnalysisBin(
                     name,
@@ -190,20 +212,19 @@ def from_root_file(
             else:
 
                 try:
-                    counts = map_infile[f"nHit{name}"]["data"]["count"].array(
-                        library="np"
-                    )[healpix_map_active > 0]
-                    bkg = map_infile[f"nHit{name}"]["bkg"]["count"].array(library="np")[
-                        healpix_map_active > 0
-                    ]
+                    
+                    counts = (
+                        map_infile[f"nHit{name}"]["data"]["count"].array().to_numpy()
+                    )
+                    bkg = map_infile[f"nHit{name}"]["bkg"]["count"].array().to_numpy()
+
                 except uproot.KeyInFileError:
+                    
                     # Sometimes, names of bins carry an extra zero
-                    counts = map_infile[f"nHit0{name}"]["data"]["count"].array(
-                        library="np"
-                    )[healpix_map_active > 0]
-                    bkg = map_infile[f"nHit0{name}"]["bkg"]["count"].array(
-                        library="np"
-                    )[healpix_map_active > 0]
+                    counts = (
+                        map_infile[f"nHit0{name}"]["data"]["count"].array().to_numpy()
+                    )
+                    bkg = map_infile[f"nHit0{name}"]["bkg"]["count"].array().to_numpy()
 
                 this_data_analysis_bin = DataAnalysisBin(
                     name,

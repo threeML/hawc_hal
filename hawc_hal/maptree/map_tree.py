@@ -3,12 +3,14 @@ from __future__ import absolute_import
 from builtins import object
 from past.utils import old_div
 import os
+import uproot
 import numpy as np
 import pandas as pd
 
 from threeML.io.rich_display import display
 from threeML.io.file_utils import sanitize_filename
 from threeML.io.logging import setup_logger
+
 log = setup_logger(__name__)
 log.propagate = False
 
@@ -24,7 +26,7 @@ def map_tree_factory(map_tree_file, roi):
     # Sanitize files in input (expand variables and so on)
     map_tree_file = sanitize_filename(map_tree_file)
 
-    if os.path.splitext(map_tree_file)[-1] == '.root':
+    if os.path.splitext(map_tree_file)[-1] == ".root":
 
         return MapTree.from_root_file(map_tree_file, roi)
 
@@ -34,7 +36,6 @@ def map_tree_factory(map_tree_file, roi):
 
 
 class MapTree(object):
-
     def __init__(self, analysis_bins, roi):
 
         self._analysis_bins = analysis_bins
@@ -107,9 +108,13 @@ class MapTree(object):
 
         df = pd.DataFrame()
 
-        df['Bin'] = list(self._analysis_bins.keys())
-        df['Nside'] = [self._analysis_bins[bin_id].nside for bin_id in self._analysis_bins]
-        df['Scheme'] = [self._analysis_bins[bin_id].scheme for bin_id in self._analysis_bins]
+        df["Bin"] = list(self._analysis_bins.keys())
+        df["Nside"] = [
+            self._analysis_bins[bin_id].nside for bin_id in self._analysis_bins
+        ]
+        df["Scheme"] = [
+            self._analysis_bins[bin_id].scheme for bin_id in self._analysis_bins
+        ]
 
         # Compute observed counts, background counts, how many pixels we have in the ROI and
         # the sky area they cover
@@ -137,17 +142,19 @@ class MapTree(object):
             n_pixels[i] = sparse_obs.shape[0]
             sky_area[i] = n_pixels[i] * analysis_bin.observation_map.pixel_area
 
-        df['Obs counts'] = obs_counts
-        df['Bkg counts'] = bkg_counts
-        df['obs/bkg'] = old_div(obs_counts, bkg_counts)
-        df['Pixels in ROI'] = n_pixels
-        df['Area (deg^2)'] = sky_area
+        df["Obs counts"] = obs_counts
+        df["Bkg counts"] = bkg_counts
+        df["obs/bkg"] = old_div(obs_counts, bkg_counts)
+        df["Pixels in ROI"] = n_pixels
+        df["Area (deg^2)"] = sky_area
 
         display(df)
 
         first_bin_id = list(self._analysis_bins.keys())[0]
-        log.info("This Map Tree contains %.3f transits in the first bin" \
-            % self._analysis_bins[first_bin_id].n_transits)
+        log.info(
+            "This Map Tree contains %.3f transits in the first bin"
+            % self._analysis_bins[first_bin_id].n_transits
+        )
         log.info("Total data size: %.2f Mb" % (size * u.byte).to(u.megabyte).value)
 
     def write(self, filename):
@@ -174,8 +181,9 @@ class MapTree(object):
 
             analysis_bin = self._analysis_bins[bin_id]
 
-            assert bin_id == analysis_bin.name, \
-                'Bin name inconsistency: {} != {}'.format(bin_id, analysis_bin.name)
+            assert (
+                bin_id == analysis_bin.name
+            ), "Bin name inconsistency: {} != {}".format(bin_id, analysis_bin.name)
 
             multi_index_keys.append(analysis_bin.name)
 
@@ -187,24 +195,26 @@ class MapTree(object):
         analysis_bins_df = pd.concat(dfs, axis=0, keys=multi_index_keys)
         meta_df = pd.concat(all_metas, axis=1, keys=multi_index_keys).T
 
-        with Serialization(filename, mode='w') as serializer:
+        with Serialization(filename, mode="w") as serializer:
 
-            serializer.store_pandas_object('/analysis_bins', analysis_bins_df)
-            serializer.store_pandas_object('/analysis_bins_meta', meta_df)
+            serializer.store_pandas_object("/analysis_bins", analysis_bins_df)
+            serializer.store_pandas_object("/analysis_bins_meta", meta_df)
 
             # Write the ROI
             if self._roi is not None:
 
-                if self._roi.to_dict()['ROI type']=='HealpixMapROI':
+                if self._roi.to_dict()["ROI type"] == "HealpixMapROI":
                     ROIDict = self._roi.to_dict()
-                    roimap = ROIDict['roimap']
-                    ROIDict.pop('roimap',None)
-                    serializer.store_pandas_object('/ROI', pd.Series(roimap), **ROIDict)
+                    roimap = ROIDict["roimap"]
+                    ROIDict.pop("roimap", None)
+                    serializer.store_pandas_object("/ROI", pd.Series(roimap), **ROIDict)
 
                 else:
 
-                    serializer.store_pandas_object('/ROI', pd.Series(), **self._roi.to_dict())
+                    serializer.store_pandas_object(
+                        "/ROI", pd.Series(), **self._roi.to_dict()
+                    )
 
             else:
 
-                serializer.store_pandas_object('/ROI', pd.Series())
+                serializer.store_pandas_object("/ROI", pd.Series())
