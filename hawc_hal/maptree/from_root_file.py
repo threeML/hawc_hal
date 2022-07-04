@@ -158,12 +158,22 @@ def from_root_file(
             if roi is not None:
                 # Note: first attempt at reading only a partial map specified by the
                 # active pixel ids.
-                counts = map_infile[f"nHit{name}"]["data"]["count"].array(library="np")[
-                    healpix_map_active > 0
-                ]
-                bkg = map_infile[f"nHit{name}"]["bkg"]["count"].array(library="np")[
-                    healpix_map_active > 0
-                ]
+                try:
+                    counts = map_infile[f"nHit{name}"]["data"]["count"].array(
+                        library="np"
+                    )[healpix_map_active > 0]
+                    bkg = map_infile[f"nHit{name}"]["bkg"]["count"].array(library="np")[
+                        healpix_map_active > 0
+                    ]
+                except uproot.KeyInFileError:
+                    # Sometimes, names of bins carry an extra zero
+                    counts = map_infile[f"nHit{name:02}"]["data"]["count"].array(
+                        library="np"
+                    )[healpix_map_active > 0]
+                    bkg = map_infile[f"nHit{name:02}"]["bkg"]["count"].array(
+                        library="np"
+                    )[healpix_map_active > 0]
+
                 counts_hpx = SparseHealpix(counts, active_pixels, nside_cnt)
                 bkg_hpx = SparseHealpix(bkg, active_pixels, nside_cnt)
 
