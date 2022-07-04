@@ -208,23 +208,23 @@ class HAWCResponse(object):
             # There is no way to evaluate the loglogspectrum function with uproot, so the
             # parameters are passed for evaluation in response_bin.py
             log_log_params = response_file['LogLogSpectrum'].member('fParams')
-            dec_bins_lower_edge = response_file['DecBins']['lowerEdge'].array(library='np')
-            dec_bins_upper_edge = response_file['DecBins']['upperEdge'].array(library='np')
-            dec_bins_center = response_file['DecBins']['simdec'].array(library='np')
+            dec_bins_lower_edge = response_file['DecBins']['lowerEdge'].array().to_numpy()
+            dec_bins_upper_edge = response_file['DecBins']['upperEdge'].array().to_numpy()
+            dec_bins_center = response_file['DecBins']['simdec'].array().to_numpy()
 
             dec_bins = list(zip(dec_bins_lower_edge, dec_bins_center, dec_bins_upper_edge))
 
             try:
 
-                response_bin_ids = response_file["AnalysisBins"]["name"].array(library='np')
+                response_bin_ids = response_file["AnalysisBins"]["name"].array().to_numpy()
 
-            except ValueError:
+            except uproot.KeyInFileError:
 
                 try:
 
-                    response_bin_ids = response_file['AnalysisBins']['id'].array(library='np')
+                    response_bin_ids = response_file["AnalysisBins"]["id"].array().to_numpy()
 
-                except ValueError:
+                except uproot.KeyInFileError:
 
                     log.warning(f"Response {response_file_name} has no AnalysisBins 'id' or 'name' branch."
                     "Will try with the default names")

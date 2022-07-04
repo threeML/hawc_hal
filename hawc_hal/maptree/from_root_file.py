@@ -122,10 +122,9 @@ def from_root_file(
 
                 raise ValueError("Maptree has no Branch: 'id' or 'name'") from exc
 
-        n_durations = np.divide(map_infile["BinInfo"]["totalDuration"].array(), 24.0)
-
-        # number of transits is obtained from first bin in maptree
+        # HACK:workaround method of getting the Nside from maptree
         bin_name = data_bins_labels[0]
+
         try:
             npix_cnt = (
                 map_infile[f"nHit{bin_name}"]["data"]["count"].array().to_numpy().size
@@ -142,6 +141,8 @@ def from_root_file(
                 map_infile[f"nHit0{bin_name}"]["data"]["count"].array().to_numpy().size
             )
 
+        # number of transits is obtained from first bin in maptree
+        n_durations = np.divide(map_infile["BinInfo"]["totalDuration"].array(), 24.0)
         n_transits: float = n_durations[0]
         n_bins: int = data_bins_labels.shape[0]
         nside_cnt: int = hp.pixelfunc.npix2nside(npix_cnt)
@@ -212,14 +213,14 @@ def from_root_file(
             else:
 
                 try:
-                    
+
                     counts = (
                         map_infile[f"nHit{name}"]["data"]["count"].array().to_numpy()
                     )
                     bkg = map_infile[f"nHit{name}"]["bkg"]["count"].array().to_numpy()
 
                 except uproot.KeyInFileError:
-                    
+
                     # Sometimes, names of bins carry an extra zero
                     counts = (
                         map_infile[f"nHit0{name}"]["data"]["count"].array().to_numpy()
