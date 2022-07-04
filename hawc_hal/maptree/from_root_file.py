@@ -167,10 +167,10 @@ def from_root_file(
                     ]
                 except uproot.KeyInFileError:
                     # Sometimes, names of bins carry an extra zero
-                    counts = map_infile[f"nHit{name:02}"]["data"]["count"].array(
+                    counts = map_infile[f"nHit0{name}"]["data"]["count"].array(
                         library="np"
                     )[healpix_map_active > 0]
-                    bkg = map_infile[f"nHit{name:02}"]["bkg"]["count"].array(
+                    bkg = map_infile[f"nHit0{name}"]["bkg"]["count"].array(
                         library="np"
                     )[healpix_map_active > 0]
 
@@ -189,8 +189,21 @@ def from_root_file(
             # Read the whole sky
             else:
 
-                counts = map_infile[f"nHit{name}"]["data"]["count"].array(library="np")
-                bkg = map_infile[f"nHit{name}"]["bkg"]["count"].array(library="np")
+                try:
+                    counts = map_infile[f"nHit{name}"]["data"]["count"].array(
+                        library="np"
+                    )[healpix_map_active > 0]
+                    bkg = map_infile[f"nHit{name}"]["bkg"]["count"].array(library="np")[
+                        healpix_map_active > 0
+                    ]
+                except uproot.KeyInFileError:
+                    # Sometimes, names of bins carry an extra zero
+                    counts = map_infile[f"nHit0{name}"]["data"]["count"].array(
+                        library="np"
+                    )[healpix_map_active > 0]
+                    bkg = map_infile[f"nHit0{name}"]["bkg"]["count"].array(
+                        library="np"
+                    )[healpix_map_active > 0]
 
                 this_data_analysis_bin = DataAnalysisBin(
                     name,
