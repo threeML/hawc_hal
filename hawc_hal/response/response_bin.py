@@ -1,5 +1,6 @@
 from builtins import range
 from builtins import object
+import uproot
 import numpy as np
 import pandas as pd
 
@@ -154,9 +155,16 @@ class ResponseBin(object):
         # Now read the various TF1(s) for PSF, signal and background
         # Read the PSF and make a copy (so it will stay when we close the file)
         # NOTE: doesn't have the ability to read and evaluate TF1
-        psf_tf1_fparams = root_file[f"dec_{dec_id:02}"][f"nh_{analysis_bin_id}"][
-            f"PSF_dec{dec_id}_nh{analysis_bin_id}_fit"
-        ].member("fParams")
+        try:
+            psf_tf1_prefix = root_file[f"dec_{dec_id}"][f"nh_{analysis_bin_id}"][
+                f"PSF_dec{dec_id}_nh{analysis_bin_id}_fit"
+            ]
+        except uproot.KeyInFileError:
+            psf_tf1_prefix = root_file[f"dec_0{dec_id}"][f"nh_{analysis_bin_id}"][
+                f"PSF_dec{dec_id}_nh{analysis_bin_id}_fit"
+            ]
+
+        psf_tf1_fparams = psf_tf1_prefix.member("fParams")
 
         psf_fun = PSFWrapper.psf_eval(psf_tf1_fparams)
 
