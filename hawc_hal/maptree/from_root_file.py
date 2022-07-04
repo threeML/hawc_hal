@@ -107,7 +107,7 @@ def from_root_file(
     # Read the maptree
     with uproot.open(str(map_tree_file)) as map_infile:
 
-        print("Reading Maptree with uproot! Testing stage!")
+        log.info("Reading Maptree with uproot! Testing stage!")
 
         try:
 
@@ -156,7 +156,8 @@ def from_root_file(
 
             # Read only elements within the ROI
             if roi is not None:
-
+                # Note: first attempt at reading only a partial map specified by the
+                # active pixel ids.
                 counts = map_infile[f"nHit{name}"]["data"]["count"].array(library="np")[
                     healpix_map_active > 0
                 ]
@@ -296,62 +297,62 @@ def from_root_file(
     return data_analysis_bins
 
 
-def _read_partial_tree(ttree_instance, elements_to_read):
+# def _read_partial_tree(ttree_instance, elements_to_read):
 
-    # Decide whether to use a smart loading scheme, or just loading the whole thing, based on the
-    # number of elements to be read
+#     # Decide whether to use a smart loading scheme, or just loading the whole thing, based on the
+#     # number of elements to be read
 
-    from ..root_handler import ROOT, root_numpy, tree_to_ndarray
+#     from ..root_handler import ROOT, root_numpy, tree_to_ndarray
 
-    if elements_to_read.shape[0] < 500000:
+#     if elements_to_read.shape[0] < 500000:
 
-        # Use a smart loading scheme, where we read only the pixels we need
+#         # Use a smart loading scheme, where we read only the pixels we need
 
-        # The fastest method that I found is to create a TEventList, apply it to the
-        # tree, get a copy of the subset and then use ttree2array
+#         # The fastest method that I found is to create a TEventList, apply it to the
+#         # tree, get a copy of the subset and then use ttree2array
 
-        # Create TEventList
-        entrylist = ROOT.TEntryList()
+#         # Create TEventList
+#         entrylist = ROOT.TEntryList()
 
-        # Add the selections
-        _ = list(map(entrylist.Enter, elements_to_read))
+#         # Add the selections
+#         _ = list(map(entrylist.Enter, elements_to_read))
 
-        # Apply the EntryList to the tree
-        ttree_instance.SetEntryList(entrylist)
+#         # Apply the EntryList to the tree
+#         ttree_instance.SetEntryList(entrylist)
 
-        # Get copy of the subset
-        # We need to create a dumb TFile to silence a lot of warnings from ROOT
-        # Get a filename for this process
-        dumb_tfile_name = "__dumb_tfile_%s_%s.root" % (
-            os.getpid(),
-            socket.gethostname(),
-        )
-        dumb_tfile = ROOT.TFile(dumb_tfile_name, "RECREATE")
-        new_tree = ttree_instance.CopyTree("")
+#         # Get copy of the subset
+#         # We need to create a dumb TFile to silence a lot of warnings from ROOT
+#         # Get a filename for this process
+#         dumb_tfile_name = "__dumb_tfile_%s_%s.root" % (
+#             os.getpid(),
+#             socket.gethostname(),
+#         )
+#         dumb_tfile = ROOT.TFile(dumb_tfile_name, "RECREATE")
+#         new_tree = ttree_instance.CopyTree("")
 
-        # Actually read it from disk
-        partial_map = root_numpy.tree2array(new_tree, "count").astype(np.float64)
+#         # Actually read it from disk
+#         partial_map = root_numpy.tree2array(new_tree, "count").astype(np.float64)
 
-        # Now reset the entry list
-        ttree_instance.SetEntryList(0)
+#         # Now reset the entry list
+#         ttree_instance.SetEntryList(0)
 
-        dumb_tfile.Close()
-        os.remove(dumb_tfile_name)
+#         dumb_tfile.Close()
+#         os.remove(dumb_tfile_name)
 
-    else:
+#     else:
 
-        # The smart scheme starts to become slower than the brute force approach, so let's read the whole thing
-        partial_map = tree_to_ndarray(ttree_instance, "count").astype(np.float64)
+#         # The smart scheme starts to become slower than the brute force approach, so let's read the whole thing
+#         partial_map = tree_to_ndarray(ttree_instance, "count").astype(np.float64)
 
-        assert (
-            partial_map.shape[0] >= elements_to_read.shape[0]
-        ), "Trying to read more pixels than present in TTree"
+#         assert (
+#             partial_map.shape[0] >= elements_to_read.shape[0]
+#         ), "Trying to read more pixels than present in TTree"
 
-        # Unless we have read the whole sky, let's remove the pixels we shouldn't have read
+#         # Unless we have read the whole sky, let's remove the pixels we shouldn't have read
 
-        if elements_to_read.shape[0] != partial_map.shape[0]:
+#         if elements_to_read.shape[0] != partial_map.shape[0]:
 
-            # Now let's remove the pixels we shouldn't have read
-            partial_map = partial_map[elements_to_read]
+#             # Now let's remove the pixels we shouldn't have read
+#             partial_map = partial_map[elements_to_read]
 
-    return partial_map.astype(np.float64)
+#     return partial_map.astype(np.float64)

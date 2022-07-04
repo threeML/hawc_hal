@@ -41,7 +41,8 @@ def hawc_response_factory(response_file_name):
 
     if not response_file_name in _instances:
 
-        log.info("Creating singleton for %s" % response_file_name)
+        # log.info("Creating singleton for %s" % response_file_name)
+        log.info(f"Creating singleton for {response_file_name}")
 
         # Use the extension of the file to figure out which kind of response it is (ROOT or HDF)
 
@@ -50,7 +51,6 @@ def hawc_response_factory(response_file_name):
         if extension == ".root":
 
             new_instance = HAWCResponse.from_root_file(response_file_name)
-            # new_instance = HAWCResponse.fro
 
         elif extension in ['.hd5', '.hdf5', '.hdf']:
 
@@ -58,8 +58,11 @@ def hawc_response_factory(response_file_name):
 
         else:  # pragma: no cover
 
-            raise NotImplementedError("Extension %s for response file %s not recognized." % (extension,
-                                                                                             response_file_name))
+            raise NotImplementedError(
+                f"Extension {extension} for response file {response_file_name} not recognized."
+            )
+            # raise NotImplementedError("Extension %s for response file %s not recognized." % (extension,
+                                                                                            #  response_file_name))
 
         _instances[response_file_name] = new_instance
 
@@ -77,13 +80,19 @@ class HAWCResponse(object):
         self._response_bins = response_bins
         
         if len(dec_bins) < 2:
-          log.warning("Only {0} dec bins given in {1}, will not try to interpolate.".format(len(dec_bins), response_file_name))
-          log.warning("Single-dec-bin mode is intended for development work only at this time and may not work with extended sources.")
+            #   log.warning("Only {0} dec bins given in {1}, will not try to interpolate.".format(len(dec_bins), response_file_name))
+            log.warning(
+                f"Only {len(dec_bins)} dec bins given in {response_file_name}, will not try to interpolate."
+            )
+            log.warning(
+                "Single-dec-bin mode is intended for development work only at this time and may not work with extended sources."
+            )
 
     @classmethod
     def from_hdf5(cls, response_file_name):
         """
-        Build response from a HDF5 file. Do not use directly, use the hawc_response_factory function instead.
+        Build response from a HDF5 file. Do not use directly,
+        use the hawc_response_factory function instead.
 
         :param response_file_name:
         :return: a HAWCResponse instance
@@ -117,7 +126,8 @@ class HAWCResponse(object):
 
                 assert dec_center_ == dec_center, "Response is corrupted"
 
-                # If this is the first energy bin, let's store the minimum and maximum dec of this bin
+                # If this is the first energy bin, let's store the minimum and
+                # maximum dec of this bin
                 if i == 0:
 
                     min_decs.append(min_dec)
@@ -125,8 +135,8 @@ class HAWCResponse(object):
 
                 else:
 
-                    # Check that the minimum and maximum declination for this bin are the same as for
-                    # the first energy bin
+                    # Check that the minimum and maximum declination for this bin are
+                    # the same as for the first energy bin
                     assert min_dec == min_decs[-1], "Response is corrupted"
                     assert max_dec == max_decs[-1], "Response is corrupted"
 
@@ -164,7 +174,7 @@ class HAWCResponse(object):
 
     @classmethod
     def from_root_file(cls, response_file_name:str):
-        """Build response from ROOT file. Do not use directly, use the 
+        """Build response from ROOT file. Do not use directly, use the
         hawc_response_factory instead.
 
         Args:
@@ -174,10 +184,10 @@ class HAWCResponse(object):
             IOError: An IOError is raised if the file is corrupted or unreadable
 
         Returns:
-            self@HAWCRESPONSE: returns a HAWCResponse instance
+            HAWCResponse: returns a HAWCResponse instance
         """
 
-        from ..root_handler import open_ROOT_file, get_list_of_keys, tree_to_ndarray
+        # from ..root_handler import open_ROOT_file, get_list_of_keys, tree_to_ndarray
 
         # Make sure file is readable
 
@@ -193,8 +203,7 @@ class HAWCResponse(object):
         # Read response
         with uproot.open(str(response_file_name)) as response_file:
 
-            print("Reading Response File with uproot! Testing stage!")
-            
+            log.info("Reading Response File with uproot! Testing stage!")
             # NOTE: The LogLogSpectrum parameters are extracted from the response file
             # There is no way to evaluate the loglogspectrum function with uproot, so the
             # parameters are passed for evaluation in response_bin.py
@@ -336,21 +345,25 @@ class HAWCResponse(object):
         return instance
 
     def get_response_dec_bin(self, dec, interpolate=False):
-        """
-        Get the responses for the provided declination bin, optionally interpolating the PSF
+        """Get the response for the provided declination bin, optionally interpolating the PSF
 
-        :param dec: the declination where the response is desired at
-        :param interpolate: whether to interpolate or not the PSF between the two closes response bins
-        :return:
+
+        Args:
+            dec (float): Declination where the response is desired
+            interpolate (bool, optional): If True, PSF is interpolated between the two 
+            closest response bins. Defaults to False.
+
+        Returns:
+            PSFWrapper: To be added later.
         """
 
         # Sort declination bins by distance to the provided declination
         dec_bins_keys = list(self._response_bins.keys())
         dec_bins_by_distance = sorted(dec_bins_keys, key=lambda x: abs(x - dec))
-        
+
         #never try to interpolate if only one dec bin is given
         if len(dec_bins_keys) < 2:
-          interpolate = False
+            interpolate = False
 
         if not interpolate:
 
@@ -412,20 +425,24 @@ class HAWCResponse(object):
         :param verbose bool: Prints the full list of declinations and analysis bins.
         """
 
-        log.info("Response file: %s" % self._response_file_name)
-        log.info("Number of dec bins: %s" % len(self._dec_bins))
+        # log.info("Response file: %s" % self._response_file_name)
+        # log.info("Number of dec bins: %s" % len(self._dec_bins))
+        log.info(f"Response file: {self._response_file_name}")
+        log.info(f"Number of dec bins: {len(self._dec_bins)}")
         if verbose:
             log.info(self._dec_bins)
-        log.info("Number of energy/nHit planes per dec bin_name: %s" % (self.n_energy_planes))
+        # log.info("Number of energy/nHit planes per dec bin_name: %s" % (self.n_energy_planes))
+        log.info(f"Number of energy/nHit planes per dec bin_name: {self.n_energy_planes}")
         if verbose:
             log.info(list(self._response_bins.values())[0].keys())
 
     def write(self, filename):
         """
-        Write the response to HDF5.
+        Write the response to HDF5 file.
 
-        :param filename: output file. WARNING: it will be overwritten if existing.
-        :return:
+        Args:
+            filename (str): Output file name. WARNING: it will be overwritten if
+            file already exists.
         """
 
         filename = sanitize_filename(filename)
@@ -433,7 +450,8 @@ class HAWCResponse(object):
         # Unravel the dec bins
         min_decs, center_decs, max_decs = list(zip(*self._dec_bins))
 
-        # We get the definition of the response bins, as well as their coordinates (the dec center) and store them
+        # We get the definition of the response bins, as well as their coordinates
+        #  (the dec center) and store them
         # in lists. Later on we will use these to make 3 dataframes containing all the needed data
         multi_index_keys = []
         effarea_dfs = []
@@ -449,8 +467,10 @@ class HAWCResponse(object):
 
                 effarea_dfs.append(this_effarea_df)
                 psf_dfs.append(this_psf_df)
+                # assert bin_id == response_bin.name, \
+                    # 'Bin name inconsistency: {} != {}'.format(bin_id, response_bin.name)
                 assert bin_id == response_bin.name, \
-                    'Bin name inconsistency: {} != {}'.format(bin_id, response_bin.name)
+                    f'Bin name inconsistency: {bin_id} != {response_bin.name}'
                 multi_index_keys.append((dec_center, response_bin.name))
                 all_metas.append(pd.Series(this_meta))
 

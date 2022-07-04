@@ -671,12 +671,13 @@ class HAL(PluginPrototype):
             title = f"Radial Profile, bin {plane_ids[0]}"
 
         else:
-            tmptitle = f"Radial Profile, bins \n{plane_ids}"
-            width = 80
-            title = "\n".join(
-                tmptitle[i : i + width] for i in range(0, len(tmptitle), width)
-            )
-            title = tmptitle
+            title = "Radial Profile"
+            # tmptitle = f"Radial Profile, bins \n{plane_ids}"
+            # width = 80
+            # title = "\n".join(
+            # tmptitle[i : i + width] for i in range(0, len(tmptitle), width)
+            # )
+            # title = tmptitle
 
         plt.title(title)
 
