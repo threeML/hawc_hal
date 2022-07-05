@@ -208,6 +208,7 @@ class HAWCResponse(object):
             # There is no way to evaluate the loglogspectrum function with uproot, so the
             # parameters are passed for evaluation in response_bin.py
             log_log_params = response_file['LogLogSpectrum'].member('fParams')
+            log_log_shape = response_file['LogLogSpectrum'].member('fTitle')
             dec_bins_lower_edge = response_file['DecBins']['lowerEdge'].array().to_numpy()
             dec_bins_upper_edge = response_file['DecBins']['upperEdge'].array().to_numpy()
             dec_bins_center = response_file['DecBins']['simdec'].array().to_numpy()
@@ -242,7 +243,7 @@ class HAWCResponse(object):
 
                 if response_bin_ids is None:
 
-                    dec_id_label = f"dec_{dec_id:02}"
+                    dec_id_label = f"dec_{dec_id:02d}"
 
                     # count the number of keys if name of bins wasn't obtained before
                     n_energy_bins = len(response_file[dec_id_label].keys(recursive=False))
@@ -250,11 +251,13 @@ class HAWCResponse(object):
                     response_bins_ids = list(range(n_energy_bins))
 
                 for response_bin_id in response_bin_ids:
+                    
                     this_response_bin = ResponseBin.from_ttree(
                         response_file,
                         dec_id,
                         response_bin_id,
                         log_log_params,
+                        log_log_shape,
                         min_dec,
                         dec_center,
                         max_dec)
@@ -340,9 +343,9 @@ class HAWCResponse(object):
             # del root_file
 
             # Instance the class and return it
-        instance = cls(response_file_name, dec_bins, response_bins)
+        # return instance
+        return cls(response_file_name, dec_bins, response_bins)
 
-        return instance
 
     def get_response_dec_bin(self, dec, interpolate=False):
         """Get the response for the provided declination bin, optionally interpolating the PSF

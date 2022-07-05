@@ -48,9 +48,17 @@ class ResponseBin(object):
         en_sig_label = f"En{prefix}_dec{dec_id}_nh{analysis_bin_id}"
 
         # this_en_th1d = open_ttree.FindObjectAny(en_sig_label)
-        this_en_th1d = open_ttree[f"dec_{dec_id:02}"][f"nh_{analysis_bin_id}"][
-            en_sig_label
-        ].to_hist()
+        try:
+
+            this_en_th1d = open_ttree[f"dec_{dec_id:02d}"][f"nh_{analysis_bin_id}"][
+                en_sig_label
+            ].to_hist()
+
+        except uproot.KeyInFileError:
+
+            this_en_th1d = open_ttree[f"dec_{dec_id:02d}"][f"nh_0{analysis_bin_id}"][
+                en_sig_label
+            ].to_hist()
 
         if not this_en_th1d:
 
@@ -66,6 +74,7 @@ class ResponseBin(object):
         dec_id: int,
         analysis_bin_id: str,
         log_log_params: np.ndarray,
+        log_log_shape: str,
         min_dec: np.ndarray,
         dec_center: np.ndarray,
         max_dec: np.ndarray,
@@ -94,12 +103,21 @@ class ResponseBin(object):
                 float: returns differential flux in units (TeV^-1 cm^-2 s^-1) in log10 scale
             """
 
-            return (
-                np.log10(parameters[0])
-                - parameters[1] * log_energy
-                - np.log10(np.exp(1.0))
-                * np.power(10.0, log_energy - np.log10(parameters[2]))
-            )
+            if log_log_shape == "SimplePowerLaw":
+
+                return np.log10(parameters[0]) - parameters[1] * log_energy
+
+            if log_log_shape == "CutOffPowerLaw":
+
+                return (
+                    np.log10(parameters[0])
+                    - parameters[1] * log_energy
+                    - np.log10(np.exp(1.0))
+                    * np.power(10.0, log_energy - np.log10(parameters[2]))
+                )
+
+            else:
+                raise ValueError("Unknown spectral shape.")
 
         # this_en_sig_th1d = root_file[f"dec_{dec_id:02}"][f"nh_{analysis_bin_id}"][
         # f"EnSig_dec{dec_id}_nh{analysis_bin_id}"
@@ -156,11 +174,11 @@ class ResponseBin(object):
         # Read the PSF and make a copy (so it will stay when we close the file)
         # NOTE: doesn't have the ability to read and evaluate TF1
         try:
-            psf_tf1_prefix = root_file[f"dec_{dec_id}"][f"nh_{analysis_bin_id}"][
+            psf_tf1_prefix = root_file[f"dec_{dec_id:02d}"][f"nh_{analysis_bin_id}"][
                 f"PSF_dec{dec_id}_nh{analysis_bin_id}_fit"
             ]
         except uproot.KeyInFileError:
-            psf_tf1_prefix = root_file[f"dec_0{dec_id}"][f"nh_{analysis_bin_id}"][
+            psf_tf1_prefix = root_file[f"dec_{dec_id:02d}"][f"nh_0{analysis_bin_id}"][
                 f"PSF_dec{dec_id}_nh{analysis_bin_id}_fit"
             ]
 
