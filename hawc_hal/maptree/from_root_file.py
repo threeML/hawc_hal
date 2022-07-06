@@ -338,7 +338,6 @@ def from_root_file(
             #             )
             #
             # data_analysis_bins[name] = this_data_analysis_bin
-
     return data_analysis_bins
 
 
