@@ -207,11 +207,11 @@ class HAWCResponse(object):
             # NOTE: The LogLogSpectrum parameters are extracted from the response file
             # There is no way to evaluate the loglogspectrum function with uproot, so the
             # parameters are passed for evaluation in response_bin.py
-            log_log_params = response_file['LogLogSpectrum'].member('fParams')
-            log_log_shape = response_file['LogLogSpectrum'].member('fTitle')
-            dec_bins_lower_edge = response_file['DecBins']['lowerEdge'].array().to_numpy()
-            dec_bins_upper_edge = response_file['DecBins']['upperEdge'].array().to_numpy()
-            dec_bins_center = response_file['DecBins']['simdec'].array().to_numpy()
+            log_log_params = response_file["LogLogSpectrum"].member("fParams")
+            log_log_shape = response_file["LogLogSpectrum"].member("fTitle")
+            dec_bins_lower_edge = response_file["DecBins"]["lowerEdge"].array().to_numpy()
+            dec_bins_upper_edge = response_file["DecBins"]["upperEdge"].array().to_numpy()
+            dec_bins_center = response_file["DecBins"]["simdec"].array().to_numpy()
 
             dec_bins = list(zip(dec_bins_lower_edge, dec_bins_center, dec_bins_upper_edge))
 
@@ -227,8 +227,10 @@ class HAWCResponse(object):
 
                 except uproot.KeyInFileError:
 
-                    log.warning(f"Response {response_file_name} has no AnalysisBins 'id' or 'name' branch."
-                    "Will try with the default names")
+                    log.warning(
+                        f"Response {response_file_name} has no AnalysisBins 'id' or 'name' branch."
+                        "Will try with the default names"
+                    )
 
                     response_bin_ids = None
 
@@ -236,6 +238,7 @@ class HAWCResponse(object):
 
             # Now we create a dictionary of ResponseBin instances for each dec bin name
             response_bins = collections.OrderedDict()
+            
             for dec_id in range(len(dec_bins)):
 
                 this_response_bins = collections.OrderedDict()

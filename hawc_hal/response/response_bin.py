@@ -119,14 +119,6 @@ class ResponseBin(object):
             else:
                 raise ValueError("Unknown spectral shape.")
 
-        # this_en_sig_th1d = root_file[f"dec_{dec_id:02}"][f"nh_{analysis_bin_id}"][
-        # f"EnSig_dec{dec_id}_nh{analysis_bin_id}"
-        # ].to_hist()
-
-        # this_en_bg_th1d = root_file[f"dec_{dec_id:02}"][f"nh_{analysis_bin_id}"][
-        # f"EnBg_dec{dec_id}_nh{analysis_bin_id}"
-        # ].to_hist()
-
         this_en_sig_th1d = cls._get_en_th1d(
             root_file, dec_id, analysis_bin_id, prefix="Sig"
         )
@@ -149,7 +141,7 @@ class ResponseBin(object):
         # Now let's see what has been simulated, i.e., the differential flux
         # at the center of each bin_name of the en_sig histogram
         bin_lower_edges = this_en_sig_th1d.axes.edges[0][:-1]
-        bin_upper_edges = this_en_sig_th1d.axes.edges[0][1:]
+        bin_upper_edges = bin_lower_edges + this_en_sig_th1d.axes.widths[0]
         bin_centers = this_en_sig_th1d.axes.centers[0]
         bin_signal_events = this_en_sig_th1d.values()
 
@@ -172,7 +164,7 @@ class ResponseBin(object):
 
         # Now read the various TF1(s) for PSF, signal and background
         # Read the PSF and make a copy (so it will stay when we close the file)
-        # NOTE: doesn't have the ability to read and evaluate TF1
+        # NOTE: uproot doesn't have the ability to read and evaluate TF1
         try:
             psf_tf1_prefix = root_file[f"dec_{dec_id:02d}"][f"nh_{analysis_bin_id}"][
                 f"PSF_dec{dec_id}_nh{analysis_bin_id}_fit"

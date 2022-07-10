@@ -130,7 +130,7 @@ def from_root_file(
                 map_infile[f"nHit{bin_name}"]["data"]["count"].array().to_numpy().size
             )
             npix_bkg = (
-                map_infile[f"nHit{bin_name}"]["data"]["count"].array().to_numpy().size
+                map_infile[f"nHit{bin_name}"]["bkg"]["count"].array().to_numpy().size
             )
 
         except uproot.KeyInFileError:
@@ -138,12 +138,17 @@ def from_root_file(
                 map_infile[f"nHit0{bin_name}"]["data"]["count"].array().to_numpy().size
             )
             npix_bkg = (
-                map_infile[f"nHit0{bin_name}"]["data"]["count"].array().to_numpy().size
+                map_infile[f"nHit0{bin_name}"]["bkg"]["count"].array().to_numpy().size
             )
 
-        # number of transits is obtained from first bin in maptree
+        # The map-maker underestimate the livetime of bins with low statistic by
+        # removing time intervals with zero events. Therefore, the best estimate
+        # of the livetime is the maximum of n_transits, which normally
+        # happen in the bins with high statistic
+
         n_durations = np.divide(map_infile["BinInfo"]["totalDuration"].array(), 24.0)
-        n_transits: float = n_durations[0]
+        n_transits: float = max(n_durations)
+
         n_bins: int = data_bins_labels.shape[0]
         nside_cnt: int = hp.pixelfunc.npix2nside(npix_cnt)
         nside_bkg: int = hp.pixelfunc.npix2nside(npix_bkg)
