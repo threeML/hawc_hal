@@ -55,6 +55,7 @@ setup(
         "reproject",
         "tqdm",
         "uproot",
+        "awkward",
         "mplhep",
         "hist",
     ],
