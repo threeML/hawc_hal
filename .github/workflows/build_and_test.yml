@@ -73,7 +73,7 @@ jobs:
                   echo "Python version: ${{matrix.python-version}}"
 
                   mamba install ${compilers} pytest codecov pytest-cov git astromodels threeML numba reproject root flake8
-                  pip install --no-binary :all: root_numpy
+          
             - name: Conda list
               shell: bash -l {0}
               run: |
@@ -152,7 +152,7 @@ jobs:
                   echo "Python version: ${{matrix.python-version}}"
 
                   mamba install pytest codecov pytest-cov git astromodels threeML numba reproject root flake8
-                  pip install --no-binary :all: root_numpy
+                  
                   pip uninstall astromodels threeML -y
                   pip install git+https://github.com/threeml/astromodels.git
                   pip install git+https://github.com/threeml/threeML.git
@@ -234,7 +234,7 @@ jobs:
                   echo "Python version: ${{matrix.python-version}}"
 
                   mamba install pytest codecov pytest-cov git astromodels threeML numba reproject root flake8
-                  mamba install -c conda-forge root_numpy
+                  
                   pip uninstall astromodels threeML -y
                   pip install git+https://github.com/threeml/astromodels.git@dev
                   pip install git+https://github.com/threeml/threeML.git@dev
