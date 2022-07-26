@@ -4,6 +4,7 @@ from builtins import zip
 from builtins import range
 from builtins import object
 from multiprocessing.managers import ValueProxy
+from pathlib import Path
 from past.utils import old_div
 import uproot
 import healpy as hp
@@ -173,7 +174,7 @@ class HAWCResponse(object):
         return cls(response_file_name, dec_bins, response_bins)
 
     @classmethod
-    def from_root_file(cls, response_file_name:str):
+    def from_root_file(cls, response_file_name: Path):
         """Build response from ROOT file. Do not use directly, use the
         hawc_response_factory instead.
 
@@ -203,33 +204,39 @@ class HAWCResponse(object):
         # Read response
         with uproot.open(str(response_file_name)) as response_file:
 
-            log.info("Reading Response File with uproot! Testing stage!")
+            log.info("Reading Response File!")
             # NOTE: The LogLogSpectrum parameters are extracted from the response file
             # There is no way to evaluate the loglogspectrum function with uproot, so the
             # parameters are passed for evaluation in response_bin.py
+            # dec_bins_lower_edge = response_file["DecBins"]["lowerEdge"].array().to_numpy()
+            # dec_bins_upper_edge = response_file["DecBins"]["upperEdge"].array().to_numpy()
+            # dec_bins_center = response_file["DecBins"]["simdec"].array().to_numpy()
+            
             log_log_params = response_file["LogLogSpectrum"].member("fParams")
             log_log_shape = response_file["LogLogSpectrum"].member("fTitle")
-            dec_bins_lower_edge = response_file["DecBins"]["lowerEdge"].array().to_numpy()
-            dec_bins_upper_edge = response_file["DecBins"]["upperEdge"].array().to_numpy()
-            dec_bins_center = response_file["DecBins"]["simdec"].array().to_numpy()
+            dec_bins_lower_edge = response_file["DecBins/lowerEdge"].array().to_numpy()
+            dec_bins_upper_edge = response_file["DecBins/upperEdge"].array().to_numpy()
+            dec_bins_center = response_file["DecBins/simdec"].array().to_numpy()
 
             dec_bins = list(zip(dec_bins_lower_edge, dec_bins_center, dec_bins_upper_edge))
 
             try:
 
-                response_bin_ids = response_file["AnalysisBins"]["name"].array().to_numpy()
+                # response_bin_ids = response_file["AnalysisBins"]["name"].array().to_numpy()
+                response_bin_ids = response_file["AnalysisBins/name"].array().to_numpy()
 
             except uproot.KeyInFileError:
 
                 try:
 
-                    response_bin_ids = response_file["AnalysisBins"]["id"].array().to_numpy()
+                    # response_bin_ids = response_file["AnalysisBins"]["id"].array().to_numpy()
+                    response_bin_ids = response_file["AnalysisBins/id"].array().to_numpy()
 
                 except uproot.KeyInFileError:
 
                     log.warning(
-                        f"Response {response_file_name} has no AnalysisBins 'id' or 'name' branch."
-                        "Will try with the default names"
+                        f"Response {response_file_name} has no AnalysisBins 'id'"
+                        "or 'name' branch. Will try with the default names"
                     )
 
                     response_bin_ids = None

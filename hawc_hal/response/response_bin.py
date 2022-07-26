@@ -9,7 +9,8 @@ from ..psf_fast import PSFWrapper, InvalidPSF, InvalidPSFError
 
 class ResponseBin(object):
     """
-    Stores detector response for one declination band and one analysis bin (called "name" or "analysis_bin_id" below).
+    Stores detector response for one declination band and one analysis
+    bin (called "name" or "analysis_bin_id" below).
     """
 
     def __init__(
@@ -42,23 +43,31 @@ class ResponseBin(object):
         self._psf = psf  # type: PSFWrapper
 
     @staticmethod
-    def _get_en_th1d(open_ttree, dec_id: int, analysis_bin_id: str, prefix: str):
+    def _get_en_th1d(
+        open_ttree: uproot.ReadOnlyDirectory,
+        dec_id: int,
+        analysis_bin_id: str,
+        prefix: str,
+    ):
 
         # en_sig_label = "En%s_dec%i_nh%s" % (prefix, dec_id, analysis_bin_id)
         en_sig_label = f"En{prefix}_dec{dec_id}_nh{analysis_bin_id}"
 
         # this_en_th1d = open_ttree.FindObjectAny(en_sig_label)
         try:
-
-            this_en_th1d = open_ttree[f"dec_{dec_id:02d}"][f"nh_{analysis_bin_id}"][
-                en_sig_label
-            ].to_hist()
+            hist_prefix = f"dec_{dec_id:02d}/nh_{analysis_bin_id}/{en_sig_label}"
+            this_en_th1d = open_ttree[hist_prefix].to_hist()
+            # this_en_th1d = open_ttree[f"dec_{dec_id:02d}"][f"nh_{analysis_bin_id}"][
+            #    en_sig_label
+            # ].to_hist()
 
         except uproot.KeyInFileError:
 
-            this_en_th1d = open_ttree[f"dec_{dec_id:02d}"][f"nh_0{analysis_bin_id}"][
-                en_sig_label
-            ].to_hist()
+            hist_prefix = f"dec_{dec_id:02d}/nh_0{analysis_bin_id}/{en_sig_label}"
+            this_en_th1d = open_ttree[hist_prefix].to_hist()
+            # this_en_th1d = open_ttree[f"dec_{dec_id:02d}"][f"nh_0{analysis_bin_id}"][
+            #    en_sig_label
+            # ].to_hist()
 
         if not this_en_th1d:
 
@@ -70,7 +79,7 @@ class ResponseBin(object):
     @classmethod
     def from_ttree(
         cls,
-        root_file: object,
+        root_file: uproot.ReadOnlyDirectory,
         dec_id: int,
         analysis_bin_id: str,
         log_log_params: np.ndarray,
@@ -166,15 +175,26 @@ class ResponseBin(object):
         # Read the PSF and make a copy (so it will stay when we close the file)
         # NOTE: uproot doesn't have the ability to read and evaluate TF1
         try:
-            psf_tf1_prefix = root_file[f"dec_{dec_id:02d}"][f"nh_{analysis_bin_id}"][
-                f"PSF_dec{dec_id}_nh{analysis_bin_id}_fit"
+
+            psf_prefix = f"dec_{dec_id:02d}/nh_{analysis_bin_id}"
+            psf_tf1_metadata = root_file[
+                f"{psf_prefix}/PSF_dec{dec_id}_nh{analysis_bin_id}_fit"
             ]
+            # psf_tf1_metadata = root_file[f"dec_{dec_id:02d}"][f"nh_{analysis_bin_id}"][
+            #    f"PSF_dec{dec_id}_nh{analysis_bin_id}_fit"
+            # ]
         except uproot.KeyInFileError:
-            psf_tf1_prefix = root_file[f"dec_{dec_id:02d}"][f"nh_0{analysis_bin_id}"][
-                f"PSF_dec{dec_id}_nh{analysis_bin_id}_fit"
+
+            psf_prefix = f"dec_{dec_id:02d}/nh_0{analysis_bin_id}"
+            psf_tf1_metadata = root_file[
+                f"{psf_prefix}/PSF_dec{dec_id}_nh{analysis_bin_id}_fit"
             ]
 
-        psf_tf1_fparams = psf_tf1_prefix.member("fParams")
+            # psf_tf1_metadata = root_file[f"dec_{dec_id:02d}"][f"nh_0{analysis_bin_id}"][
+            #    f"PSF_dec{dec_id}_nh{analysis_bin_id}_fit"
+            # ]
+
+        psf_tf1_fparams = psf_tf1_metadata.member("fParams")
 
         psf_fun = PSFWrapper.psf_eval(psf_tf1_fparams)
 

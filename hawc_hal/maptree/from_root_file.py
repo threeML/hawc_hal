@@ -4,6 +4,7 @@ from builtins import str
 from builtins import range
 from itertools import count
 import os
+from pathlib import Path
 import socket
 import collections
 from token import N_TOKENS
@@ -24,37 +25,38 @@ from .data_analysis_bin import DataAnalysisBin
 
 from ..healpix_handling import SparseHealpix, DenseHealpix
 
+# ! As of right now, any code with ROOT functionality is commented,
+# ! but should be removed in the future.
+# def _get_bin_object(f, bin_name, suffix):
 
-def _get_bin_object(f, bin_name, suffix):
+#     # kludge: some maptrees have bin labels in BinInfo like "0", "1", "2", but then
+#     # the nHit bin is actually "nHit00, nHit01, nHit02... others instead have
+#     # labels in BinInfo like "00", "01", "02", and still the nHit bin is nHit00, nHit01
+#     # thus we need to add a 0 to the former case, but not add it to the latter case
 
-    # kludge: some maptrees have bin labels in BinInfo like "0", "1", "2", but then
-    # the nHit bin is actually "nHit00, nHit01, nHit02... others instead have
-    # labels in BinInfo like "00", "01", "02", and still the nHit bin is nHit00, nHit01
-    # thus we need to add a 0 to the former case, but not add it to the latter case
+#     # bin_label = "nHit0%s/%s" % (bin_name, suffix)
+#     bin_label = f"nHit0{bin_name}/{suffix}"
 
-    # bin_label = "nHit0%s/%s" % (bin_name, suffix)
-    bin_label = f"nHit0{bin_name}/{suffix}"
+#     bin_tobject = f.Get(bin_label)
 
-    bin_tobject = f.Get(bin_label)
+#     if not bin_tobject:
 
-    if not bin_tobject:
+#         # Try the other way
+#         # bin_label = "nHit%s/%s" % (bin_name, suffix)
+#         bin_label = f"nHit{bin_name}/{suffix}"
 
-        # Try the other way
-        # bin_label = "nHit%s/%s" % (bin_name, suffix)
-        bin_label = f"nHit{bin_name}/{suffix}"
+#         bin_tobject = f.Get(bin_label)
 
-        bin_tobject = f.Get(bin_label)
+#         if not bin_tobject:
 
-        if not bin_tobject:
+#             # raise IOError("Could not read bin %s" % bin_label)
+#             raise IOError(f"Could not read bin {bin_label}")
 
-            # raise IOError("Could not read bin %s" % bin_label)
-            raise IOError(f"Could not read bin {bin_label}")
-
-    return bin_tobject
+#     return bin_tobject
 
 
 def from_root_file(
-    map_tree_file: str,
+    map_tree_file: Path,
     roi: HealpixROIBase,
     scheme: int = 0,
 ):
@@ -106,17 +108,19 @@ def from_root_file(
     # Read the maptree
     with uproot.open(str(map_tree_file)) as map_infile:
 
-        log.info("Reading Maptree with uproot! Testing stage!")
+        log.info("Reading Maptree!")
 
         try:
 
-            data_bins_labels = map_infile["BinInfo"]["name"].array().to_numpy()
+            # data_bins_labels = map_infile["BinInfo"]["name"].array().to_numpy()
+            data_bins_labels = map_infile["BinInfo/name"].array().to_numpy()
 
         except ValueError:
 
             try:
 
-                data_bins_labels = map_infile["BinInfo"]["id"].array().to_numpy()
+                # data_bins_labels = map_infile["BinInfo"]["id"].array().to_numpy()
+                data_bins_labels = map_infile["BinInfo/id"].array().to_numpy()
 
             except ValueError as exc:
 
@@ -126,34 +130,47 @@ def from_root_file(
         bin_name = data_bins_labels[0]
 
         try:
-            npix_cnt = (
-                map_infile[f"nHit{bin_name}"]["data"]["count"].array().to_numpy().size
-            )
-            npix_bkg = (
-                map_infile[f"nHit{bin_name}"]["bkg"]["count"].array().to_numpy().size
-            )
+            data_tree_prefix = f"nHit{bin_name}/data/count"
+            bkg_tree_prefix = f"nHit{bin_name}/bkg/count"
+
+            npix_cnt = map_infile[data_tree_prefix].array().to_numpy().size
+            npix_bkg = map_infile[bkg_tree_prefix].array().to_numpy().size
+            # npix_cnt = (
+            # map_infile[f"nHit{bin_name}"]["data"]["count"].array().to_numpy().size
+            # )
+            # npix_bkg = (
+            # map_infile[f"nHit{bin_name}"]["bkg"]["count"].array().to_numpy().size
+            # )
 
         except uproot.KeyInFileError:
-            npix_cnt = (
-                map_infile[f"nHit0{bin_name}"]["data"]["count"].array().to_numpy().size
-            )
-            npix_bkg = (
-                map_infile[f"nHit0{bin_name}"]["bkg"]["count"].array().to_numpy().size
-            )
+            data_tree_prefix = f"nHit0{bin_name}/data/count"
+            bkg_tree_prefix = f"nHit0{bin_name}/bkg/count"
 
-        # The map-maker underestimate the livetime of bins with low statistic by
-        # removing time intervals with zero events. Therefore, the best estimate
-        # of the livetime is the maximum of n_transits, which normally
+            npix_cnt = map_infile[data_tree_prefix].array().to_numpy().size
+            npix_bkg = map_infile[bkg_tree_prefix].array().to_numpy().size
+
+            # npix_cnt = (
+            # map_infile[f"nHit0{bin_name}"]["data"]["count"].array().to_numpy().size
+            # )
+            # npix_bkg = (
+            # map_infile[f"nHit0{bin_name}"]["bkg"]["count"].array().to_numpy().size
+            # )
+
+        # The map-maker underestimate the livetime of bins with low statistic
+        # by removing time intervals with zero events. Therefore, the best
+        # estimate of the livetime is the maximum of n_transits, which normally
         # happen in the bins with high statistic
-
-        n_durations = np.divide(map_infile["BinInfo"]["totalDuration"].array(), 24.0)
+        # n_durations = np.divide(map_infile["BinInfo"]["totalDuration"].array(), 24.0)
+        maptree_durations = map_infile["BinInfo/totalDuration"].array()
+        n_durations = np.divide(maptree_durations, 24.0)
         n_transits: float = max(n_durations)
 
         n_bins: int = data_bins_labels.shape[0]
         nside_cnt: int = hp.pixelfunc.npix2nside(npix_cnt)
         nside_bkg: int = hp.pixelfunc.npix2nside(npix_bkg)
 
-        # so far, a value of Nside of 1024  (perhaps will change) and a RING HEALPix
+        # so far, a value of Nside of 1024  (perhaps will change) and a
+        # RING HEALPix
         assert (
             nside_cnt == nside_bkg
         ), "Nside value needs to be the same for counts and bkg. maps"
@@ -164,7 +181,8 @@ def from_root_file(
 
         healpix_map_active = np.zeros(hp.nside2npix(nside_cnt))
 
-        # HACK: simple way of reading the number of active pixels within the define ROI
+        # HACK: simple way of reading the number of active pixels within
+        # the define ROI
         if roi is not None:
             active_pixels = roi.active_pixels(
                 nside_cnt, system="equatorial", ordering="RING"
@@ -178,25 +196,32 @@ def from_root_file(
 
             name = data_bins_labels[i]
 
+            try:
+
+                data_tree_prefix = f"nHit{name}/data/count"
+                bkg_tree_prefix = f"nHit{name}/bkg/count"
+
+                counts = map_infile[data_tree_prefix].array().to_numpy()
+                bkg = map_infile[bkg_tree_prefix].array().to_numpy()
+                # counts = map_infile[f"nHit{name}"]["data"]["count"].array().to_numpy()
+                # bkg = map_infile[f"nHit{name}"]["bkg"]["count"].array().to_numpy()
+
+            except uproot.KeyInFileError:
+
+                # Sometimes, names of bins carry an extra zero
+                data_tree_prefix = f"nHit0{name}/data/count"
+                bkg_tree_prefix = f"nHit0{name}/bkg/count"
+
+                counts = map_infile[data_tree_prefix].array().to_numpy()
+                bkg = map_infile[bkg_tree_prefix].array().to_numpy()
+                # counts = map_infile[f"nHit0{name}"]["data"]["count"].array().to_numpy()
+                # bkg = map_infile[f"nHit0{name}"]["bkg"]["count"].array().to_numpy()
+
             # Read only elements within the ROI
             if roi is not None:
-                # Note: first attempt at reading only a partial map specified by the
-                # active pixel ids.
-                try:
-                    counts = (
-                        map_infile[f"nHit{name}"]["data"]["count"].array().to_numpy()
-                    )
 
-                    bkg = map_infile[f"nHit{name}"]["bkg"]["count"].array().to_numpy()
-
-                except uproot.KeyInFileError:
-
-                    # Sometimes, names of bins carry an extra zero
-                    counts = (
-                        map_infile[f"nHit0{name}"]["data"]["count"].array().to_numpy()
-                    )
-
-                    bkg = map_infile[f"nHit0{name}"]["bkg"]["count"].array().to_numpy()
+                # HACK: first attempt at reading only a partial map specified
+                # by the active pixel ids.
 
                 counts_hpx = SparseHealpix(
                     counts[healpix_map_active > 0], active_pixels, nside_cnt
@@ -217,20 +242,20 @@ def from_root_file(
             # Read the whole sky
             else:
 
-                try:
+                # try:
 
-                    counts = (
-                        map_infile[f"nHit{name}"]["data"]["count"].array().to_numpy()
-                    )
-                    bkg = map_infile[f"nHit{name}"]["bkg"]["count"].array().to_numpy()
+                #     counts = (
+                #         map_infile[f"nHit{name}"]["data"]["count"].array().to_numpy()
+                #     )
+                #     bkg = map_infile[f"nHit{name}"]["bkg"]["count"].array().to_numpy()
 
-                except uproot.KeyInFileError:
+                # except uproot.KeyInFileError:
 
-                    # Sometimes, names of bins carry an extra zero
-                    counts = (
-                        map_infile[f"nHit0{name}"]["data"]["count"].array().to_numpy()
-                    )
-                    bkg = map_infile[f"nHit0{name}"]["bkg"]["count"].array().to_numpy()
+                #     # Sometimes, names of bins carry an extra zero
+                #     counts = (
+                #         map_infile[f"nHit0{name}"]["data"]["count"].array().to_numpy()
+                #     )
+                #     bkg = map_infile[f"nHit0{name}"]["bkg"]["count"].array().to_numpy()
 
                 this_data_analysis_bin = DataAnalysisBin(
                     name,

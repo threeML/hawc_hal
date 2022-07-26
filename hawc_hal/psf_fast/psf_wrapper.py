@@ -228,28 +228,28 @@ class PSFWrapper(object):
 
         return new_instance
 
-    @classmethod
-    def from_TF1(cls, tf1_instance):
-
-        # Annoyingly, some PSFs for some Dec bins (at large Zenith angles) have
-        # zero or negative integrals, i.e., they are useless. Return an unusable PSF
-        # object in that case
-        if tf1_instance.Integral(0, _INTEGRAL_OUTER_RADIUS) <= 0.0:
-
-            return InvalidPSF()
-
-        # Make interpolation
-        xs = np.logspace(-3, np.log10(_INTEGRAL_OUTER_RADIUS), 500)
-        ys = np.array([tf1_instance.Eval(x) for x in xs], float)
-
-        assert np.all(np.isfinite(xs))
-        assert np.all(np.isfinite(ys))
-
-        instance = cls(xs, ys)
-
-        instance._tf1 = tf1_instance.Clone()
-
-        return instance
+    # @classmethod
+    # def from_TF1(cls, tf1_instance):
+    #
+    #     # Annoyingly, some PSFs for some Dec bins (at large Zenith angles) have
+    #     # zero or negative integrals, i.e., they are useless. Return an unusable PSF
+    #     # object in that case
+    #     if tf1_instance.Integral(0, _INTEGRAL_OUTER_RADIUS) <= 0.0:
+    #
+    #         return InvalidPSF()
+    #
+    #     # Make interpolation
+    #     xs = np.logspace(-3, np.log10(_INTEGRAL_OUTER_RADIUS), 500)
+    #     ys = np.array([tf1_instance.Eval(x) for x in xs], float)
+    #
+    #     assert np.all(np.isfinite(xs))
+    #     assert np.all(np.isfinite(ys))
+    #
+    #     instance = cls(xs, ys)
+    #
+    #     instance._tf1 = tf1_instance.Clone()
+    #
+    #     return instance
 
     def integral(self, a, b):
 
