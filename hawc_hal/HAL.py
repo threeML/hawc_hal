@@ -803,26 +803,27 @@ class HAL(PluginPrototype):
 
         return fig
 
-    def get_log_like(self):
+    def get_log_like(self, individual_bins=False, return_null=False):
         """
         Return the value of the log-likelihood with the current values for the
         parameters
         """
+        if return_null is True:
+            n_point_sources = 0
+            n_ext_sources = 0
+        else:
+            n_point_sources = self._likelihood_model.get_number_of_point_sources()
+            n_ext_sources = self._likelihood_model.get_number_of_extended_sources()
 
-        n_point_sources = self._likelihood_model.get_number_of_point_sources()
-        n_ext_sources = self._likelihood_model.get_number_of_extended_sources()
 
-        # Make sure that no source has been added since we filled the cache
-        assert (
-            n_point_sources == self._convolved_point_sources.n_sources_in_cache
-            and n_ext_sources == self._convolved_ext_sources.n_sources_in_cache
-        ), "The number of sources has changed. Please re-assign the model to the plugin."
-        # assert n_point_sources == self._convolved_point_sources.n_sources_in_cache and \
-        #       n_ext_sources == self._convolved_ext_sources.n_sources_in_cache, \
-        #    "The number of sources has changed. Please re-assign the model to the plugin."
+            # Make sure that no source has been added since we filled the cache
+            assert n_point_sources == self._convolved_point_sources.n_sources_in_cache and \
+                n_ext_sources == self._convolved_ext_sources.n_sources_in_cache, \
+                "The number of sources has changed. Please re-assign the model to the plugin."
 
         # This will hold the total log-likelihood
         total_log_like = 0
+        log_like_per_bin = {}
 
         for bin_id in self._active_planes:
             data_analysis_bin = self._maptree[bin_id]
@@ -846,7 +847,15 @@ class HAL(PluginPrototype):
                 - self._saturated_model_like_per_maptree[bin_id]
             )
 
-        return total_log_like
+            if individual_bins is True:
+                log_like_per_bin[bin_id] = this_pseudo_log_like - self._log_factorials[bin_id] \
+                                           - self._saturated_model_like_per_maptree[bin_id]
+        if individual_bins is True:
+            for k in log_like_per_bin:
+                log_like_per_bin[k]/=total_log_like
+            return total_log_like, log_like_per_bin
+        else:
+            return total_log_like
 
     def write(self, response_file_name, map_tree_file_name):
         """
