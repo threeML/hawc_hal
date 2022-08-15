@@ -685,7 +685,7 @@ class HAL(PluginPrototype):
         plt.plot(radii, excess_model, color="red", label="Model")
 
         plt.legend(
-            bbox_to_anchor=(1.0, 1.0), loc="upper right", numpoints=1, fonsize=16
+            bbox_to_anchor=(1.0, 1.0), loc="upper right", numpoints=1, fontsize=16
         )
         plt.axhline(0, color="deepskyblue", linestyle="--")
 
