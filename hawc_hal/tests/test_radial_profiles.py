@@ -1,70 +1,75 @@
 from __future__ import print_function
 
 import matplotlib.pyplot as plt
+import pandas as pd
 import pytest
-from hawc_hal import HAL
+from conftest import point_source_model
 from threeML import *
 from tqdm import tqdm
 
-from conftest import point_source_model
-
-# @pytest.fixture(scope="module")
-# def test_fit(roi, maptree, response, point_source_model):
-
-#     pts_model = point_source_model
-
-#     hawc = HAL(
-#         "HAWC",
-#         maptree,
-#         response,
-#         roi
-#     )
-
-#     hawc.set_active_measurements(1, 9)
-
-#     hawc.display()
-
-#     hawc.get_saturated_model_likelihood()
-
-#     data = DataList(hawc)
-
-#     jl = JointLikelihood(pts_model, data, verbose=True)
-
-#     param_df, like_df = jl.fit()
-
-#     return jl, hawc, pts_model, param_df, like_df, data
-
-# def test_simulation(test_fit):
-
-#     jl, hawc, pts_model, param_df, like_df, data = test_fit
-
-#     sim = hawc.get_simulated_dataset("HAWCsim")
-#     sim.write("sim_resp.hd5", "sim_maptree.hd5")
+from hawc_hal import HAL
 
 
-# def test_plots(test_fit):
+@pytest.fixture(scope="module")
+def test_fit(roi, maptree, response, point_source_model):
 
-#     jl, hawc, pts_model, param_df, like_df, data = test_fit
+    pts_model = point_source_model
 
-#     ra = pts_model.pts.position.ra.value
-#     dec = pts_model.pts.position.dec.value
-#     radius = 1.5
+    hawc = HAL("HAWC", maptree, response, roi)
 
-#     bins = hawc._active_planes
+    hawc.set_active_measurements(1, 9)
 
-#     fig = hawc.plot_radial_profile(ra, dec, bins, radius, n_radial_bins=10)
-#     fig.savefig("hal_src_radial_profile.png")
+    hawc.display()
+
+    hawc.get_saturated_model_likelihood()
+
+    data = DataList(hawc)
+
+    jl = JointLikelihood(pts_model, data, verbose=True)
+
+    param_df, like_df = jl.fit()
+
+    return jl, hawc, pts_model, param_df, like_df, data
 
 
-#     prog_bar = tqdm(total = len(hawc._active_planes), desc="Smoothing planes")
-#     for bin in hawc._active_planes:
+def test_simulation(test_fit):
 
-#         fig = hawc.plot_radial_profile(ra, dec, f"{bin}", radius)
-#         fig.savefig(f"hal_src_radial_profile_bin{bin}.png")
+    jl, hawc, pts_model, param_df, like_df, data = test_fit
 
-#         # NOTE: ensure figures are closed to maintain memory 
-#         # usage low 
+    sim = hawc.get_simulated_dataset("HAWCsim")
+    sim.write("sim_resp.hd5", "sim_maptree.hd5")
 
-#         plt.close(fig)
 
-#         prog_bar.update(1)
+def test_plots(test_fit):
+
+    jl, hawc, pts_model, param_df, like_df, data = test_fit
+
+    ra = pts_model.pts.position.ra.value
+    dec = pts_model.pts.position.dec.value
+    radius = 1.5
+
+    bins = hawc._active_planes
+
+    fig, table = hawc.plot_radial_profile(
+        ra,
+        dec,
+        bins,
+        radius,
+        n_radial_bins=25,
+    )
+    fig.savefig("hal_src_radial_profile.png")
+    table.to_hdf("hal_src_radial_table.hd5", key="radial")
+
+    prog_bar = tqdm(total=len(hawc._active_planes), desc="Smoothing planes")
+    for bin in hawc._active_planes:
+
+        fig, table = hawc.plot_radial_profile(ra, dec, f"{bin}", radius)
+        fig.savefig(f"hal_src_radial_profile_bin{bin}.png")
+
+        table.to_hdf(f"hal_src_radial_table_{bin}.hd5", key="radial")
+        # NOTE: ensure figures are closed to maintain memory
+        # usage low
+
+        plt.close(fig)
+
+        prog_bar.update(1)
