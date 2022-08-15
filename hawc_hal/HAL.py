@@ -664,7 +664,7 @@ class HAL(PluginPrototype):
 
         # add a dataframe for easy retrieval for calculations of surface
         # brighntess, if necessary.
-        df = pd.DataFrame(columnts=["Excess", "Bkg", "Model"], index=radii)
+        df = pd.DataFrame(columns=["Excess", "Bkg", "Model"], index=radii)
         df.index.name = "Radii"
         df["Excess"] = excess_data
         df["Bkg"] = excess_error
