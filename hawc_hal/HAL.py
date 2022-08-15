@@ -375,9 +375,7 @@ class HAL(PluginPrototype):
 
                 self._convolved_ext_sources.append(this_convolved_ext_source)
 
-    def get_excess_background(
-        self, ra: float, dec: float, radius: float
-    ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    def get_excess_background(self, ra: float, dec: float, radius: float):
         """Calculates excess (data-bkg), background, and model counts at
         different radial distances from origin of radial profile.
 
@@ -470,7 +468,7 @@ class HAL(PluginPrototype):
         n_radial_bins: int = 30,
         model_to_subtract: astromodels.Model = None,
         subtract_model_from_model: bool = False,
-    ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, list[str]]:
+    ):
         """Calculates radial profiles for a source in units of excess counts
            per steradian
 
@@ -620,7 +618,7 @@ class HAL(PluginPrototype):
         n_radial_bins: int = 30,
         model_to_subtract: astromodels.Model = None,
         subtract_model_from_model: bool = False,
-    ) -> tuple[plt.Figure, pd.DataFrame]:
+    ):
         """Plots radial profiles of data-background & model
 
         Args:
