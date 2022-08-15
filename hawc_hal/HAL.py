@@ -613,7 +613,7 @@ class HAL(PluginPrototype):
         self,
         ra: float,
         dec: float,
-        active_planes: list[str] = None,
+        active_planes: list = None,
         max_radius: float = 3.0,
         n_radial_bins: int = 30,
         model_to_subtract: astromodels.Model = None,
