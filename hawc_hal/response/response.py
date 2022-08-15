@@ -3,7 +3,11 @@ from __future__ import absolute_import
 from builtins import zip
 from builtins import range
 from builtins import object
+from multiprocessing.managers import ValueProxy
+from pathlib import Path
 from past.utils import old_div
+import uproot
+import healpy as hp
 import numpy as np
 import pandas as pd
 import os
@@ -38,7 +42,8 @@ def hawc_response_factory(response_file_name):
 
     if not response_file_name in _instances:
 
-        log.info("Creating singleton for %s" % response_file_name)
+        # log.info("Creating singleton for %s" % response_file_name)
+        log.info(f"Creating singleton for {response_file_name}")
 
         # Use the extension of the file to figure out which kind of response it is (ROOT or HDF)
 
@@ -54,8 +59,11 @@ def hawc_response_factory(response_file_name):
 
         else:  # pragma: no cover
 
-            raise NotImplementedError("Extension %s for response file %s not recognized." % (extension,
-                                                                                             response_file_name))
+            raise NotImplementedError(
+                f"Extension {extension} for response file {response_file_name} not recognized."
+            )
+            # raise NotImplementedError("Extension %s for response file %s not recognized." % (extension,
+                                                                                            #  response_file_name))
 
         _instances[response_file_name] = new_instance
 
@@ -73,13 +81,19 @@ class HAWCResponse(object):
         self._response_bins = response_bins
         
         if len(dec_bins) < 2:
-          log.warning("Only {0} dec bins given in {1}, will not try to interpolate.".format(len(dec_bins), response_file_name))
-          log.warning("Single-dec-bin mode is intended for development work only at this time and may not work with extended sources.")
+            #   log.warning("Only {0} dec bins given in {1}, will not try to interpolate.".format(len(dec_bins), response_file_name))
+            log.warning(
+                f"Only {len(dec_bins)} dec bins given in {response_file_name}, will not try to interpolate."
+            )
+            log.warning(
+                "Single-dec-bin mode is intended for development work only at this time and may not work with extended sources."
+            )
 
     @classmethod
     def from_hdf5(cls, response_file_name):
         """
-        Build response from a HDF5 file. Do not use directly, use the hawc_response_factory function instead.
+        Build response from a HDF5 file. Do not use directly,
+        use the hawc_response_factory function instead.
 
         :param response_file_name:
         :return: a HAWCResponse instance
@@ -113,7 +127,8 @@ class HAWCResponse(object):
 
                 assert dec_center_ == dec_center, "Response is corrupted"
 
-                # If this is the first energy bin, let's store the minimum and maximum dec of this bin
+                # If this is the first energy bin, let's store the minimum and
+                # maximum dec of this bin
                 if i == 0:
 
                     min_decs.append(min_dec)
@@ -121,8 +136,8 @@ class HAWCResponse(object):
 
                 else:
 
-                    # Check that the minimum and maximum declination for this bin are the same as for
-                    # the first energy bin
+                    # Check that the minimum and maximum declination for this bin are
+                    # the same as for the first energy bin
                     assert min_dec == min_decs[-1], "Response is corrupted"
                     assert max_dec == max_decs[-1], "Response is corrupted"
 
@@ -159,15 +174,21 @@ class HAWCResponse(object):
         return cls(response_file_name, dec_bins, response_bins)
 
     @classmethod
-    def from_root_file(cls, response_file_name):
-        """
-        Build response from a ROOT file. Do not use directly, use the hawc_response_factory function instead.
+    def from_root_file(cls, response_file_name: Path):
+        """Build response from ROOT file. Do not use directly, use the
+        hawc_response_factory instead.
 
-        :param response_file_name:
-        :return: a HAWCResponse instance
+        Args:
+            response_file_name (str): name of response file name
+
+        Raises:
+            IOError: An IOError is raised if the file is corrupted or unreadable
+
+        Returns:
+            HAWCResponse: returns a HAWCResponse instance
         """
 
-        from ..root_handler import open_ROOT_file, get_list_of_keys, tree_to_ndarray
+        # from ..root_handler import open_ROOT_file, get_list_of_keys, tree_to_ndarray
 
         # Make sure file is readable
 
@@ -177,105 +198,185 @@ class HAWCResponse(object):
 
         if not file_existing_and_readable(response_file_name):  # pragma: no cover
 
-            raise IOError("Response %s does not exist or is not readable" % response_file_name)
+            # raise IOError("Response %s does not exist or is not readable" % response_file_name)
+            raise IOError(f"Response {response_file_name} does not exist or is not readable")
 
         # Read response
+        with uproot.open(str(response_file_name)) as response_file:
 
-        with open_ROOT_file( str(response_file_name) ) as root_file:
-
-            # Get the name of the trees
-            object_names = get_list_of_keys(root_file)
-
-            # Make sure we have all the things we need
-
-            assert 'LogLogSpectrum' in object_names
-            assert 'DecBins' in object_names
-            assert 'AnalysisBins' in object_names
-
-            # Read spectrum used during the simulation
-            log_log_spectrum = root_file.Get("LogLogSpectrum")
-
-            # Get the analysis bins definition
-            dec_bins_ = tree_to_ndarray(root_file.Get("DecBins"))
-
-            dec_bins_lower_edge = dec_bins_['lowerEdge']  # type: np.ndarray
-            dec_bins_upper_edge = dec_bins_['upperEdge']  # type: np.ndarray
-            dec_bins_center = dec_bins_['simdec']  # type: np.ndarray
+            log.info("Reading Response File!")
+            # NOTE: The LogLogSpectrum parameters are extracted from the response file
+            # There is no way to evaluate the loglogspectrum function with uproot, so the
+            # parameters are passed for evaluation in response_bin.py
+            # dec_bins_lower_edge = response_file["DecBins"]["lowerEdge"].array().to_numpy()
+            # dec_bins_upper_edge = response_file["DecBins"]["upperEdge"].array().to_numpy()
+            # dec_bins_center = response_file["DecBins"]["simdec"].array().to_numpy()
+            
+            log_log_params = response_file["LogLogSpectrum"].member("fParams")
+            log_log_shape = response_file["LogLogSpectrum"].member("fTitle")
+            dec_bins_lower_edge = response_file["DecBins/lowerEdge"].array().to_numpy()
+            dec_bins_upper_edge = response_file["DecBins/upperEdge"].array().to_numpy()
+            dec_bins_center = response_file["DecBins/simdec"].array().to_numpy()
 
             dec_bins = list(zip(dec_bins_lower_edge, dec_bins_center, dec_bins_upper_edge))
 
-            # Read in the ids of the response bins ("analysis bins" in LiFF jargon)
             try:
 
-                response_bins_ids = tree_to_ndarray(root_file.Get("AnalysisBins"), "name")  # type: np.ndarray
+                # response_bin_ids = response_file["AnalysisBins"]["name"].array().to_numpy()
+                response_bin_ids = response_file["AnalysisBins/name"].array().to_numpy()
 
-            except ValueError:
+            except uproot.KeyInFileError:
 
                 try:
 
-                    response_bins_ids = tree_to_ndarray(root_file.Get("AnalysisBins"), "id")  # type: np.ndarray
+                    # response_bin_ids = response_file["AnalysisBins"]["id"].array().to_numpy()
+                    response_bin_ids = response_file["AnalysisBins/id"].array().to_numpy()
 
-                except ValueError:
+                except uproot.KeyInFileError:
 
-                    # Some old response files (or energy responses) have no "name" branch
-                    log.warning("Response %s has no AnalysisBins 'id' or 'name' branch. "
-                                         "Will try with default names" % response_file_name)
+                    log.warning(
+                        f"Response {response_file_name} has no AnalysisBins 'id'"
+                        "or 'name' branch. Will try with the default names"
+                    )
 
-                    response_bins_ids = None
+                    response_bin_ids = None
 
-            response_bins_ids = response_bins_ids.astype(str)
+            response_bin_ids = response_bin_ids.astype(str)
 
-            # Now we create a dictionary of ResponseBin instances for each dec bin_name
+            # Now we create a dictionary of ResponseBin instances for each dec bin name
             response_bins = collections.OrderedDict()
-
+            
             for dec_id in range(len(dec_bins)):
 
                 this_response_bins = collections.OrderedDict()
-
                 min_dec, dec_center, max_dec = dec_bins[dec_id]
 
-                # If we couldn't get the reponse_bins_ids above, let's use the default names
-                if response_bins_ids is None:
+                if response_bin_ids is None:
 
-                    # Default are just integers. let's read how many nHit bins are from the first dec bin
-                    dec_id_label = "dec_%02i" % dec_id
+                    dec_id_label = f"dec_{dec_id:02d}"
 
-                    n_energy_bins = root_file.Get(dec_id_label).GetNkeys()
+                    # count the number of keys if name of bins wasn't obtained before
+                    n_energy_bins = len(response_file[dec_id_label].keys(recursive=False))
 
                     response_bins_ids = list(range(n_energy_bins))
 
-                for response_bin_id in response_bins_ids:
-                    this_response_bin = ResponseBin.from_ttree(root_file, dec_id, response_bin_id, log_log_spectrum,
-                                                               min_dec, dec_center, max_dec)
+                for response_bin_id in response_bin_ids:
+                    
+                    this_response_bin = ResponseBin.from_ttree(
+                        response_file,
+                        dec_id,
+                        response_bin_id,
+                        log_log_params,
+                        log_log_shape,
+                        min_dec,
+                        dec_center,
+                        max_dec)
 
                     this_response_bins[response_bin_id] = this_response_bin
 
                 response_bins[dec_bins[dec_id][1]] = this_response_bins
 
-        # Now the file is closed. Let's explicitly remove f so we are sure it is freed
-        del root_file
+            del response_file
 
-        # Instance the class and return it
-        instance = cls(response_file_name, dec_bins, response_bins)
+            # with open_ROOT_file( str(response_file_name) ) as root_file:
 
-        return instance
+            #     # Get the name of the trees
+            #     object_names = get_list_of_keys(root_file)
+
+            #     # Make sure we have all the things we need
+
+            #     assert 'LogLogSpectrum' in object_names
+            #     assert 'DecBins' in object_names
+            #     assert 'AnalysisBins' in object_names
+
+            #     # Read spectrum used during the simulation
+            #     log_log_spectrum = root_file.Get("LogLogSpectrum")
+
+            #     # Get the analysis bins definition
+            #     dec_bins_ = tree_to_ndarray(root_file.Get("DecBins"))
+
+            #     dec_bins_lower_edge = dec_bins_['lowerEdge']  # type: np.ndarray
+            #     dec_bins_upper_edge = dec_bins_['upperEdge']  # type: np.ndarray
+            #     dec_bins_center = dec_bins_['simdec']  # type: np.ndarray
+
+            #     dec_bins = list(zip(dec_bins_lower_edge, dec_bins_center, dec_bins_upper_edge))
+
+            #     # Read in the ids of the response bins ("analysis bins" in LiFF jargon)
+            #     try:
+
+            #         response_bins_ids = tree_to_ndarray(root_file.Get("AnalysisBins"), "name")  # type: np.ndarray
+
+            #     except ValueError:
+
+            #         try:
+
+            #             response_bins_ids = tree_to_ndarray(root_file.Get("AnalysisBins"), "id")  # type: np.ndarray
+
+            #         except ValueError:
+
+            #             # Some old response files (or energy responses) have no "name" branch
+            #             log.warning("Response %s has no AnalysisBins 'id' or 'name' branch. "
+            #                                  "Will try with default names" % response_file_name)
+
+            #             response_bins_ids = None
+
+            #     response_bins_ids = response_bins_ids.astype(str)
+
+            #     # Now we create a dictionary of ResponseBin instances for each dec bin_name
+            #     response_bins = collections.OrderedDict()
+
+            #     for dec_id in range(len(dec_bins)):
+
+            #         this_response_bins = collections.OrderedDict()
+
+            #         min_dec, dec_center, max_dec = dec_bins[dec_id]
+
+            #         # If we couldn't get the reponse_bins_ids above, let's use the default names
+            #         if response_bins_ids is None:
+
+            #             # Default are just integers. let's read how many nHit bins are from the first dec bin
+            #             dec_id_label = "dec_%02i" % dec_id
+
+            #             n_energy_bins = root_file.Get(dec_id_label).GetNkeys()
+
+            #             response_bins_ids = list(range(n_energy_bins))
+
+            #         for response_bin_id in response_bins_ids:
+            #             this_response_bin = ResponseBin.from_ttree(root_file, dec_id, response_bin_id, log_log_spectrum,
+            #                                                        min_dec, dec_center, max_dec)
+
+            #             this_response_bins[response_bin_id] = this_response_bin
+
+            #         response_bins[dec_bins[dec_id][1]] = this_response_bins
+
+            # # Now the file is closed. Let's explicitly remove f so we are sure it is freed
+            # del root_file
+
+            # Instance the class and return it
+        # return instance
+        return cls(response_file_name, dec_bins, response_bins)
+
 
     def get_response_dec_bin(self, dec, interpolate=False):
-        """
-        Get the responses for the provided declination bin, optionally interpolating the PSF
+        """Get the response for the provided declination bin, optionally interpolating the PSF
 
-        :param dec: the declination where the response is desired at
-        :param interpolate: whether to interpolate or not the PSF between the two closes response bins
-        :return:
+
+        Args:
+            dec (float): Declination where the response is desired
+            interpolate (bool, optional): If True, PSF is interpolated between the two 
+            closest response bins. Defaults to False.
+
+        Returns:
+            PSFWrapper: To be added later.
         """
 
         # Sort declination bins by distance to the provided declination
         dec_bins_keys = list(self._response_bins.keys())
         dec_bins_by_distance = sorted(dec_bins_keys, key=lambda x: abs(x - dec))
-        
+
         #never try to interpolate if only one dec bin is given
         if len(dec_bins_keys) < 2:
-          interpolate = False
+            interpolate = False
 
         if not interpolate:
 
@@ -337,20 +438,24 @@ class HAWCResponse(object):
         :param verbose bool: Prints the full list of declinations and analysis bins.
         """
 
-        log.info("Response file: %s" % self._response_file_name)
-        log.info("Number of dec bins: %s" % len(self._dec_bins))
+        # log.info("Response file: %s" % self._response_file_name)
+        # log.info("Number of dec bins: %s" % len(self._dec_bins))
+        log.info(f"Response file: {self._response_file_name}")
+        log.info(f"Number of dec bins: {len(self._dec_bins)}")
         if verbose:
             log.info(self._dec_bins)
-        log.info("Number of energy/nHit planes per dec bin_name: %s" % (self.n_energy_planes))
+        # log.info("Number of energy/nHit planes per dec bin_name: %s" % (self.n_energy_planes))
+        log.info(f"Number of energy/nHit planes per dec bin_name: {self.n_energy_planes}")
         if verbose:
             log.info(list(self._response_bins.values())[0].keys())
 
     def write(self, filename):
         """
-        Write the response to HDF5.
+        Write the response to HDF5 file.
 
-        :param filename: output file. WARNING: it will be overwritten if existing.
-        :return:
+        Args:
+            filename (str): Output file name. WARNING: it will be overwritten if
+            file already exists.
         """
 
         filename = sanitize_filename(filename)
@@ -358,7 +463,8 @@ class HAWCResponse(object):
         # Unravel the dec bins
         min_decs, center_decs, max_decs = list(zip(*self._dec_bins))
 
-        # We get the definition of the response bins, as well as their coordinates (the dec center) and store them
+        # We get the definition of the response bins, as well as their coordinates
+        #  (the dec center) and store them
         # in lists. Later on we will use these to make 3 dataframes containing all the needed data
         multi_index_keys = []
         effarea_dfs = []
@@ -374,8 +480,10 @@ class HAWCResponse(object):
 
                 effarea_dfs.append(this_effarea_df)
                 psf_dfs.append(this_psf_df)
+                # assert bin_id == response_bin.name, \
+                    # 'Bin name inconsistency: {} != {}'.format(bin_id, response_bin.name)
                 assert bin_id == response_bin.name, \
-                    'Bin name inconsistency: {} != {}'.format(bin_id, response_bin.name)
+                    f'Bin name inconsistency: {bin_id} != {response_bin.name}'
                 multi_index_keys.append((dec_center, response_bin.name))
                 all_metas.append(pd.Series(this_meta))
 

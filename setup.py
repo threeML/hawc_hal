@@ -1,5 +1,6 @@
 from setuptools import setup
 import os, os.path
+
 # Create list of data files
 
 
@@ -15,52 +16,51 @@ def find_data_files(directory):
 
     return paths
 
+
 extra_files = find_data_files("hawc_hal/tests/data")
 
 
 setup(
-
-    name='hawc_hal',
-
-    version='1.0',
-
-    packages=['hawc_hal',
-              'hawc_hal/convolved_source',
-              'hawc_hal/healpix_handling',
-              'hawc_hal/interpolation',
-              'hawc_hal/response',
-              'hawc_hal/maptree',
-              'hawc_hal/psf_fast',
-              'hawc_hal/region_of_interest',
-              'hawc_hal/convenience_functions',
-              'hawc_hal/tests'],
-
-    url='https://github.com/threeML/hawc_hal',
-
-    license='BSD-3.0',
-
-    author='Giacomo Vianello',
-
-    author_email='giacomov@stanford.edu',
-
-    description='Read and handle HAWC data',
-
-    install_requires=['numpy >=1.14',
-                      'healpy',
-                      'threeml',
-                      'astromodels',
-                      'pandas',
-                      'healpy',
-                      'six',
-                      'astropy',
-                      'scipy',
-                      'matplotlib',
-                      'numba',
-                      'reproject',
-                      'tqdm'
-                      ],
-                      
+    name="hawc_hal",
+    version="1.0",
+    packages=[
+        "hawc_hal",
+        "hawc_hal/convolved_source",
+        "hawc_hal/healpix_handling",
+        "hawc_hal/interpolation",
+        "hawc_hal/response",
+        "hawc_hal/maptree",
+        "hawc_hal/psf_fast",
+        "hawc_hal/region_of_interest",
+        "hawc_hal/convenience_functions",
+        "hawc_hal/tests",
+    ],
+    url="https://github.com/threeML/hawc_hal",
+    license="BSD-3.0",
+    author="Giacomo Vianello",
+    author_email="giacomov@stanford.edu",
+    description="Read and handle HAWC data",
+    install_requires=[
+        "numpy >=1.14",
+        "healpy",
+        "threeml",
+        "astromodels",
+        "pandas",
+        "healpy",
+        "six",
+        "astropy",
+        "scipy",
+        "matplotlib",
+        "numba",
+        "reproject",
+        "tqdm",
+        "uproot",
+        "awkward",
+        "mplhep",
+        "hist",
+    ],
     # NOTE: we use '' as package name because the extra_files already contain the full path from here
-    package_data={"": extra_files,},
-
+    package_data={
+        "": extra_files,
+    },
 )
