@@ -13,12 +13,13 @@
 
 If you don't have `mamba`,install mamba according to the [instruction](https://github.com/mamba-org/mamba) into the `base` environment.
 
-To install hawc_hal in a conda environment, we recommend to use the following procedure: 
+To install hawc_hal in a conda environment, we recommend to use the following procedure:
 
 <!-- pip install --no-binary :all: root_numpy -->
 <!-- pip install uproot awkward hist mplhep -->
+
 ```
-mamba create --name new_hal -c conda-forge -c threeml numpy scipy matplotlib ipython numba reproject "astromodels>=2" "threeml>=2" root
+mamba create --name new_hal -c conda-forge -c threeml numpy scipy matplotlib ipython numba reproject "astromodels>=2" "threeml>=2"
 conda activate new_hal
 pip install git+https://github.com/threeml/hawc_hal.git
 ```
@@ -44,7 +45,6 @@ You also need `root` (whether installed through conda or not) and `threeML`/`ast
 
 HAL now has no dependencies relying on ROOT or root-numpy. Instead, it uses `uproot`. The following are installed along with HAL:
 `uproot, awkward, hist, mplhep`
-
 
 <!-- ```bash -->
  <!-- > pip install --no-binary :all: root_numpy -->
