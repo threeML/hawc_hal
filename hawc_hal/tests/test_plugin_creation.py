@@ -20,7 +20,7 @@ import pytest
 
 @pytest.fixture
 def bin_list():
-        return bin_list
+        return bin_list;
 
 def test_plugin_from_root(geminga_maptree, geminga_response, geminga_roi, bin_list):
 
