@@ -263,7 +263,7 @@ class HAWCResponse(object):
                     response_bins_ids = list(range(n_energy_bins))
 #V1: for response_bin_id in response_bins_ids:  changed to read bins from the bin list instead of all bins from the IRF
                 #for response_bin_id in response_bin_ids:
-                 for response_bin_id in bin_list2:
+                for response_bin_id in bin_list2:
    
 #                    this_response_bin = ResponseBin.from_ttree(
 #                        response_file,
