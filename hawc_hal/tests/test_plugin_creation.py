@@ -18,8 +18,10 @@ import pytest
 #    hal = HAL("HAL", geminga_maptree, geminga_response, geminga_roi)
 #V1: Rishi: Add bin_list
 
+@pytest.fixture
 def bin_list():
-        return bin_list;
+        return bin_list
+
 def test_plugin_from_root(geminga_maptree, geminga_response, geminga_roi, bin_list):
 
     hal = HAL( "HAL", geminga_maptree, geminga_response, geminga_roi, bin_list=None )
