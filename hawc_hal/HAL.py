@@ -69,7 +69,7 @@ class HAL(PluginPrototype):
         self._maptree = map_tree_factory(maptree, roi=self._roi)
 
         # Read detector response_file
-        self._response = hawc_response_factory(response_file)
+        self._response = hawc_response_factory(response_file, bin_list)
 
         # Use a renormalization of the background as nuisance parameter
         # NOTE: it is fixed to 1.0 unless the user explicitly sets it free (experimental)
