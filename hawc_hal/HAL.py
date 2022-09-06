@@ -53,8 +53,9 @@ class HAL(PluginPrototype):
     :param flat_sky_pixels_size: size of the pixel for the flat sky projection (Hammer Aitoff)
     """
 
-    def __init__(self, name, maptree, response_file, roi, flat_sky_pixels_size=0.17):
-
+#    def __init__(self, name, maptree, response_file, roi, flat_sky_pixels_size=0.17):
+    def __init__(self, name, maptree, response_file, roi, flat_sky_pixels_size=0.17, bin_list=None): \
+    #V1: Initialize hal to read bin_list from the fitModel script for bin list psf fit
         # Store ROI
         self._roi = roi
 

@@ -36,9 +36,12 @@ def test_healpixRoi(geminga_maptree,geminga_response):
 
   map_roi = HealpixMapROI(data_radius=data_radius, ra=ra, dec=dec, model_radius=model_radius, roimap=m)
   #fits_roi = HealpixMapROI(data_radius=data_radius, ra=ra, dec=dec, model_radius=model_radius, roifile="roitemp.fits")
-  hawc = HAL("HAWC",geminga_maptree,geminga_response,map_roi)
-  hawc.set_active_measurements(1,9)
- 
+  #hawc = HAL("HAWC",geminga_maptree,geminga_response,map_roi)
+  #hawc.set_active_measurements(1,9)
+  #V1: Provide bin_list
+  bins = ['1', '2', '3', '4', '5', '6', '7', '8', '9']
+  hawc = HAL("HAWC",geminga_maptree,geminga_response,map_roi, bin_list=bins)
+  hawc.set_active_measurements(bin_list=bins)
   '''
   Define model: Two sources, 1 point, 1 extended
 

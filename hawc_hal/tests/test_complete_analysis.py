@@ -10,15 +10,16 @@ from conftest import point_source_model
 def test_fit(roi, maptree, response, point_source_model):
 
     pts_model = point_source_model
-
+    #V1: Provide bin list
+    bin = ['1', '2', '3', '4', '5', '6', '7', '8', '9']
     hawc = HAL("HAWC",
                maptree,
                response,
-               roi)
+               roi, bin_list=bin)
 
     # Use from bin 1 to bin 9
-    hawc.set_active_measurements(1, 9)
-
+    #hawc.set_active_measurements(1, 9)
+    hawc.set_active_measurements(bin_list=bin)
     # Display information about the data loaded and the ROI
     hawc.display()
 

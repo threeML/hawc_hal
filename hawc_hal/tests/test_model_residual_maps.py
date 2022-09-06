@@ -31,10 +31,16 @@ def test_model_residual_maps(geminga_maptree, geminga_response, geminga_roi):
     ra_src, dec_src = 101.7, 16.0
     maptree, response, roi  = geminga_maptree, geminga_response, geminga_roi
 
-    hawc = HAL("HAWC", maptree, response, roi)
+    #hawc = HAL("HAWC", maptree, response, roi)
 
     # Use from bin 1 to bin 9
-    hawc.set_active_measurements(1, 9)
+    #hawc.set_active_measurements(1, 9)
+    #V1: Provide bin_list
+    bins = ['1', '2', '3', '4', '5', '6', '7', '8', '9']
+    hawc = HAL("HAWC", maptree, response, roi, bin_list=bins)
+
+    # Use from bin 1 to bin 9
+    hawc.set_active_measurements(bin_list=bins)
 
     # Display information about the data loaded and the ROI
     hawc.display()

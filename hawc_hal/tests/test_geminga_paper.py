@@ -159,13 +159,21 @@ def go(args):
                              model_radius=rad + 10.0,
                              ra=ra_c, dec=dec_c)
     
+        #llh = HAL("HAWC",
+        #          args.mtfile,
+        #          args.rsfile,
+        #          roi)
+            
+        #llh.set_active_measurements(args.startBin, args.stopBin)
+#V1: Provide bin_list
+        bins = ['1', '2', '3', '4', '5', '6', '7', '8', '9'] #Rishi
         llh = HAL("HAWC",
                   args.mtfile,
                   args.rsfile,
-                  roi)
-            
-        llh.set_active_measurements(args.startBin, args.stopBin)
+                  roi, bin_list=bins)
 
+        #llh.set_active_measurements(args.startBin, args.stopBin)
+        llh.set_active_measurements(bin_list=bins)
     print(lm)
 
     # we fit a common diffusion coefficient so parameters are linked

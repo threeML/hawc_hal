@@ -87,7 +87,12 @@ class ResponseBin(object):
         min_dec: np.ndarray,
         dec_center: np.ndarray,
         max_dec: np.ndarray,
+	bin_list3
     ):
+	#V1: Update the bin_list to include only use specified bin list
+	#analysis_bin_id = bin_list3[0]
+        #print("analysis bin id", analysis_bin_id)
+        #print("Modified analysis bin id", bin_list3)  #Check if bin_id is same as one provided
         """
         Obtain the information from Response ROOT file
 

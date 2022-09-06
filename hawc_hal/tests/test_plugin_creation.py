@@ -13,10 +13,16 @@ from collections import namedtuple
 import pytest
 
 
-def test_plugin_from_root(geminga_maptree, geminga_response, geminga_roi):
+#def test_plugin_from_root(geminga_maptree, geminga_response, geminga_roi):
 
-    hal = HAL("HAL", geminga_maptree, geminga_response, geminga_roi)
+#    hal = HAL("HAL", geminga_maptree, geminga_response, geminga_roi)
+#V1: Rishi: Add bin_list
 
+def bin_list():
+        return bin_list;
+def test_plugin_from_root(geminga_maptree, geminga_response, geminga_roi, bin_list):
+
+    hal = HAL( "HAL", geminga_maptree, geminga_response, geminga_roi, bin_list=None )
 
 def test_plugin_from_hd5(maptree, response, roi):
 
