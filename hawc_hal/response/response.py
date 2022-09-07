@@ -56,8 +56,8 @@ def hawc_response_factory(response_file_name, bin_list2=None):
 
         elif extension in ['.hd5', '.hdf5', '.hdf']:
 
-            new_instance = HAWCResponse.from_hdf5(response_file_name, bin_list2)
-
+            #new_instance = HAWCResponse.from_hdf5(response_file_name, bin_list2)
+            new_instance = HAWCResponse.from_hdf5(response_file_name)
         else:  # pragma: no cover
 
             raise NotImplementedError(
