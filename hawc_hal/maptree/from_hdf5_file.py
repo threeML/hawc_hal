@@ -1,19 +1,19 @@
 from __future__ import absolute_import
+
 import collections
 
-from hawc_hal.serialize import Serialization
 from hawc_hal.region_of_interest import get_roi_from_dict
-
-
+from hawc_hal.serialize import Serialization
 from threeML.io.logging import setup_logger
+
 log = setup_logger(__name__)
 log.propagate = False
 
-from ..healpix_handling import SparseHealpix, DenseHealpix
+from ..healpix_handling import DenseHealpix, SparseHealpix
 from .data_analysis_bin import DataAnalysisBin
 
 
-def from_hdf5_file(map_tree_file, roi):
+def from_hdf5_file(map_tree_file, roi, transits):
     """
     Create a MapTree object from a HDF5 file and a ROI. Do not use this directly, use map_tree_factory instead.
 
@@ -25,12 +25,12 @@ def from_hdf5_file(map_tree_file, roi):
     # Read the data frames contained in the file
     with Serialization(map_tree_file) as serializer:
 
-        analysis_bins_df, _ = serializer.retrieve_pandas_object('/analysis_bins')
-        meta_df, _ = serializer.retrieve_pandas_object('/analysis_bins_meta')
-        roimap, roi_meta = serializer.retrieve_pandas_object('/ROI')
-        
-    if len(roimap)>0:
-        roi_meta['roimap']=roimap.values
+        analysis_bins_df, _ = serializer.retrieve_pandas_object("/analysis_bins")
+        meta_df, _ = serializer.retrieve_pandas_object("/analysis_bins_meta")
+        roimap, roi_meta = serializer.retrieve_pandas_object("/ROI")
+
+    if len(roimap) > 0:
+        roi_meta["roimap"] = roimap.values
 
     # Let's see if the file contains the definition of an ROI
     if len(roi_meta) > 0:
@@ -47,16 +47,19 @@ def from_hdf5_file(map_tree_file, roi):
             active_pixels_user = roi.active_pixels(1024)
 
             # This verifies that active_pixels_file is a superset (or equal) to the user-provided set
-            assert set(active_pixels_file) >= set(active_pixels_user), \
-                "The ROI you provided (%s) is not a subset " \
+            assert set(active_pixels_file) >= set(active_pixels_user), (
+                "The ROI you provided (%s) is not a subset "
                 "of the one contained in the file (%s)" % (roi, file_roi)
+            )
 
         else:
 
             # The user has provided no ROI, but the file contains one. Let's issue a warning
-            log.warning("You did not provide any ROI but the map tree %s contains "
-                                 "only data within the ROI %s. "
-                                 "Only those will be used." % (map_tree_file, file_roi))
+            log.warning(
+                "You did not provide any ROI but the map tree %s contains "
+                "only data within the ROI %s. "
+                "Only those will be used." % (map_tree_file, file_roi)
+            )
 
             # Make a copy of the file ROI and use it as if the user provided that one
             roi = get_roi_from_dict(file_roi.to_dict())
@@ -69,6 +72,11 @@ def from_hdf5_file(map_tree_file, roi):
 
     data_analysis_bins = collections.OrderedDict()
 
+    if transits is not None:
+        n_transits = transits
+    else:
+        n_transits: float = meta_df["n_transits"].max()
+
     for bin_name in bin_names:
 
         this_df = analysis_bins_df.loc[bin_name]
@@ -77,31 +85,40 @@ def from_hdf5_file(map_tree_file, roi):
         if roi is not None:
 
             # Get the active pixels for this plane
-            active_pixels_user = roi.active_pixels(int(this_meta['nside']))
+            active_pixels_user = roi.active_pixels(int(this_meta["nside"]))
 
             # Read only the pixels that the user wants
-            observation_hpx_map = SparseHealpix(this_df.loc[active_pixels_user, 'observation'].values,
-                                                active_pixels_user, this_meta['nside'])
-            background_hpx_map = SparseHealpix(this_df.loc[active_pixels_user, 'background'].values,
-                                               active_pixels_user, this_meta['nside'])
+            observation_hpx_map = SparseHealpix(
+                this_df.loc[active_pixels_user, "observation"].values,
+                active_pixels_user,
+                this_meta["nside"],
+            )
+            background_hpx_map = SparseHealpix(
+                this_df.loc[active_pixels_user, "background"].values,
+                active_pixels_user,
+                this_meta["nside"],
+            )
 
         else:
 
             # Full sky
-            observation_hpx_map = DenseHealpix(this_df.loc[:, 'observation'].values)
-            background_hpx_map = DenseHealpix(this_df.loc[:, 'background'].values)
+            observation_hpx_map = DenseHealpix(this_df.loc[:, "observation"].values)
+            background_hpx_map = DenseHealpix(this_df.loc[:, "background"].values)
 
             # This signals the DataAnalysisBin that we are dealing with a full sky map
             active_pixels_user = None
 
         # Let's now build the instance
-        this_bin = DataAnalysisBin(bin_name,
-                                   observation_hpx_map=observation_hpx_map,
-                                   background_hpx_map=background_hpx_map,
-                                   active_pixels_ids=active_pixels_user,
-                                   n_transits=this_meta['n_transits'],
-                                   scheme='RING' if this_meta['scheme'] == 0 else 'NEST')
+        this_bin = DataAnalysisBin(
+            bin_name,
+            observation_hpx_map=observation_hpx_map,
+            background_hpx_map=background_hpx_map,
+            active_pixels_ids=active_pixels_user,
+            # n_transits=this_meta["n_transits"],
+            n_transits=n_transits,
+            scheme="RING" if this_meta["scheme"] == 0 else "NEST",
+        )
 
         data_analysis_bins[bin_name] = this_bin
 
-    return data_analysis_bins
+    return data_analysis_bins, n_transits

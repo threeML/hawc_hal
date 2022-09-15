@@ -1,13 +1,14 @@
 from __future__ import division
-from builtins import zip
-from builtins import object
-from past.utils import old_div
+
 import copy
+from builtins import object, zip
+
 import numpy as np
+import pandas as pd
 import scipy.integrate
 import scipy.interpolate
 import scipy.optimize
-import pandas as pd
+from past.utils import old_div
 
 _INTEGRAL_OUTER_RADIUS = 15.0
 
@@ -29,9 +30,7 @@ class PSFWrapper(object):
 
         # Memorize the total integral (will use it for normalization)
 
-        self._total_integral = self._psf_interpolated.integral(
-            self._xs[0], _INTEGRAL_OUTER_RADIUS
-        )
+        self._total_integral = self._psf_interpolated.integral(self._xs[0], _INTEGRAL_OUTER_RADIUS)
 
         # Now compute the truncation radius, which is a very conservative measurement
         # of the size of the PSF
@@ -91,9 +90,7 @@ class PSFWrapper(object):
 
         f = lambda r: fraction - old_div(self.integral(1e-4, r), self._total_integral)
 
-        radius, status = scipy.optimize.brentq(
-            f, 0.005, _INTEGRAL_OUTER_RADIUS, full_output=True
-        )
+        radius, status = scipy.optimize.brentq(f, 0.005, _INTEGRAL_OUTER_RADIUS, full_output=True)
 
         assert status.converged, "Brentq did not converged"
 
@@ -134,9 +131,7 @@ class PSFWrapper(object):
         new_ys = w1 * self.ys + w2 * other_psf.ys
 
         # Also weight the brightness interpolation points
-        new_br_interp_y = (
-            w1 * self._brightness_interp_y + w2 * other_psf._brightness_interp_y
-        )
+        new_br_interp_y = w1 * self._brightness_interp_y + w2 * other_psf._brightness_interp_y
 
         return PSFWrapper(
             self.xs,
@@ -227,29 +222,6 @@ class PSFWrapper(object):
         new_instance = copy.deepcopy(instance)
 
         return new_instance
-
-    # @classmethod
-    # def from_TF1(cls, tf1_instance):
-    #
-    #     # Annoyingly, some PSFs for some Dec bins (at large Zenith angles) have
-    #     # zero or negative integrals, i.e., they are useless. Return an unusable PSF
-    #     # object in that case
-    #     if tf1_instance.Integral(0, _INTEGRAL_OUTER_RADIUS) <= 0.0:
-    #
-    #         return InvalidPSF()
-    #
-    #     # Make interpolation
-    #     xs = np.logspace(-3, np.log10(_INTEGRAL_OUTER_RADIUS), 500)
-    #     ys = np.array([tf1_instance.Eval(x) for x in xs], float)
-    #
-    #     assert np.all(np.isfinite(xs))
-    #     assert np.all(np.isfinite(ys))
-    #
-    #     instance = cls(xs, ys)
-    #
-    #     instance._tf1 = tf1_instance.Clone()
-    #
-    #     return instance
 
     def integral(self, a, b):
 
