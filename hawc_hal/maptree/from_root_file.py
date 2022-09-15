@@ -115,10 +115,14 @@ def from_root_file(
         # estimate of the livetime is the maximum of n_transits, which normally
         # happen in the bins with high statistic
         maptree_durations = map_infile["BinInfo/totalDuration"].array()
+        n_durations: np.ndarray = np.divide(maptree_durations, 24.0)
+
         if transits is not None:
+
             n_transits = transits
+
         else:
-            n_durations: np.ndarray = np.divide(maptree_durations, 24.0)
+
             n_transits: float = max(n_durations)
 
         n_bins: int = data_bins_labels.shape[0]
@@ -138,6 +142,7 @@ def from_root_file(
         # HACK: simple way of reading the number of active pixels within
         # the define ROI
         if roi is not None:
+
             active_pixels = roi.active_pixels(nside_cnt, system="equatorial", ordering="RING")
 
             for pix_id in active_pixels:
@@ -153,8 +158,14 @@ def from_root_file(
                 data_tree_prefix = f"nHit{name}/data/count"
                 bkg_tree_prefix = f"nHit{name}/bkg/count"
 
-                counts = map_infile[data_tree_prefix].array().to_numpy()
-                bkg = map_infile[bkg_tree_prefix].array().to_numpy()
+                # if using number of transitions different from the maptree
+                # then make sure counts are scaled accordingly.
+                counts: np.ndarray = map_infile[data_tree_prefix].array().to_numpy() * (
+                    n_transits / max(n_durations)
+                )
+                bkg: np.ndarray = map_infile[bkg_tree_prefix].array().to_numpy() * (
+                    n_transits / max(n_durations)
+                )
 
             except uproot.KeyInFileError:
 
