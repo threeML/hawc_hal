@@ -1,6 +1,7 @@
 from __future__ import absolute_import
 
 import collections
+from curses import meta
 
 from hawc_hal.region_of_interest import get_roi_from_dict
 from hawc_hal.serialize import Serialization
@@ -73,6 +74,8 @@ def from_hdf5_file(map_tree_file, roi, transits):
     data_analysis_bins = collections.OrderedDict()
 
     if transits is not None:
+        # if using user-specified transits, make sure to scale the counts
+        # in observation map and background map accordingly.
         n_transits = transits
     else:
         n_transits: float = meta_df["n_transits"].max()
@@ -89,12 +92,14 @@ def from_hdf5_file(map_tree_file, roi, transits):
 
             # Read only the pixels that the user wants
             observation_hpx_map = SparseHealpix(
-                this_df.loc[active_pixels_user, "observation"].values,
+                this_df.loc[active_pixels_user, "observation"].values
+                * (n_transits / meta_df["n_transits"].max()),
                 active_pixels_user,
                 this_meta["nside"],
             )
             background_hpx_map = SparseHealpix(
-                this_df.loc[active_pixels_user, "background"].values,
+                this_df.loc[active_pixels_user, "background"].values
+                * (n_transits / meta_df["n_transits"].max()),
                 active_pixels_user,
                 this_meta["nside"],
             )
@@ -102,8 +107,12 @@ def from_hdf5_file(map_tree_file, roi, transits):
         else:
 
             # Full sky
-            observation_hpx_map = DenseHealpix(this_df.loc[:, "observation"].values)
-            background_hpx_map = DenseHealpix(this_df.loc[:, "background"].values)
+            observation_hpx_map = DenseHealpix(
+                this_df.loc[:, "observation"].values * (n_transits / meta_df["n_transits"].max())
+            )
+            background_hpx_map = DenseHealpix(
+                this_df.loc[:, "background"].values * (n_transits / meta_df["n_transits"].max())
+            )
 
             # This signals the DataAnalysisBin that we are dealing with a full sky map
             active_pixels_user = None
