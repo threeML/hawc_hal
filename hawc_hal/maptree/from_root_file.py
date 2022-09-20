@@ -55,7 +55,7 @@ def from_root_file(
     # Check that they exists and can be read
 
     if not file_existing_and_readable(map_tree_file):  # pragma: no cover
-        # raise IOError("MapTree %s does not exist or is not readable" % map_tree_file)
+
         raise IOError(f"MapTree {map_tree_file} does not exist or is not readable")
 
     # Make sure we have a proper ROI (or None)
@@ -117,13 +117,12 @@ def from_root_file(
         maptree_durations = map_infile["BinInfo/totalDuration"].array()
         n_durations: np.ndarray = np.divide(maptree_durations, 24.0)
 
-        if transits is not None:
+        assert transits <= max(
+            n_durations
+        ), "Cannot use a higher value than that of maptree."
 
-            n_transits = transits
-
-        else:
-
-            n_transits: float = max(n_durations)
+        # use value of maptree unless otherwise specified by user
+        n_transits = max(n_durations) if transits is None else transits
 
         n_bins: int = data_bins_labels.shape[0]
         nside_cnt: int = hp.pixelfunc.npix2nside(npix_cnt)
@@ -131,7 +130,9 @@ def from_root_file(
 
         # so far, a value of Nside of 1024  (perhaps will change) and a
         # RING HEALPix
-        assert nside_cnt == nside_bkg, "Nside value needs to be the same for counts and bkg. maps"
+        assert (
+            nside_cnt == nside_bkg
+        ), "Nside value needs to be the same for counts and bkg. maps"
 
         assert scheme == 0, "NESTED HEALPix is not currently supported."
 
@@ -143,7 +144,9 @@ def from_root_file(
         # the define ROI
         if roi is not None:
 
-            active_pixels = roi.active_pixels(nside_cnt, system="equatorial", ordering="RING")
+            active_pixels = roi.active_pixels(
+                nside_cnt, system="equatorial", ordering="RING"
+            )
 
             for pix_id in active_pixels:
 
@@ -185,7 +188,9 @@ def from_root_file(
                 counts_hpx = SparseHealpix(
                     counts[healpix_map_active > 0], active_pixels, nside_cnt
                 )
-                bkg_hpx = SparseHealpix(bkg[healpix_map_active > 0], active_pixels, nside_cnt)
+                bkg_hpx = SparseHealpix(
+                    bkg[healpix_map_active > 0], active_pixels, nside_cnt
+                )
 
                 this_data_analysis_bin = DataAnalysisBin(
                     name,

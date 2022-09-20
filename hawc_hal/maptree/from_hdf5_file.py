@@ -3,9 +3,10 @@ from __future__ import absolute_import
 import collections
 from curses import meta
 
+from threeML.io.logging import setup_logger
+
 from hawc_hal.region_of_interest import get_roi_from_dict
 from hawc_hal.serialize import Serialization
-from threeML.io.logging import setup_logger
 
 log = setup_logger(__name__)
 log.propagate = False
@@ -73,12 +74,11 @@ def from_hdf5_file(map_tree_file, roi, transits):
 
     data_analysis_bins = collections.OrderedDict()
 
-    if transits is not None:
-        # if using user-specified transits, make sure to scale the counts
-        # in observation map and background map accordingly.
-        n_transits = transits
-    else:
-        n_transits: float = meta_df["n_transits"].max()
+    assert (
+        transits <= meta_df["transits"].max()
+    ), "Cannot use higher value than that of maptree"
+
+    n_transits = meta_df["n_transits"].max() if transits is None else transits
 
     for bin_name in bin_names:
 
@@ -108,10 +108,12 @@ def from_hdf5_file(map_tree_file, roi, transits):
 
             # Full sky
             observation_hpx_map = DenseHealpix(
-                this_df.loc[:, "observation"].values * (n_transits / meta_df["n_transits"].max())
+                this_df.loc[:, "observation"].values
+                * (n_transits / meta_df["n_transits"].max())
             )
             background_hpx_map = DenseHealpix(
-                this_df.loc[:, "background"].values * (n_transits / meta_df["n_transits"].max())
+                this_df.loc[:, "background"].values
+                * (n_transits / meta_df["n_transits"].max())
             )
 
             # This signals the DataAnalysisBin that we are dealing with a full sky map
