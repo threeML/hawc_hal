@@ -117,12 +117,12 @@ def from_root_file(
         maptree_durations = map_infile["BinInfo/totalDuration"].array()
         n_durations: np.ndarray = np.divide(maptree_durations, 24.0)
 
-        assert transits <= max(
-            n_durations
-        ), "Cannot use a higher value than that of maptree."
-
         # use value of maptree unless otherwise specified by user
         n_transits = max(n_durations) if transits is None else transits
+
+        assert n_transits <= max(
+            n_durations
+        ), "Cannot use a higher value than that of maptree."
 
         n_bins: int = data_bins_labels.shape[0]
         nside_cnt: int = hp.pixelfunc.npix2nside(npix_cnt)

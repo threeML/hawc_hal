@@ -74,11 +74,11 @@ def from_hdf5_file(map_tree_file, roi, transits):
 
     data_analysis_bins = collections.OrderedDict()
 
-    assert (
-        transits <= meta_df["transits"].max()
-    ), "Cannot use higher value than that of maptree"
-
     n_transits = meta_df["n_transits"].max() if transits is None else transits
+
+    assert (
+        n_transits <= meta_df["transits"].max()
+    ), "Cannot use higher value than that of maptree"
 
     for bin_name in bin_names:
 
