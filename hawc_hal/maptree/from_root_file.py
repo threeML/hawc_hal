@@ -120,9 +120,9 @@ def from_root_file(
         # use value of maptree unless otherwise specified by user
         n_transits = max(n_durations) if transits is None else transits
 
-        assert n_transits <= max(
-            n_durations
-        ), "Cannot use a higher value than that of maptree."
+        # assert n_transits <= max(
+        #     n_durations
+        # ), "Cannot use a higher value than that of maptree."
 
         n_bins: int = data_bins_labels.shape[0]
         nside_cnt: int = hp.pixelfunc.npix2nside(npix_cnt)
