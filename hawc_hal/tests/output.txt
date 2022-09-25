@@ -1,0 +1,26 @@
+Test statistic: 133.591
+
+Free parameters:
+Geminga.Continuous_injection_diffusion_legacy.rdiff0                             5.37194 deg
+Geminga.spectrum.main.Powerlaw.K                                      1.39983e-23 1 / (cm2 keV s)
+Geminga.spectrum.main.Powerlaw.index                                     -2.34259 
+B0656.Continuous_injection_diffusion_legacy.rdiff0                                   6 deg
+B0656.spectrum.main.Powerlaw.K                                        5.97969e-24 1 / (cm2 keV s)
+B0656.spectrum.main.Powerlaw.index                                       -2.13759 
+
+Fixed parameters:
+Geminga.Continuous_injection_diffusion_legacy.lon0                                98.5 deg
+Geminga.Continuous_injection_diffusion_legacy.lat0                               17.76 deg
+Geminga.Continuous_injection_diffusion_legacy.delta                              0.3333 
+Geminga.Continuous_injection_diffusion_legacy.uratio                                1.12 
+Geminga.Continuous_injection_diffusion_legacy.piv                               2e+10 keV
+Geminga.Continuous_injection_diffusion_legacy.piv2                               1e+09 keV
+Geminga.spectrum.main.Powerlaw.piv                                          2e+10 keV
+B0656.Continuous_injection_diffusion_legacy.lon0                              104.95 deg
+B0656.Continuous_injection_diffusion_legacy.lat0                               14.24 deg
+B0656.Continuous_injection_diffusion_legacy.delta                              0.3333 
+B0656.Continuous_injection_diffusion_legacy.uratio                                1.12 
+B0656.Continuous_injection_diffusion_legacy.piv                               2e+10 keV
+B0656.Continuous_injection_diffusion_legacy.piv2                               1e+09 keV
+B0656.spectrum.main.Powerlaw.piv                                            2e+10 keV
+HAWC_bkg_renorm                                                                 1 

@@ -24,7 +24,6 @@ from threeML.parallel import parallel_client
 from threeML.plugin_prototype import PluginPrototype
 from threeML.utils.statistics.gammaln import logfactorial
 from tqdm.auto import tqdm
-
 from hawc_hal.convolved_source import (ConvolvedExtendedSource2D,
                                        ConvolvedExtendedSource3D,
                                        ConvolvedPointSource,
@@ -54,11 +53,15 @@ class HAL(PluginPrototype):
     """
 
 #    def __init__(self, name, maptree, response_file, roi, flat_sky_pixels_size=0.17):
-    def __init__(self, name, maptree, response_file, roi, flat_sky_pixels_size=0.17, bin_list=None): \
+    def __init__(self, name, maptree, response_file, roi, flat_sky_pixels_size=0.17, bin_list=None, dec_list=None): \
     #V1: Initialize hal to read bin_list from the fitModel script for bin list psf fit
         # Store ROI
         self._roi = roi
-
+                # These lists will contain the maps for the point sources
+        #self._convolved_point_sources = ConvolvedSourcesContainer()
+        # and this one for extended sources
+        #self._convolved_ext_sources = ConvolvedSourcesContainer()
+        #self.set_model(None)  #Rishi
         # Set up the flat-sky projection
         self.flat_sky_pixels_size = flat_sky_pixels_size
         self._flat_sky_projection = self._roi.get_flat_sky_projection(
@@ -69,7 +72,7 @@ class HAL(PluginPrototype):
         self._maptree = map_tree_factory(maptree, roi=self._roi)
 
         # Read detector response_file
-        self._response = hawc_response_factory(response_file, bin_list)
+        self._response = hawc_response_factory(response_file, bin_list, dec_list)
 
         # Use a renormalization of the background as nuisance parameter
         # NOTE: it is fixed to 1.0 unless the user explicitly sets it free (experimental)
@@ -329,6 +332,7 @@ class HAL(PluginPrototype):
         log.info(f"Active energy/nHit planes ({len(self._active_planes)}):")
         log.info("-------------------------------")
         log.info(self._active_planes)
+   # def Index_listing(self): #Rishi
 
     def set_model(self, likelihood_model_instance):
         """
@@ -342,7 +346,6 @@ class HAL(PluginPrototype):
         self._convolved_ext_sources.reset()
 
         # For each point source in the model, build the convolution class
-
         for source in list(self._likelihood_model.point_sources.values()):
             this_convolved_point_source = ConvolvedPointSource(
                 source, self._response, self._flat_sky_projection
@@ -373,7 +376,7 @@ class HAL(PluginPrototype):
                     this_convolved_ext_source = ConvolvedExtendedSource3D(
                         source, self._response, self._flat_sky_projection
                     )
-
+                #log.info("Rishi returns:  %s" %(this_convolved_ext_source.return_index))
                 self._convolved_ext_sources.append(this_convolved_ext_source)
 
     def get_excess_background(self, ra: float, dec: float, radius: float):

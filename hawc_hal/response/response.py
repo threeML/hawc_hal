@@ -27,7 +27,7 @@ from .response_bin import ResponseBin
 _instances = {}
 
 
-def hawc_response_factory(response_file_name, bin_list2=None):
+def hawc_response_factory(response_file_name, bin_list2=None, dec_list2=None):
 #V1: Instance bin_list to be provided from HAL
     """
     A factory function for the response which keeps a cache, so that the same response is not read over and
@@ -52,7 +52,7 @@ def hawc_response_factory(response_file_name, bin_list2=None):
 
         if extension == ".root":
 #V1: Provide the bin_list from HAL 
-            new_instance = HAWCResponse.from_root_file(response_file_name, bin_list2)
+            new_instance = HAWCResponse.from_root_file(response_file_name, bin_list2, dec_list2)
 
         elif extension in ['.hd5', '.hdf5', '.hdf']:
 
@@ -175,7 +175,7 @@ class HAWCResponse(object):
         return cls(response_file_name, dec_bins, response_bins)
 
     @classmethod
-    def from_root_file(cls, response_file_name: Path, bin_list2):
+    def from_root_file(cls, response_file_name: Path, bin_list2, dec_list2):
 #V1: Add bin_list
         """Build response from ROOT file. Do not use directly, use the
         hawc_response_factory instead.
@@ -248,8 +248,8 @@ class HAWCResponse(object):
             # Now we create a dictionary of ResponseBin instances for each dec bin name
             response_bins = collections.OrderedDict()
             
-            for dec_id in range(len(dec_bins)):
-
+            #for dec_id in range(len(dec_bins)):
+            for dec_id in dec_list2:
                 this_response_bins = collections.OrderedDict()
                 min_dec, dec_center, max_dec = dec_bins[dec_id]
 
@@ -261,6 +261,7 @@ class HAWCResponse(object):
                     n_energy_bins = len(response_file[dec_id_label].keys(recursive=False))
 
                     response_bins_ids = list(range(n_energy_bins))
+                log.info("Dec ID= %s" %(dec_id))
 #V1: for response_bin_id in response_bins_ids:  changed to read bins from the bin list instead of all bins from the IRF
                 #for response_bin_id in response_bin_ids:
                 for response_bin_id in bin_list2:

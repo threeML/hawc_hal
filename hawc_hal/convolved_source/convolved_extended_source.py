@@ -30,7 +30,7 @@ deg2_to_rad2 = 0.00030461741978670857
 
 class ConvolvedExtendedSource(object):
 
-    def __init__(self, source, response, flat_sky_projection):
+    def __init__(self, source, response, flat_sky_projection): # index): #Rishi add index
 
         self._response = response
         self._flat_sky_projection = flat_sky_projection
@@ -39,7 +39,7 @@ class ConvolvedExtendedSource(object):
         self._name = source.name
 
         self._source = source
-
+        log.info("Source desc: %s" %(source))
         # Find out the response bins we need to consider for this extended source
 
         # # Get the footprint (i..e, the coordinates of the 4 points limiting the projections)
@@ -50,26 +50,32 @@ class ConvolvedExtendedSource(object):
         # Figure out maximum and minimum declination to be covered
         dec_min = max(min([dec1, dec2, dec3, dec4]), lat_start)
         dec_max = min(max([dec1, dec2, dec3, dec4]), lat_stop)
-
+        log.info("Lat start = %.3f, Lat stop = %.3f" %(lat_start, lat_stop))
+        log.info("Min = %.3f, Max = %.3f" %(dec_min, dec_max))
         # Get the defined dec bins lower edges
         lower_edges = np.array([x[0] for x in response.dec_bins])
         upper_edges = np.array([x[-1] for x in response.dec_bins])
         centers = np.array([x[1] for x in response.dec_bins])
-
+        #log.info("Lower edge: %s" %(lower_edges))
+        #log.info("upper edge: %s" %(upper_edges))
+        #log.info("centers : %s" %(centers))
         dec_bins_to_consider_idx = np.flatnonzero((upper_edges >= dec_min) & (lower_edges <= dec_max))
-
+        log.info("Central bins = %s" %(dec_bins_to_consider_idx))
         # Wrap the selection so we have always one bin before and one after.
         # NOTE: we assume that the ROI do not overlap with the very first or the very last dec bin
         # Add one dec bin to cover the last part
         dec_bins_to_consider_idx = np.append(dec_bins_to_consider_idx, [dec_bins_to_consider_idx[-1] + 1])
         # Add one dec bin to cover the first part
         dec_bins_to_consider_idx = np.insert(dec_bins_to_consider_idx, 0, [dec_bins_to_consider_idx[0] - 1])
-
+        log.info("The bins are %s" %(dec_bins_to_consider_idx))  #Rishi
         self._dec_bins_to_consider = [response.response_bins[centers[x]] for x in dec_bins_to_consider_idx]
-
         log.info("Considering %i dec bins for extended source %s" % (len(self._dec_bins_to_consider),
                                                                   self._name))
+#	if index="True" :
 
+        log.info("The bins are %s" %(dec_bins_to_consider_idx))  #Rishi
+        self.return_bins = dec_bins_to_consider_idx  #Rishi
+	#	return dec_bins_to_consider_idx
         # Find central bin for the PSF
 
         dec_center = (lat_start + lat_stop) / 2.0
@@ -77,7 +83,7 @@ class ConvolvedExtendedSource(object):
         self._central_response_bins = response.get_response_dec_bin(dec_center, interpolate=False)
 
         log.info("Central bin is bin at Declination = %.3f" % dec_center)
-
+    #    log.info("Central bin is bin = %s" %(self._central_response_bins))
         # Take note of the pixels within the flat sky projection that actually need to be computed. If the extended
         # source is significantly smaller than the flat sky projection, this gains a substantial amount of time
 
@@ -94,7 +100,8 @@ class ConvolvedExtendedSource(object):
         # Prepare array for fluxes
         self._all_fluxes = np.zeros((self._flat_sky_projection.ras.shape[0],
                                      self._energy_centers_keV.shape[0]))
-
+    def return_index(self):
+        return self.return_bins
     def _setup_callbacks(self, callback):
 
         # Register call back with all free parameters and all linked parameters. If a parameter is linked to another
