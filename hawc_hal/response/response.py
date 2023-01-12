@@ -1,23 +1,21 @@
-from __future__ import division
-from __future__ import absolute_import
-from builtins import zip
-from builtins import range
-from builtins import object
+from __future__ import absolute_import, division
+
+import collections
+import os
+from builtins import object, range, zip
 from multiprocessing.managers import ValueProxy
 from pathlib import Path
-from past.utils import old_div
-import uproot
+
 import healpy as hp
 import numpy as np
 import pandas as pd
-import os
-import collections
+import uproot
+from past.utils import old_div
+from threeML.io.file_utils import file_existing_and_readable, sanitize_filename
+from threeML.io.logging import setup_logger
 
 from ..serialize import Serialization
 
-from threeML.io.file_utils import file_existing_and_readable, sanitize_filename
-
-from threeML.io.logging import setup_logger
 log = setup_logger(__name__)
 log.propagate = False
 
@@ -53,7 +51,7 @@ def hawc_response_factory(response_file_name):
 
             new_instance = HAWCResponse.from_root_file(response_file_name)
 
-        elif extension in ['.hd5', '.hdf5', '.hdf']:
+        elif extension in [".hd5", ".hdf5", ".hdf"]:
 
             new_instance = HAWCResponse.from_hdf5(response_file_name)
 
@@ -63,7 +61,7 @@ def hawc_response_factory(response_file_name):
                 f"Extension {extension} for response file {response_file_name} not recognized."
             )
             # raise NotImplementedError("Extension %s for response file %s not recognized." % (extension,
-                                                                                            #  response_file_name))
+            #  response_file_name))
 
         _instances[response_file_name] = new_instance
 
@@ -73,13 +71,12 @@ def hawc_response_factory(response_file_name):
 
 
 class HAWCResponse(object):
-
     def __init__(self, response_file_name, dec_bins, response_bins):
 
         self._response_file_name = response_file_name
         self._dec_bins = dec_bins
         self._response_bins = response_bins
-        
+
         if len(dec_bins) < 2:
             #   log.warning("Only {0} dec bins given in {1}, will not try to interpolate.".format(len(dec_bins), response_file_name))
             log.warning(
@@ -101,11 +98,11 @@ class HAWCResponse(object):
 
         response_bins = collections.OrderedDict()
 
-        with Serialization(response_file_name, mode='r') as serializer:
+        with Serialization(response_file_name, mode="r") as serializer:
 
-            meta_dfs, _ = serializer.retrieve_pandas_object('/dec_bins_definition')
-            effarea_dfs, _ = serializer.retrieve_pandas_object('/effective_area')
-            psf_dfs, _ = serializer.retrieve_pandas_object('/psf')
+            meta_dfs, _ = serializer.retrieve_pandas_object("/dec_bins_definition")
+            effarea_dfs, _ = serializer.retrieve_pandas_object("/effective_area")
+            psf_dfs, _ = serializer.retrieve_pandas_object("/psf")
 
         declination_centers = effarea_dfs.index.levels[0]
         energy_bins = effarea_dfs.index.levels[1]
@@ -121,9 +118,9 @@ class HAWCResponse(object):
 
                 these_meta = meta_dfs.loc[dec_center, energy_bin]
 
-                min_dec = these_meta['min_dec']
-                max_dec = these_meta['max_dec']
-                dec_center_ = these_meta['declination_center']
+                min_dec = these_meta["min_dec"]
+                max_dec = these_meta["max_dec"]
+                dec_center_ = these_meta["declination_center"]
 
                 assert dec_center_ == dec_center, "Response is corrupted"
 
@@ -141,27 +138,37 @@ class HAWCResponse(object):
                     assert min_dec == min_decs[-1], "Response is corrupted"
                     assert max_dec == max_decs[-1], "Response is corrupted"
 
-                sim_n_sig_events = these_meta['n_sim_signal_events']
-                sim_n_bg_events = these_meta['n_sim_bkg_events']
+                sim_n_sig_events = these_meta["n_sim_signal_events"]
+                sim_n_bg_events = these_meta["n_sim_bkg_events"]
 
                 this_effarea_df = effarea_dfs.loc[dec_center, energy_bin]
 
-                sim_energy_bin_low = this_effarea_df.loc[:, 'sim_energy_bin_low'].values
-                sim_energy_bin_centers = this_effarea_df.loc[:, 'sim_energy_bin_centers'].values
-                sim_energy_bin_hi = this_effarea_df.loc[:, 'sim_energy_bin_hi'].values
-                sim_differential_photon_fluxes = this_effarea_df.loc[:, 'sim_differential_photon_fluxes'].values
-                sim_signal_events_per_bin = this_effarea_df.loc[:, 'sim_signal_events_per_bin'].values
+                sim_energy_bin_low = this_effarea_df.loc[:, "sim_energy_bin_low"].values
+                sim_energy_bin_centers = this_effarea_df.loc[:, "sim_energy_bin_centers"].values
+                sim_energy_bin_hi = this_effarea_df.loc[:, "sim_energy_bin_hi"].values
+                sim_differential_photon_fluxes = this_effarea_df.loc[
+                    :, "sim_differential_photon_fluxes"
+                ].values
+                sim_signal_events_per_bin = this_effarea_df.loc[
+                    :, "sim_signal_events_per_bin"
+                ].values
 
                 this_psf = PSFWrapper.from_pandas(psf_dfs.loc[dec_center, energy_bin, :])
 
-                this_response_bin = ResponseBin(energy_bin, min_dec, max_dec, dec_center,
-                                                sim_n_sig_events, sim_n_bg_events,
-                                                sim_energy_bin_low,
-                                                sim_energy_bin_centers,
-                                                sim_energy_bin_hi,
-                                                sim_differential_photon_fluxes,
-                                                sim_signal_events_per_bin,
-                                                this_psf)
+                this_response_bin = ResponseBin(
+                    energy_bin,
+                    min_dec,
+                    max_dec,
+                    dec_center,
+                    sim_n_sig_events,
+                    sim_n_bg_events,
+                    sim_energy_bin_low,
+                    sim_energy_bin_centers,
+                    sim_energy_bin_hi,
+                    sim_differential_photon_fluxes,
+                    sim_signal_events_per_bin,
+                    this_psf,
+                )
 
                 these_response_bins[energy_bin] = this_response_bin
 
@@ -208,10 +215,7 @@ class HAWCResponse(object):
             # NOTE: The LogLogSpectrum parameters are extracted from the response file
             # There is no way to evaluate the loglogspectrum function with uproot, so the
             # parameters are passed for evaluation in response_bin.py
-            # dec_bins_lower_edge = response_file["DecBins"]["lowerEdge"].array().to_numpy()
-            # dec_bins_upper_edge = response_file["DecBins"]["upperEdge"].array().to_numpy()
-            # dec_bins_center = response_file["DecBins"]["simdec"].array().to_numpy()
-            
+
             log_log_params = response_file["LogLogSpectrum"].member("fParams")
             log_log_shape = response_file["LogLogSpectrum"].member("fTitle")
             dec_bins_lower_edge = response_file["DecBins/lowerEdge"].array().to_numpy()
@@ -222,14 +226,12 @@ class HAWCResponse(object):
 
             try:
 
-                # response_bin_ids = response_file["AnalysisBins"]["name"].array().to_numpy()
                 response_bin_ids = response_file["AnalysisBins/name"].array().to_numpy()
 
             except uproot.KeyInFileError:
 
                 try:
 
-                    # response_bin_ids = response_file["AnalysisBins"]["id"].array().to_numpy()
                     response_bin_ids = response_file["AnalysisBins/id"].array().to_numpy()
 
                 except uproot.KeyInFileError:
@@ -245,7 +247,7 @@ class HAWCResponse(object):
 
             # Now we create a dictionary of ResponseBin instances for each dec bin name
             response_bins = collections.OrderedDict()
-            
+
             for dec_id in range(len(dec_bins)):
 
                 this_response_bins = collections.OrderedDict()
@@ -261,7 +263,7 @@ class HAWCResponse(object):
                     response_bins_ids = list(range(n_energy_bins))
 
                 for response_bin_id in response_bin_ids:
-                    
+
                     this_response_bin = ResponseBin.from_ttree(
                         response_file,
                         dec_id,
@@ -270,7 +272,8 @@ class HAWCResponse(object):
                         log_log_shape,
                         min_dec,
                         dec_center,
-                        max_dec)
+                        max_dec,
+                    )
 
                     this_response_bins[response_bin_id] = this_response_bin
 
@@ -278,84 +281,7 @@ class HAWCResponse(object):
 
             del response_file
 
-            # with open_ROOT_file( str(response_file_name) ) as root_file:
-
-            #     # Get the name of the trees
-            #     object_names = get_list_of_keys(root_file)
-
-            #     # Make sure we have all the things we need
-
-            #     assert 'LogLogSpectrum' in object_names
-            #     assert 'DecBins' in object_names
-            #     assert 'AnalysisBins' in object_names
-
-            #     # Read spectrum used during the simulation
-            #     log_log_spectrum = root_file.Get("LogLogSpectrum")
-
-            #     # Get the analysis bins definition
-            #     dec_bins_ = tree_to_ndarray(root_file.Get("DecBins"))
-
-            #     dec_bins_lower_edge = dec_bins_['lowerEdge']  # type: np.ndarray
-            #     dec_bins_upper_edge = dec_bins_['upperEdge']  # type: np.ndarray
-            #     dec_bins_center = dec_bins_['simdec']  # type: np.ndarray
-
-            #     dec_bins = list(zip(dec_bins_lower_edge, dec_bins_center, dec_bins_upper_edge))
-
-            #     # Read in the ids of the response bins ("analysis bins" in LiFF jargon)
-            #     try:
-
-            #         response_bins_ids = tree_to_ndarray(root_file.Get("AnalysisBins"), "name")  # type: np.ndarray
-
-            #     except ValueError:
-
-            #         try:
-
-            #             response_bins_ids = tree_to_ndarray(root_file.Get("AnalysisBins"), "id")  # type: np.ndarray
-
-            #         except ValueError:
-
-            #             # Some old response files (or energy responses) have no "name" branch
-            #             log.warning("Response %s has no AnalysisBins 'id' or 'name' branch. "
-            #                                  "Will try with default names" % response_file_name)
-
-            #             response_bins_ids = None
-
-            #     response_bins_ids = response_bins_ids.astype(str)
-
-            #     # Now we create a dictionary of ResponseBin instances for each dec bin_name
-            #     response_bins = collections.OrderedDict()
-
-            #     for dec_id in range(len(dec_bins)):
-
-            #         this_response_bins = collections.OrderedDict()
-
-            #         min_dec, dec_center, max_dec = dec_bins[dec_id]
-
-            #         # If we couldn't get the reponse_bins_ids above, let's use the default names
-            #         if response_bins_ids is None:
-
-            #             # Default are just integers. let's read how many nHit bins are from the first dec bin
-            #             dec_id_label = "dec_%02i" % dec_id
-
-            #             n_energy_bins = root_file.Get(dec_id_label).GetNkeys()
-
-            #             response_bins_ids = list(range(n_energy_bins))
-
-            #         for response_bin_id in response_bins_ids:
-            #             this_response_bin = ResponseBin.from_ttree(root_file, dec_id, response_bin_id, log_log_spectrum,
-            #                                                        min_dec, dec_center, max_dec)
-
-            #             this_response_bins[response_bin_id] = this_response_bin
-
-            #         response_bins[dec_bins[dec_id][1]] = this_response_bins
-
-            # # Now the file is closed. Let's explicitly remove f so we are sure it is freed
-            # del root_file
-
-            # Instance the class and return it
-        # return instance
         return cls(response_file_name, dec_bins, response_bins)
-
 
     def get_response_dec_bin(self, dec, interpolate=False):
         """Get the response for the provided declination bin, optionally interpolating the PSF
@@ -363,7 +289,7 @@ class HAWCResponse(object):
 
         Args:
             dec (float): Declination where the response is desired
-            interpolate (bool, optional): If True, PSF is interpolated between the two 
+            interpolate (bool, optional): If True, PSF is interpolated between the two
             closest response bins. Defaults to False.
 
         Returns:
@@ -374,7 +300,7 @@ class HAWCResponse(object):
         dec_bins_keys = list(self._response_bins.keys())
         dec_bins_by_distance = sorted(dec_bins_keys, key=lambda x: abs(x - dec))
 
-        #never try to interpolate if only one dec bin is given
+        # never try to interpolate if only one dec bin is given
         if len(dec_bins_keys) < 2:
             interpolate = False
 
@@ -410,7 +336,9 @@ class HAWCResponse(object):
             new_responses = collections.OrderedDict()
 
             for bin_id in energy_bins_one:
-                this_new_response = energy_bins_one[bin_id].combine_with_weights(energy_bins_two[bin_id], dec, w1, w2)
+                this_new_response = energy_bins_one[bin_id].combine_with_weights(
+                    energy_bins_two[bin_id], dec, w1, w2
+                )
 
                 new_responses[bin_id] = this_new_response
 
@@ -481,9 +409,10 @@ class HAWCResponse(object):
                 effarea_dfs.append(this_effarea_df)
                 psf_dfs.append(this_psf_df)
                 # assert bin_id == response_bin.name, \
-                    # 'Bin name inconsistency: {} != {}'.format(bin_id, response_bin.name)
-                assert bin_id == response_bin.name, \
-                    f'Bin name inconsistency: {bin_id} != {response_bin.name}'
+                # 'Bin name inconsistency: {} != {}'.format(bin_id, response_bin.name)
+                assert (
+                    bin_id == response_bin.name
+                ), f"Bin name inconsistency: {bin_id} != {response_bin.name}"
                 multi_index_keys.append((dec_center, response_bin.name))
                 all_metas.append(pd.Series(this_meta))
 
@@ -493,8 +422,8 @@ class HAWCResponse(object):
         meta_df = pd.concat(all_metas, axis=1, keys=multi_index_keys).T
 
         # Now write the 4 dataframes to file
-        with Serialization(filename, mode='w') as serializer:
+        with Serialization(filename, mode="w") as serializer:
 
-            serializer.store_pandas_object('/dec_bins_definition', meta_df)
-            serializer.store_pandas_object('/effective_area', effarea_df)
-            serializer.store_pandas_object('/psf', psf_df)
+            serializer.store_pandas_object("/dec_bins_definition", meta_df)
+            serializer.store_pandas_object("/effective_area", effarea_df)
+            serializer.store_pandas_object("/psf", psf_df)

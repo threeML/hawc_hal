@@ -1,49 +1,40 @@
-from __future__ import division
-from __future__ import print_function
-from past.utils import old_div
+from __future__ import division, print_function
+
 import matplotlib
+from past.utils import old_div
+
 matplotlib.use("Agg")
 
 import os
 
-os.environ['OMP_NUM_THREADS'] = '1'
-os.environ['MKL_NUM_THREADS'] = '1'
-os.environ['NUMEXPR_NUM_THREADS'] = '1'
+os.environ["OMP_NUM_THREADS"] = "1"
+os.environ["MKL_NUM_THREADS"] = "1"
+os.environ["NUMEXPR_NUM_THREADS"] = "1"
 
-import pytest
-from hawc_hal import HealpixConeROI
-from threeML import *
-from hawc_hal import HAL
 import time
+
 import numpy as np
+import pytest
+from hawc_hal import HAL, HealpixConeROI
+from threeML import *
 
 # Get data path
-test_data_path = os.path.join(os.path.abspath(os.path.dirname(__file__)), 'data')
+test_data_path = os.path.join(os.path.abspath(os.path.dirname(__file__)), "data")
 
 
-def fit_point_source(roi,
-                      maptree,
-                      response,
-                      point_source_model,
-                      liff=False):
+def fit_point_source(roi, maptree, response, point_source_model, liff=False):
     data_radius = roi.data_radius.to("deg").value
 
     if not liff:
 
         # This is a 3ML plugin
-        hawc = HAL("HAWC",
-                   maptree,
-                   response,
-                   roi)
+        hawc = HAL("HAWC", maptree, response, roi)
 
     else:
 
         from threeML import HAWCLike
 
-        hawc = HAWCLike("HAWC",
-                        maptree,
-                        response,
-                        fullsky=True)
+        hawc = HAWCLike("HAWC", maptree, response, fullsky=True)
 
         ra_roi, dec_roi = roi.ra_dec_center
 
@@ -51,7 +42,8 @@ def fit_point_source(roi,
 
     hawc.set_active_measurements(1, 9)
 
-    if not liff: hawc.display()
+    if not liff:
+        hawc.display()
 
     data = DataList(hawc)
 
@@ -73,7 +65,6 @@ def fit_point_source(roi,
 
         hawc.display_fit(display_colorbar=True).savefig("display_fit.png")
 
-
     return param_df, like_df
 
 
@@ -91,6 +82,18 @@ def check_map_trees(m1, m2):
 
         assert p1.nside == p2.nside
         assert p1.n_transits == p2.n_transits
+
+
+def check_n_transits(maptree, transits):
+    # Should give maptree object and expected transits
+
+    # check maptree is assigned proper transits
+    assert maptree.n_transits == transits
+
+    # check each bin as well
+    for bin_key in maptree:
+        the_bin = maptree[bin_key]
+        assert the_bin.n_transits == transits
 
 
 def check_responses(r1, r2):
@@ -121,7 +124,9 @@ def check_responses(r1, r2):
 
             assert np.allclose(rb1.sim_energy_bin_centers, rb2.sim_energy_bin_centers)
 
-            assert np.allclose(rb1.sim_differential_photon_fluxes, rb2.sim_differential_photon_fluxes)
+            assert np.allclose(
+                rb1.sim_differential_photon_fluxes, rb2.sim_differential_photon_fluxes
+            )
 
             assert np.allclose(rb1.sim_signal_events_per_bin, rb2.sim_signal_events_per_bin)
 
@@ -149,10 +154,12 @@ def roi():
     # NOTE: the center of the ROI is not exactly on the source. This is on purpose, to make sure that we are
     # doing the model map with the right orientation
 
-    roi = HealpixConeROI(data_radius=data_radius,
-                         model_radius=model_radius,
-                         ra=ra_sim_source - 1.0,
-                         dec=dec_sim_source + 0.5)
+    roi = HealpixConeROI(
+        data_radius=data_radius,
+        model_radius=model_radius,
+        ra=ra_sim_source - 1.0,
+        dec=dec_sim_source + 0.5,
+    )
 
     return roi
 
@@ -160,15 +167,12 @@ def roi():
 @pytest.fixture(scope="session", autouse=True)
 def geminga_roi():
 
-    ra_c, dec_c, rad = 101.7, 16, 9.
+    ra_c, dec_c, rad = 101.7, 16, 9.0
 
     # NOTE: the center of the ROI is not exactly on the source. This is on purpose, to make sure that we are
     # doing the model map with the right orientation
 
-    roi = HealpixConeROI(data_radius=rad,
-                         model_radius=rad + 15.0,
-                         ra=ra_c,
-                         dec=dec_c)
+    roi = HealpixConeROI(data_radius=rad, model_radius=rad + 15.0, ra=ra_c, dec=dec_c)
 
     return roi
 
@@ -176,25 +180,25 @@ def geminga_roi():
 @pytest.fixture(scope="session", autouse=True)
 def geminga_maptree():
 
-    return os.path.join(test_data_path, 'geminga_maptree.root')
+    return os.path.join(test_data_path, "geminga_maptree.root")
 
 
 @pytest.fixture(scope="session", autouse=True)
 def geminga_response():
 
-    return os.path.join(test_data_path, 'geminga_response.root')
+    return os.path.join(test_data_path, "geminga_response.root")
 
 
 @pytest.fixture(scope="session", autouse=True)
 def maptree():
 
-    return os.path.join(test_data_path, 'zebra_simulated_source_mt_roi.hd5')
+    return os.path.join(test_data_path, "zebra_simulated_source_mt_roi.hd5")
 
 
 @pytest.fixture(scope="session", autouse=True)
 def response():
 
-    return os.path.join(test_data_path, 'detector_response.hd5')
+    return os.path.join(test_data_path, "detector_response.hd5")
 
 
 @pytest.fixture(scope="module", autouse=True)
@@ -217,7 +221,7 @@ def point_source_model(ra=83.6279, dec=22.14):
 
     spectrum.piv.fix = True
 
-    spectrum.K = old_div(3.15e-11, (u.TeV * u.cm ** 2 * u.s))  # norm (in 1/(keV cm2 s))
+    spectrum.K = old_div(3.15e-11, (u.TeV * u.cm**2 * u.s))  # norm (in 1/(keV cm2 s))
     spectrum.K.bounds = (1e-23, 1e-17)  # without units energies are in keV
 
     spectrum.index = -2.0
@@ -230,4 +234,3 @@ def point_source_model(ra=83.6279, dec=22.14):
     model = Model(source)
 
     return model
-
