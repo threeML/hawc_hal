@@ -17,18 +17,17 @@ def interp_weights(xy, uv, d=2):  # pragma: no cover
 
     delta = uv - temp[:, d]
 
-    bary = np.einsum('njk,nk->nj', temp[:, :d, :], delta)
+    bary = np.einsum("njk,nk->nj", temp[:, :d, :], delta)
 
     return vertices, np.hstack((bary, 1 - bary.sum(axis=1, keepdims=True)))
 
 
 def interpolate(values, vtx, wts):  # pragma: no cover
 
-    return np.einsum('nj,nj->n', np.take(values, vtx), wts)
+    return np.einsum("nj,nj->n", np.take(values, vtx), wts)
 
 
 class FastLinearInterpolatorIrregularGrid(object):  # pragma: no cover
-
     def __init__(self, data_shape, new_coords):
 
         old_coords = cartesian([np.arange(data_shape[0]), np.arange(data_shape[1])])

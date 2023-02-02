@@ -10,6 +10,6 @@ def get_roi_from_dict(dictionary):
     :return:
     """
 
-    roi_type = dictionary['ROI type']
+    roi_type = dictionary["ROI type"]
 
     return globals()[roi_type].from_dict(dictionary)

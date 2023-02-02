@@ -6,6 +6,7 @@ import numpy as np
 
 from astromodels import use_astromodels_memoization
 from threeML.io.logging import setup_logger
+
 log = setup_logger(__name__)
 log.propagate = False
 
@@ -24,12 +25,12 @@ def _select_with_wrap_around(arr, start, stop, wrap=(360, 0)):
 
     return idx
 
+
 # Conversion factor between deg^2 and rad^2
 deg2_to_rad2 = 0.00030461741978670857
 
 
 class ConvolvedExtendedSource(object):
-
     def __init__(self, source, response, flat_sky_projection):
 
         self._response = response
@@ -43,7 +44,12 @@ class ConvolvedExtendedSource(object):
         # Find out the response bins we need to consider for this extended source
 
         # # Get the footprint (i..e, the coordinates of the 4 points limiting the projections)
-        (ra1, dec1), (ra2, dec2), (ra3, dec3), (ra4, dec4) = flat_sky_projection.wcs.calc_footprint()
+        (
+            (ra1, dec1),
+            (ra2, dec2),
+            (ra3, dec3),
+            (ra4, dec4),
+        ) = flat_sky_projection.wcs.calc_footprint()
 
         (lon_start, lon_stop), (lat_start, lat_stop) = source.get_boundaries()
 
@@ -56,44 +62,68 @@ class ConvolvedExtendedSource(object):
         upper_edges = np.array([x[-1] for x in response.dec_bins])
         centers = np.array([x[1] for x in response.dec_bins])
 
-        dec_bins_to_consider_idx = np.flatnonzero((upper_edges >= dec_min) & (lower_edges <= dec_max))
+        dec_bins_to_consider_idx = np.flatnonzero(
+            (upper_edges >= dec_min) & (lower_edges <= dec_max)
+        )
 
         # Wrap the selection so we have always one bin before and one after.
         # NOTE: we assume that the ROI do not overlap with the very first or the very last dec bin
         # Add one dec bin to cover the last part
-        dec_bins_to_consider_idx = np.append(dec_bins_to_consider_idx, [dec_bins_to_consider_idx[-1] + 1])
+        dec_bins_to_consider_idx = np.append(
+            dec_bins_to_consider_idx, [dec_bins_to_consider_idx[-1] + 1]
+        )
         # Add one dec bin to cover the first part
-        dec_bins_to_consider_idx = np.insert(dec_bins_to_consider_idx, 0, [dec_bins_to_consider_idx[0] - 1])
+        dec_bins_to_consider_idx = np.insert(
+            dec_bins_to_consider_idx, 0, [dec_bins_to_consider_idx[0] - 1]
+        )
 
-        self._dec_bins_to_consider = [response.response_bins[centers[x]] for x in dec_bins_to_consider_idx]
+        self._dec_bins_to_consider = [
+            response.response_bins[centers[x]] for x in dec_bins_to_consider_idx
+        ]
 
-        log.info("Considering %i dec bins for extended source %s" % (len(self._dec_bins_to_consider),
-                                                                  self._name))
+        log.info(
+            "Considering %i dec bins for extended source %s"
+            % (len(self._dec_bins_to_consider), self._name)
+        )
 
         # Find central bin for the PSF
 
         dec_center = (lat_start + lat_stop) / 2.0
         #
-        self._central_response_bins = response.get_response_dec_bin(dec_center, interpolate=False)
+        self._central_response_bins = response.get_response_dec_bin(
+            dec_center, interpolate=False
+        )
 
         log.info("Central bin is bin at Declination = %.3f" % dec_center)
 
         # Take note of the pixels within the flat sky projection that actually need to be computed. If the extended
         # source is significantly smaller than the flat sky projection, this gains a substantial amount of time
 
-        idx_lon = _select_with_wrap_around(self._flat_sky_projection.ras, lon_start, lon_stop, (360, 0))
-        idx_lat = _select_with_wrap_around(self._flat_sky_projection.decs, lat_start, lat_stop, (90, -90))
+        idx_lon = _select_with_wrap_around(
+            self._flat_sky_projection.ras, lon_start, lon_stop, (360, 0)
+        )
+        idx_lat = _select_with_wrap_around(
+            self._flat_sky_projection.decs, lat_start, lat_stop, (90, -90)
+        )
 
-        self._active_flat_sky_mask = (idx_lon & idx_lat)
+        self._active_flat_sky_mask = idx_lon & idx_lat
 
-        assert np.sum(self._active_flat_sky_mask) > 0, "Mismatch between source %s and ROI" % self._name
+        assert np.sum(self._active_flat_sky_mask) > 0, (
+            "Mismatch between source %s and ROI" % self._name
+        )
 
         # Get the energies needed for the computation of the flux
-        self._energy_centers_keV = self._central_response_bins[list(self._central_response_bins.keys())[0]].sim_energy_bin_centers * 1e9
+        self._energy_centers_keV = (
+            self._central_response_bins[
+                list(self._central_response_bins.keys())[0]
+            ].sim_energy_bin_centers
+            * 1e9
+        )
 
         # Prepare array for fluxes
-        self._all_fluxes = np.zeros((self._flat_sky_projection.ras.shape[0],
-                                     self._energy_centers_keV.shape[0]))
+        self._all_fluxes = np.zeros(
+            (self._flat_sky_projection.ras.shape[0], self._energy_centers_keV.shape[0])
+        )
 
     def _setup_callbacks(self, callback):
 
@@ -118,10 +148,11 @@ class ConvolvedExtendedSource(object):
 
 
 class ConvolvedExtendedSource3D(ConvolvedExtendedSource):
-
     def __init__(self, source, response, flat_sky_projection):
 
-        super(ConvolvedExtendedSource3D, self).__init__(source, response, flat_sky_projection)
+        super(ConvolvedExtendedSource3D, self).__init__(
+            source, response, flat_sky_projection
+        )
 
         # We implement a caching system so that the source flux is evaluated only when strictly needed,
         # because it is the most computationally intense part otherwise.
@@ -154,51 +185,76 @@ class ConvolvedExtendedSource3D(ConvolvedExtendedSource):
 
                 # Recompute the fluxes for the pixels that are covered by this extended source
                 self._all_fluxes[self._active_flat_sky_mask, :] = self._source(
-                                                            self._flat_sky_projection.ras[self._active_flat_sky_mask],
-                                                            self._flat_sky_projection.decs[self._active_flat_sky_mask],
-                                                            self._energy_centers_keV)  # 1 / (keV cm^2 s rad^2)
+                    self._flat_sky_projection.ras[self._active_flat_sky_mask],
+                    self._flat_sky_projection.decs[self._active_flat_sky_mask],
+                    self._energy_centers_keV,
+                )  # 1 / (keV cm^2 s rad^2)
 
                 # We don't need to recompute the function anymore until a parameter changes
                 self._recompute_flux = False
 
             # Now compute the expected signal
 
-            pixel_area_rad2 = self._flat_sky_projection.project_plane_pixel_area * deg2_to_rad2
+            pixel_area_rad2 = (
+                self._flat_sky_projection.project_plane_pixel_area * deg2_to_rad2
+            )
 
             this_model_image = np.zeros(self._all_fluxes.shape[0])
 
             # Loop over the Dec bins that cover this source and compute the expected flux, interpolating between
             # two dec bins for each point
 
-            for dec_bin1, dec_bin2 in zip(self._dec_bins_to_consider[:-1], self._dec_bins_to_consider[1:]):
+            for dec_bin1, dec_bin2 in zip(
+                self._dec_bins_to_consider[:-1], self._dec_bins_to_consider[1:]
+            ):
 
                 # Get the two response bins to consider
                 this_response_bin1 = dec_bin1[energy_bin_id]
                 this_response_bin2 = dec_bin2[energy_bin_id]
 
                 # Figure out which pixels are between the centers of the dec bins we are considering
-                c1, c2 = this_response_bin1.declination_center, this_response_bin2.declination_center
+                c1, c2 = (
+                    this_response_bin1.declination_center,
+                    this_response_bin2.declination_center,
+                )
 
-                idx = (self._flat_sky_projection.decs >= c1) & (self._flat_sky_projection.decs < c2) & \
-                      self._active_flat_sky_mask
+                idx = (
+                    (self._flat_sky_projection.decs >= c1)
+                    & (self._flat_sky_projection.decs < c2)
+                    & self._active_flat_sky_mask
+                )
 
                 # Reweight the spectrum separately for the two bins
                 # NOTE: the scale is the same because the sim_differential_photon_fluxes are the same (the simulation
                 # used to make the response used the same spectrum for each bin). What changes between the two bins
                 # is the observed signal per bin (the .sim_signal_events_per_bin member)
-                scale = old_div((self._all_fluxes[idx, :] * pixel_area_rad2), this_response_bin1.sim_differential_photon_fluxes)
+                scale = old_div(
+                    (self._all_fluxes[idx, :] * pixel_area_rad2),
+                    this_response_bin1.sim_differential_photon_fluxes,
+                )
 
                 # Compute the interpolation weights for the two responses
                 w1 = old_div((self._flat_sky_projection.decs[idx] - c2), (c1 - c2))
                 w2 = old_div((self._flat_sky_projection.decs[idx] - c1), (c2 - c1))
 
-                this_model_image[idx] = (w1 * np.sum(scale * this_response_bin1.sim_signal_events_per_bin, axis=1) +
-                                         w2 * np.sum(scale * this_response_bin2.sim_signal_events_per_bin, axis=1)) * \
-                                        1e9
+                this_model_image[idx] = (
+                    w1
+                    * np.sum(
+                        scale * this_response_bin1.sim_signal_events_per_bin, axis=1
+                    )
+                    + w2
+                    * np.sum(
+                        scale * this_response_bin2.sim_signal_events_per_bin, axis=1
+                    )
+                ) * 1e9
 
             # Reshape the flux array into an image
-            this_model_image = this_model_image.reshape((self._flat_sky_projection.npix_height,
-                                                         self._flat_sky_projection.npix_width)).T
+            this_model_image = this_model_image.reshape(
+                (
+                    self._flat_sky_projection.npix_height,
+                    self._flat_sky_projection.npix_width,
+                )
+            ).T
 
             return this_model_image
 

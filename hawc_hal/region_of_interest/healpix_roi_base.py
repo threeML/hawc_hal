@@ -1,13 +1,13 @@
 from builtins import object
-_EQUATORIAL = 'equatorial'
-_GALACTIC = 'galactic'
 
-_RING = 'RING'
-_NESTED = 'NESTED'
+_EQUATORIAL = "equatorial"
+_GALACTIC = "galactic"
+
+_RING = "RING"
+_NESTED = "NESTED"
 
 
 class HealpixROIBase(object):
-
     def active_pixels(self, nside, system=_EQUATORIAL, ordering=_RING):
         """
         Returns the non-zero elements, i.e., the pixels selected according to this Region Of Interest
@@ -23,9 +23,14 @@ class HealpixROIBase(object):
 
         assert system == _EQUATORIAL, "%s reference system not supported" % system
 
-        assert ordering in [_RING, _NESTED], "Could not understand ordering %s. Must be %s or %s" % (ordering,
-                                                                                                     _RING,
-                                                                                                     _NESTED)
+        assert ordering in [
+            _RING,
+            _NESTED,
+        ], "Could not understand ordering %s. Must be %s or %s" % (
+            ordering,
+            _RING,
+            _NESTED,
+        )
 
         return self._active_pixels(nside, ordering)
 

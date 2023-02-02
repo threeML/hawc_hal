@@ -3,6 +3,7 @@ import copy
 import pytest
 from hawc_hal.psf_fast import InvalidPSF, InvalidPSFError
 
+
 def test_invalid_psf():
 
     psf = InvalidPSF()

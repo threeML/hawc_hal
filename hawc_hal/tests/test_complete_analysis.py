@@ -6,15 +6,12 @@ import pytest
 from conftest import point_source_model
 
 
-@pytest.fixture(scope='module')
+@pytest.fixture(scope="module")
 def test_fit(roi, maptree, response, point_source_model):
 
     pts_model = point_source_model
 
-    hawc = HAL("HAWC",
-               maptree,
-               response,
-               roi)
+    hawc = HAL("HAWC", maptree, response, roi)
 
     # Use from bin 1 to bin 9
     hawc.set_active_measurements(1, 9)
@@ -37,7 +34,7 @@ def test_fit(roi, maptree, response, point_source_model):
 def test_simulation(test_fit):
 
     jl, hawc, pts_model, param_df, like_df, data = test_fit
-    
+
     sim = hawc.get_simulated_dataset("HAWCsim")
     sim.write("sim_resp.hd5", "sim_maptree.hd5")
 
@@ -81,21 +78,28 @@ def test_goodness(test_fit):
     gf = GoodnessOfFit(jl)
 
     gof, param, likes = gf.by_mc(10)
-    print("Prob. of obtaining -log(like) >= observed by chance if null hypothesis is true: %.2f" % gof['HAWC'])
+    print(
+        "Prob. of obtaining -log(like) >= observed by chance if null hypothesis is true: %.2f"
+        % gof["HAWC"]
+    )
 
     # it is a good idea to inspect the results of the simulations with some plots
     # Histogram of likelihood values
     fig, sub = plt.subplots()
     likes.hist(ax=sub)
     # Overplot a vertical dashed line on the observed value
-    plt.axvline(jl.results.get_statistic_frame().loc['HAWC', '-log(likelihood)'],
-                color='black',
-                linestyle='--')
+    plt.axvline(
+        jl.results.get_statistic_frame().loc["HAWC", "-log(likelihood)"],
+        color="black",
+        linestyle="--",
+    )
     fig.savefig("hal_sim_all_likes.png")
 
     # Plot the value of beta for all simulations (for example)
     fig, sub = plt.subplots()
-    param.loc[(slice(None), ['pts.spectrum.main.Cutoff_powerlaw.index']), 'value'].plot()
+    param.loc[
+        (slice(None), ["pts.spectrum.main.Cutoff_powerlaw.index"]), "value"
+    ].plot()
     fig.savefig("hal_sim_all_index.png")
 
 
@@ -103,7 +107,7 @@ def test_fit_with_free_position(test_fit):
 
     jl, hawc, pts_model, param_df, like_df, data = test_fit
 
-    hawc.psf_integration_method = 'fast'
+    hawc.psf_integration_method = "fast"
 
     # Free the position of the source
     pts_model.pts.position.ra.free = True
@@ -126,16 +130,25 @@ def test_fit_with_free_position(test_fit):
     # pts.position.dec(2.214 + / - 0.00025) x
     # 10
 
-    a, b, cc, fig = jl.get_contours(pts_model.pts.position.dec, 22.13, 22.1525, 5,
-                                    pts_model.pts.position.ra, 83.615, 83.635, 5)
+    a, b, cc, fig = jl.get_contours(
+        pts_model.pts.position.dec,
+        22.13,
+        22.1525,
+        5,
+        pts_model.pts.position.ra,
+        83.615,
+        83.635,
+        5,
+    )
 
-    plt.plot([ra], [dec], 'x')
+    plt.plot([ra], [dec], "x")
     fig.savefig("hal_src_localization.png")
 
-    hawc.psf_integration_method = 'exact'
+    hawc.psf_integration_method = "exact"
 
     pts_model.pts.position.ra.free = False
     pts_model.pts.position.dec.free = False
+
 
 def test_bayesian_analysis(test_fit):
 
@@ -168,4 +181,3 @@ def test_bayesian_analysis(test_fit):
     fig = bs.results.corner_plot()
 
     fig.savefig("hal_corner_plot.png")
-

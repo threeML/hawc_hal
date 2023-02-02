@@ -15,6 +15,7 @@ skip_if_ROOT_is_not_available = pytest.mark.skipif(
     not has_root, reason="No ROOT available"
 )
 
+
 @skip_if_ROOT_is_not_available
 def test_root_to_hdf_response(response):
 
@@ -35,9 +36,8 @@ def test_root_to_hdf_response(response):
 
     os.remove(test_filename)
 
-def do_one_test_maptree(geminga_roi,
-                        geminga_maptree,
-                        fullsky=False):
+
+def do_one_test_maptree(geminga_roi, geminga_maptree, fullsky=False):
     # Test both with a defined ROI and full sky (ROI is None)
     if fullsky:
 
@@ -64,16 +64,12 @@ def do_one_test_maptree(geminga_roi,
 
     os.remove(test_filename)
 
-@skip_if_ROOT_is_not_available
-def test_root_to_hdf_maptree_roi(geminga_roi,
-                                 geminga_maptree):
-    do_one_test_maptree(geminga_roi,
-                        geminga_maptree,
-                        fullsky=False)
 
 @skip_if_ROOT_is_not_available
-def test_root_to_hdf_maptree_full_sky(geminga_roi,
-                                      geminga_maptree):
-    do_one_test_maptree(geminga_roi,
-                        geminga_maptree,
-                        fullsky=True)
+def test_root_to_hdf_maptree_roi(geminga_roi, geminga_maptree):
+    do_one_test_maptree(geminga_roi, geminga_maptree, fullsky=False)
+
+
+@skip_if_ROOT_is_not_available
+def test_root_to_hdf_maptree_full_sky(geminga_roi, geminga_maptree):
+    do_one_test_maptree(geminga_roi, geminga_maptree, fullsky=True)

@@ -5,8 +5,7 @@ import pytest
 from conftest import check_map_trees
 
 
-def test_constructor(maptree,
-                     roi):
+def test_constructor(maptree, roi):
 
     roi_ = roi
 
@@ -26,8 +25,8 @@ def test_constructor(maptree,
     # Check corner cases
     # This should issue a warning because we saved the maptree with a ROI and we try to use
     # without one
-    
-    #with pytest.warns(UserWarning):
+
+    # with pytest.warns(UserWarning):
     _ = map_tree_factory(test_filename, None)
 
     # Now try to load with a different ROI than the one used for the file
@@ -39,10 +38,12 @@ def test_constructor(maptree,
         _ = map_tree_factory(test_filename, oroi)
 
     # This instead should work because the ROI is different, but contained in the ROI of the file
-    smaller_roi = HealpixConeROI(data_radius=roi.data_radius / 2.0,
-                                 model_radius=roi.model_radius,
-                                 ra=ra_c - 0.2,
-                                 dec=dec_c + 0.15)
+    smaller_roi = HealpixConeROI(
+        data_radius=roi.data_radius / 2.0,
+        model_radius=roi.model_radius,
+        ra=ra_c - 0.2,
+        dec=dec_c + 0.15,
+    )
 
     _ = map_tree_factory(test_filename, smaller_roi)
 

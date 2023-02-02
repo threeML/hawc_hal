@@ -15,16 +15,16 @@ from ..interpolation import FastBilinearInterpolation
 
 
 ORDER = {}
-ORDER['nearest-neighbor'] = 0
-ORDER['bilinear'] = 1
-ORDER['biquadratic'] = 2
-ORDER['bicubic'] = 3
+ORDER["nearest-neighbor"] = 0
+ORDER["bilinear"] = 1
+ORDER["biquadratic"] = 2
+ORDER["bicubic"] = 3
 
 
 COORDSYS = {
-    'g': Galactic(),
-    'c': ICRS(),
-    'icrs': ICRS(),
+    "g": Galactic(),
+    "c": ICRS(),
+    "icrs": ICRS(),
 }
 
 
@@ -48,14 +48,13 @@ def _convert_world_coordinates(lon_in, lat_in, wcs_in, wcs_out):
     lon_out_unit = u.Unit(wcs_out.wcs.cunit[0])
     lat_out_unit = u.Unit(wcs_out.wcs.cunit[1])
 
-    data = UnitSphericalRepresentation(lon_in * lon_in_unit,
-                                       lat_in * lat_in_unit)
+    data = UnitSphericalRepresentation(lon_in * lon_in_unit, lat_in * lat_in_unit)
 
     coords_in = frame_in.realize_frame(data)
     coords_out = coords_in.transform_to(frame_out)
 
-    lon_out = coords_out.represent_as('unitspherical').lon.to(lon_out_unit).value
-    lat_out = coords_out.represent_as('unitspherical').lat.to(lat_out_unit).value
+    lon_out = coords_out.represent_as("unitspherical").lon.to(lon_out_unit).value
+    lat_out = coords_out.represent_as("unitspherical").lat.to(lat_out_unit).value
 
     return lon_out, lat_out
 
@@ -69,20 +68,31 @@ class FlatSkyToHealpixTransform(object):
     the transformation. This avoids to re-compute the same quantities over and over again.
     """
 
-    def __init__(self, wcs_in, coord_system_out, nside, pixels_id, input_shape, order='bilinear', nested=False):
+    def __init__(
+        self,
+        wcs_in,
+        coord_system_out,
+        nside,
+        pixels_id,
+        input_shape,
+        order="bilinear",
+        nested=False,
+    ):
 
         # Look up lon, lat of pixels in output system and convert colatitude theta
         # and longitude phi to longitude and latitude.
         theta, phi = hp.pix2ang(nside, pixels_id, nested)
 
         lon_out = np.degrees(phi)
-        lat_out = 90. - np.degrees(theta)
+        lat_out = 90.0 - np.degrees(theta)
 
         # Convert between celestial coordinates
         coord_system_out = _parse_coord_system(coord_system_out)
 
-        with np.errstate(invalid='ignore'):
-            lon_in, lat_in = _convert_world_coordinates(lon_out, lat_out, (coord_system_out, u.deg, u.deg), wcs_in)
+        with np.errstate(invalid="ignore"):
+            lon_in, lat_in = _convert_world_coordinates(
+                lon_out, lat_out, (coord_system_out, u.deg, u.deg), wcs_in
+            )
 
         # Look up pixels in input system
         yinds, xinds = wcs_in.wcs_world2pix(lon_in, lat_in, 0)
