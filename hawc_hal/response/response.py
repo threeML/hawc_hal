@@ -38,7 +38,8 @@ def hawc_response_factory(response_file_name):
 
     # See if this response is in the cache, if not build it
 
-    if not response_file_name in _instances:
+    # if not response_file_name in _instances:
+    if response_file_name not in _instances:
 
         # log.info("Creating singleton for %s" % response_file_name)
         log.info(f"Creating singleton for {response_file_name}")
@@ -65,9 +66,10 @@ def hawc_response_factory(response_file_name):
 
         _instances[response_file_name] = new_instance
 
-    # return the response, whether it was already in the cache or we just built it
+        # return the response, whether it was already in the cache or we just built it
 
-    return _instances[response_file_name]  # type: HAWCResponse
+    # return _instances[response_file_name]  # type HAWCResponse
+    return _instances[response_file_name]
 
 
 class HAWCResponse(object):
@@ -144,7 +146,9 @@ class HAWCResponse(object):
                 this_effarea_df = effarea_dfs.loc[dec_center, energy_bin]
 
                 sim_energy_bin_low = this_effarea_df.loc[:, "sim_energy_bin_low"].values
-                sim_energy_bin_centers = this_effarea_df.loc[:, "sim_energy_bin_centers"].values
+                sim_energy_bin_centers = this_effarea_df.loc[
+                    :, "sim_energy_bin_centers"
+                ].values
                 sim_energy_bin_hi = this_effarea_df.loc[:, "sim_energy_bin_hi"].values
                 sim_differential_photon_fluxes = this_effarea_df.loc[
                     :, "sim_differential_photon_fluxes"
@@ -153,7 +157,9 @@ class HAWCResponse(object):
                     :, "sim_signal_events_per_bin"
                 ].values
 
-                this_psf = PSFWrapper.from_pandas(psf_dfs.loc[dec_center, energy_bin, :])
+                this_psf = PSFWrapper.from_pandas(
+                    psf_dfs.loc[dec_center, energy_bin, :]
+                )
 
                 this_response_bin = ResponseBin(
                     energy_bin,
@@ -206,7 +212,9 @@ class HAWCResponse(object):
         if not file_existing_and_readable(response_file_name):  # pragma: no cover
 
             # raise IOError("Response %s does not exist or is not readable" % response_file_name)
-            raise IOError(f"Response {response_file_name} does not exist or is not readable")
+            raise IOError(
+                f"Response {response_file_name} does not exist or is not readable"
+            )
 
         # Read response
         with uproot.open(str(response_file_name)) as response_file:
@@ -222,7 +230,9 @@ class HAWCResponse(object):
             dec_bins_upper_edge = response_file["DecBins/upperEdge"].array().to_numpy()
             dec_bins_center = response_file["DecBins/simdec"].array().to_numpy()
 
-            dec_bins = list(zip(dec_bins_lower_edge, dec_bins_center, dec_bins_upper_edge))
+            dec_bins = list(
+                zip(dec_bins_lower_edge, dec_bins_center, dec_bins_upper_edge)
+            )
 
             try:
 
@@ -232,7 +242,9 @@ class HAWCResponse(object):
 
                 try:
 
-                    response_bin_ids = response_file["AnalysisBins/id"].array().to_numpy()
+                    response_bin_ids = (
+                        response_file["AnalysisBins/id"].array().to_numpy()
+                    )
 
                 except uproot.KeyInFileError:
 
@@ -258,7 +270,9 @@ class HAWCResponse(object):
                     dec_id_label = f"dec_{dec_id:02d}"
 
                     # count the number of keys if name of bins wasn't obtained before
-                    n_energy_bins = len(response_file[dec_id_label].keys(recursive=False))
+                    n_energy_bins = len(
+                        response_file[dec_id_label].keys(recursive=False)
+                    )
 
                     response_bins_ids = list(range(n_energy_bins))
 
@@ -373,7 +387,9 @@ class HAWCResponse(object):
         if verbose:
             log.info(self._dec_bins)
         # log.info("Number of energy/nHit planes per dec bin_name: %s" % (self.n_energy_planes))
-        log.info(f"Number of energy/nHit planes per dec bin_name: {self.n_energy_planes}")
+        log.info(
+            f"Number of energy/nHit planes per dec bin_name: {self.n_energy_planes}"
+        )
         if verbose:
             log.info(list(self._response_bins.values())[0].keys())
 
