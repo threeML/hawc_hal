@@ -16,7 +16,7 @@ def deepcopy_hal(theMaptree, theResponse, extended=False):
     bins = ['1', '2', '3', '4', '5', '6', '7', '8', '9']
     hawc = HAL('HAWC', theMaptree, theResponse, roi, bin_list=bins)
     #V1: Rishi: Add bin_list for test
-    #hawc = HAL('HAWC', theMaptree, theResponse, roi)
+
     hawc.set_active_measurements(1, 9)
     data = DataList(hawc)
 

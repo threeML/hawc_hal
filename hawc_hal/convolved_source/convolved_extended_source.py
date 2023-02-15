@@ -66,7 +66,9 @@ class ConvolvedExtendedSource(object):
         # Add one dec bin to cover the last part
         dec_bins_to_consider_idx = np.append(dec_bins_to_consider_idx, [dec_bins_to_consider_idx[-1] + 1])
         # Add one dec bin to cover the first part
-        dec_bins_to_consider_idx = np.insert(dec_bins_to_consider_idx, 0, [dec_bins_to_consider_idx[0] - 1])
+        if (dec_bins_to_consider_idx[0]!=0):
+             dec_bins_to_consider_idx = np.insert(dec_bins_to_consider_idx, 0, [dec_bins_to_consider_idx[0] - 1])
+        #else (Rishi change code to remove dec band below 0)
         log.info("The bins are %s" %(dec_bins_to_consider_idx))  #Rishi
         self._dec_bins_to_consider = [response.response_bins[centers[x]] for x in dec_bins_to_consider_idx]
         log.info("Considering %i dec bins for extended source %s" % (len(self._dec_bins_to_consider),

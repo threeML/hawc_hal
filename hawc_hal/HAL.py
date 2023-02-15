@@ -11,7 +11,8 @@ import healpy as hp
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 import numpy as np
-import pandas as pd
+import pandas as pdi
+from hawc_hal.dec_band_select import dec_index_search
 from astromodels import Parameter
 from astropy.convolution import Gaussian2DKernel
 from astropy.convolution import convolve_fft as convolve
@@ -30,7 +31,8 @@ from hawc_hal.convolved_source import (ConvolvedExtendedSource2D,
                                        ConvolvedSourcesContainer)
 from hawc_hal.healpix_handling import (FlatSkyToHealpixTransform,
                                        SparseHealpix, get_gnomonic_projection)
-from hawc_hal.log_likelihood import log_likelihood
+from hawc_hal.region_of_interest import (HealpixConeROI, HealpixMapROI)  #red
+from hawc_hal.log_likelihood import log_likelihood 
 from hawc_hal.maptree import map_tree_factory
 from hawc_hal.maptree.data_analysis_bin import DataAnalysisBin
 from hawc_hal.maptree.map_tree import MapTree
@@ -53,7 +55,8 @@ class HAL(PluginPrototype):
     """
 
 #    def __init__(self, name, maptree, response_file, roi, flat_sky_pixels_size=0.17):
-    def __init__(self, name, maptree, response_file, roi, flat_sky_pixels_size=0.17, bin_list=None, dec_list=None): \
+    #def __init__(self, name, maptree, response_file, roi, flat_sky_pixels_size=0.17, bin_list=None, dec_list=None): 
+    def __init__(self, name, maptree, response_file, roi, flat_sky_pixels_size=0.17, bin_list=None): 
     #V1: Initialize hal to read bin_list from the fitModel script for bin list psf fit
         # Store ROI
         self._roi = roi
@@ -67,7 +70,12 @@ class HAL(PluginPrototype):
         self._flat_sky_projection = self._roi.get_flat_sky_projection(
             self.flat_sky_pixels_size
         )
-
+        if roi:
+            dec_arange=[roi.ra_dec_center[1]-roi.model_radius.to(u.deg).value, roi.ra_dec_center[1]+roi.model_radius.to(u.deg).value]
+            print("printing dec range", dec_arange)
+            dec_list = dec_index_search(response_file, dec_arange)
+            print("Printing dec list=", dec_list)
+            
         # Read map tree (data)
         self._maptree = map_tree_factory(maptree, roi=self._roi)
 
@@ -969,6 +977,7 @@ class HAL(PluginPrototype):
 
                 # Active plane. Generate new data
                 expectation = self._clone[1][bin_id]
+                print(bin_id, len(expectation), expectation)
                 new_data = np.random.poisson(
                     expectation, size=(1, expectation.shape[0])
                 ).flatten()
