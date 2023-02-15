@@ -52,6 +52,6 @@ def dec_index_search(response_file, dec_var, use_module):
         # Add one dec bin to cover the first part
         dec_bins_to_consider_idx = np.insert(dec_bins_to_consider_idx, 0, [dec_bins_to_consider_idx[0] - 1])
         # Rescale bins to be remove dec bins less than 0 and greater than 22
-        dec_bins_in_use=dec_bins_to_consider_idx[(dec_bins_to_consider_idx >=0) | (-23>dec_bins_to_consider_idx)]
+        dec_bins_in_use=dec_bins_to_consider_idx[(dec_bins_to_consider_idx >=0) & (23>dec_bins_to_consider_idx)]
         log.info("Declination bins to read response file: %s" %(dec_bins_in_use))
         return dec_bins_in_use
