@@ -13,8 +13,8 @@ def deepcopy_hal(theMaptree, theResponse, extended=False):
     src_name = 'test_source'
 
     roi = HealpixConeROI(data_radius=5., model_radius=8., ra=src_ra, dec=src_dec)
-
-    hawc = HAL('HAWC', theMaptree, theResponse, roi)
+    bins = ['1', '2', '3', '4', '5', '6', '7', '8', '9']
+    hawc = HAL('HAWC', theMaptree, theResponse, roi, bin_list=bins)
     hawc.set_active_measurements(1, 9)
     data = DataList(hawc)
 
