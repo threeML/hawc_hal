@@ -78,6 +78,7 @@ class ResponseBin(object):
         min_dec: np.ndarray,
         dec_center: np.ndarray,
         max_dec: np.ndarray,
+        bin_list3
     ):
         """
         Obtain the information from Response ROOT file
