@@ -33,7 +33,7 @@ setup(
         "hawc_hal/region_of_interest",
         "hawc_hal/convenience_functions",
         "hawc_hal/tests",
-        "hawc_hal/scripts",
+        "scripts",
     ],
     url="https://github.com/threeML/hawc_hal",
     license="BSD-3.0",
