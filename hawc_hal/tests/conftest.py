@@ -77,12 +77,8 @@ def check_map_trees(m1, m2):
         p1 = m1[p_key]
         p2 = m2[p_key]
 
-        assert np.allclose(
-            p1.observation_map.as_partial(), p2.observation_map.as_partial()
-        )
-        assert np.allclose(
-            p1.background_map.as_partial(), p2.background_map.as_partial()
-        )
+        assert np.allclose(p1.observation_map.as_partial(), p2.observation_map.as_partial())
+        assert np.allclose(p1.background_map.as_partial(), p2.background_map.as_partial())
 
         assert p1.nside == p2.nside
         assert p1.n_transits == p2.n_transits
@@ -132,9 +128,7 @@ def check_responses(r1, r2):
                 rb1.sim_differential_photon_fluxes, rb2.sim_differential_photon_fluxes
             )
 
-            assert np.allclose(
-                rb1.sim_signal_events_per_bin, rb2.sim_signal_events_per_bin
-            )
+            assert np.allclose(rb1.sim_signal_events_per_bin, rb2.sim_signal_events_per_bin)
 
             # Test PSF
             assert np.allclose(rb1.psf.xs, rb2.psf.xs)

@@ -4,17 +4,9 @@ import numpy as np
 
 # This function has two signatures in numba because if there are no sources in the likelihood model,
 # then expected_model_counts is 0.0
-@jit(
-    [
-        "float64(float64[:], float64[:], float64[:])",
-        "float64(float64[:], float64[:], float64)",
-    ],
-    nopython=True,
-    parallel=False,
-)
-def log_likelihood(
-    observed_counts, expected_bkg_counts, expected_model_counts
-):  # pragma: no cover
+@jit(["float64(float64[:], float64[:], float64[:])", "float64(float64[:], float64[:], float64)"],
+     nopython=True, parallel=False)
+def log_likelihood(observed_counts, expected_bkg_counts, expected_model_counts):  # pragma: no cover
     """
     Poisson log-likelihood minus log factorial minus bias. The bias migth be needed to keep the numerical value
     of the likelihood small enough so that there aren't numerical problems when computing differences between two

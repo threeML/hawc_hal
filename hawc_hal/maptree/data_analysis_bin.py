@@ -4,27 +4,16 @@ import pandas as pd
 
 
 class DataAnalysisBin(object):
-    def __init__(
-        self,
-        name,
-        observation_hpx_map,
-        background_hpx_map,
-        active_pixels_ids,
-        n_transits,
-        scheme="RING",
-    ):
+
+    def __init__(self, name, observation_hpx_map, background_hpx_map, active_pixels_ids, n_transits, scheme='RING'):
 
         # Get nside
         self._nside = observation_hpx_map.nside
 
         nside_bkg = background_hpx_map.nside
 
-        assert (
-            self._nside == nside_bkg
-        ), "Observation and background maps have " "different nside (%i vs %i)" % (
-            self._nside,
-            nside_bkg,
-        )
+        assert self._nside == nside_bkg, "Observation and background maps have " \
+                                         "different nside (%i vs %i)" % (self._nside, nside_bkg)
 
         self._npix = observation_hpx_map.npix
 
@@ -39,7 +28,7 @@ class DataAnalysisBin(object):
         # Store name and scheme
         self._name = str(name)
 
-        assert scheme in ["RING", "NEST"], "Scheme must be either RING or NEST"
+        assert scheme in ['RING', 'NEST'], "Scheme must be either RING or NEST"
 
         self._scheme = scheme
 
@@ -48,23 +37,17 @@ class DataAnalysisBin(object):
     def to_pandas(self):
 
         # Make a dataframe
-        df = pd.DataFrame.from_dict(
-            {
-                "observation": self._observation_hpx_map.to_pandas(),
-                "background": self._background_hpx_map.to_pandas(),
-            }
-        )
+        df = pd.DataFrame.from_dict({'observation': self._observation_hpx_map.to_pandas(),
+                                     'background': self._background_hpx_map.to_pandas()})
 
         if self._active_pixels_ids is not None:
             # We are saving only a subset
             df.set_index(self._active_pixels_ids, inplace=True)
 
         # Some metadata
-        meta = {
-            "scheme": 0 if self._scheme == "RING" else 1,
-            "n_transits": self._n_transits,
-            "nside": self._nside,
-        }
+        meta = {'scheme': 0 if self._scheme == 'RING' else 1,
+                'n_transits': self._n_transits,
+                'nside': self._nside}
 
         return df, meta
 

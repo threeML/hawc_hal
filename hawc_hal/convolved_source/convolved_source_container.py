@@ -1,6 +1,4 @@
 from builtins import object
-
-
 class ConvolvedSourcesContainer(object):
     def __init__(self):
 

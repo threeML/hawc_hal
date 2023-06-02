@@ -112,20 +112,15 @@ class ResponseBin(object):
                 return (
                     np.log10(parameters[0])
                     - parameters[1] * log_energy
-                    - np.log10(np.exp(1.0))
-                    * np.power(10.0, log_energy - np.log10(parameters[2]))
+                    - np.log10(np.exp(1.0)) * np.power(10.0, log_energy - np.log10(parameters[2]))
                 )
 
             else:
                 raise ValueError("Unknown spectral shape.")
 
-        this_en_sig_th1d = cls._get_en_th1d(
-            root_file, dec_id, analysis_bin_id, prefix="Sig"
-        )
+        this_en_sig_th1d = cls._get_en_th1d(root_file, dec_id, analysis_bin_id, prefix="Sig")
 
-        this_en_bg_th1d = cls._get_en_th1d(
-            root_file, dec_id, analysis_bin_id, prefix="Bg"
-        )
+        this_en_bg_th1d = cls._get_en_th1d(root_file, dec_id, analysis_bin_id, prefix="Bg")
 
         total_bins = this_en_sig_th1d.shape[0]
         sim_energy_bin_low = np.zeros(total_bins)
@@ -168,15 +163,11 @@ class ResponseBin(object):
         try:
 
             psf_prefix = f"dec_{dec_id:02d}/nh_{analysis_bin_id}"
-            psf_tf1_metadata = root_file[
-                f"{psf_prefix}/PSF_dec{dec_id}_nh{analysis_bin_id}_fit"
-            ]
+            psf_tf1_metadata = root_file[f"{psf_prefix}/PSF_dec{dec_id}_nh{analysis_bin_id}_fit"]
         except uproot.KeyInFileError:
 
             psf_prefix = f"dec_{dec_id:02d}/nh_0{analysis_bin_id}"
-            psf_tf1_metadata = root_file[
-                f"{psf_prefix}/PSF_dec{dec_id}_nh{analysis_bin_id}_fit"
-            ]
+            psf_tf1_metadata = root_file[f"{psf_prefix}/PSF_dec{dec_id}_nh{analysis_bin_id}_fit"]
 
         psf_tf1_fparams = psf_tf1_metadata.member("fParams")
 
@@ -250,9 +241,7 @@ class ResponseBin(object):
         n_sim_signal_events = (
             w1 * self._sim_n_sig_events + w2 * other_response_bin._sim_n_sig_events
         )
-        n_sim_bkg_events = (
-            w1 * self._sim_n_bg_events + w2 * other_response_bin._sim_n_bg_events
-        )
+        n_sim_bkg_events = w1 * self._sim_n_bg_events + w2 * other_response_bin._sim_n_bg_events
 
         # We assume that the bin centers are the same
         assert np.allclose(

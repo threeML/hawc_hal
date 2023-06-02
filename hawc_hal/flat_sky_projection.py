@@ -33,21 +33,11 @@ def _get_header(ra, dec, pixel_size, coordsys, h, w):
 
     assert 0 <= ra <= 360
 
-    header = fits.Header.fromstring(
-        _fits_header
-        % (
-            h,
-            w,
-            old_div(h, 2),
-            ra,
-            pixel_size,
-            old_div(w, 2),
-            dec,
-            pixel_size,
-            coordsys,
-        ),
-        sep="\n",
-    )
+    header = fits.Header.fromstring(_fits_header % (h, w,
+                                                    old_div(h, 2), ra, pixel_size,
+                                                    old_div(w, 2), dec, pixel_size,
+                                                    coordsys),
+                                    sep='\n')
 
     return header
 
@@ -59,7 +49,8 @@ def _get_all_ra_dec(input_wcs, h, w):
     xx = np.arange(0.5, h + 0.5, 1, dtype=np.int16)
     yy = np.arange(0.5, w + 0.5, 1, dtype=np.int16)
 
-    _ij_grid = cartesian((xx, yy))
+    _ij_grid = cartesian((xx,
+                          yy))
 
     # Convert pixel coordinates to world coordinates
     world = input_wcs.all_pix2world(_ij_grid, 0, ra_dec_order=True)
@@ -68,6 +59,7 @@ def _get_all_ra_dec(input_wcs, h, w):
 
 
 class FlatSkyProjection(object):
+
     def __init__(self, ra_center, dec_center, pixel_size_deg, npix_height, npix_width):
 
         assert npix_height % 2 == 0, "Number of height pixels must be even"
@@ -94,11 +86,7 @@ class FlatSkyProjection(object):
 
         # Build projection, i.e., a World Coordinate System object
 
-        self._wcs = WCS(
-            _get_header(
-                ra_center, dec_center, pixel_size_deg, "icrs", npix_height, npix_width
-            )
-        )
+        self._wcs = WCS(_get_header(ra_center, dec_center, pixel_size_deg, 'icrs', npix_height, npix_width))
 
         # Pre-compute all R.A., Decs
         self._ras, self._decs = _get_all_ra_dec(self._wcs, npix_height, npix_width)
@@ -252,3 +240,4 @@ class FlatSkyProjection(object):
     #         self._distance_cache[key] = (ds[fine_selection_idx], selection_idx)
     #
     #     return self._distance_cache[key]
+

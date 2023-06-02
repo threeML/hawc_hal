@@ -125,12 +125,8 @@ class MapTree(object):
         df = pd.DataFrame()
 
         df["Bin"] = list(self._analysis_bins.keys())
-        df["Nside"] = [
-            self._analysis_bins[bin_id].nside for bin_id in self._analysis_bins
-        ]
-        df["Scheme"] = [
-            self._analysis_bins[bin_id].scheme for bin_id in self._analysis_bins
-        ]
+        df["Nside"] = [self._analysis_bins[bin_id].nside for bin_id in self._analysis_bins]
+        df["Scheme"] = [self._analysis_bins[bin_id].scheme for bin_id in self._analysis_bins]
 
         # Compute observed counts, background counts, how many pixels we have in the ROI and
         # the sky area they cover
@@ -197,9 +193,9 @@ class MapTree(object):
 
             analysis_bin = self._analysis_bins[bin_id]
 
-            assert (
-                bin_id == analysis_bin.name
-            ), "Bin name inconsistency: {} != {}".format(bin_id, analysis_bin.name)
+            assert bin_id == analysis_bin.name, "Bin name inconsistency: {} != {}".format(
+                bin_id, analysis_bin.name
+            )
 
             multi_index_keys.append(analysis_bin.name)
 
@@ -227,9 +223,7 @@ class MapTree(object):
 
                 else:
 
-                    serializer.store_pandas_object(
-                        "/ROI", pd.Series(), **self._roi.to_dict()
-                    )
+                    serializer.store_pandas_object("/ROI", pd.Series(), **self._roi.to_dict())
 
             else:
 

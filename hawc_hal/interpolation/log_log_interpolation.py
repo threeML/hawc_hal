@@ -6,6 +6,7 @@ import scipy.interpolate
 
 
 class LogLogInterpolator(object):  # pragma: no cover
+
     def __init__(self, x, y, k=2):
 
         y = y.astype(np.float64)
@@ -18,7 +19,7 @@ class LogLogInterpolator(object):  # pragma: no cover
 
     def __call__(self, x):
 
-        return 10 ** self._interp(log10(x))
+        return 10**self._interp(log10(x))
 
     def integral(self, a, b, n_points=100, k=1):
 

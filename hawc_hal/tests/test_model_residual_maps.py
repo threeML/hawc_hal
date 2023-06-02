@@ -21,16 +21,15 @@ skip_if_ROOT_is_not_available = pytest.mark.skipif(
     not has_root, reason="No ROOT available"
 )
 
-
 @skip_if_ROOT_is_not_available
 def test_model_residual_maps(geminga_maptree, geminga_response, geminga_roi):
 
-    # data_radius = 5.0
-    # model_radius = 7.0
+    #data_radius = 5.0
+    #model_radius = 7.0
     output = dirname(geminga_maptree)
 
     ra_src, dec_src = 101.7, 16.0
-    maptree, response, roi = geminga_maptree, geminga_response, geminga_roi
+    maptree, response, roi  = geminga_maptree, geminga_response, geminga_roi
 
     hawc = HAL("HAWC", maptree, response, roi)
 
@@ -40,24 +39,22 @@ def test_model_residual_maps(geminga_maptree, geminga_response, geminga_roi):
     # Display information about the data loaded and the ROI
     hawc.display()
 
-    """
+    '''
     Define model: Two sources, 1 point, 1 extended
 
     Same declination, but offset in RA
 
     Different spectral index, but both power laws
 
-    """
-    pt_shift = 3.0
+    '''
+    pt_shift=3.0
     ext_shift = 2.0
 
     # First source
     spectrum1 = Powerlaw()
-    source1 = PointSource(
-        "point", ra=ra_src + pt_shift, dec=dec_src, spectral_shape=spectrum1
-    )
+    source1 = PointSource("point", ra=ra_src + pt_shift, dec=dec_src, spectral_shape=spectrum1)
 
-    spectrum1.K = 1e-12 / (u.TeV * u.cm**2 * u.s)
+    spectrum1.K = 1e-12 / (u.TeV * u.cm ** 2 * u.s)
     spectrum1.piv = 1 * u.TeV
     spectrum1.index = -2.3
 
@@ -70,13 +67,13 @@ def test_model_residual_maps(geminga_maptree, geminga_response, geminga_roi):
     spectrum2 = Powerlaw()
     source2 = ExtendedSource("extended", spatial_shape=shape, spectral_shape=spectrum2)
 
-    spectrum2.K = 1e-12 / (u.TeV * u.cm**2 * u.s)
+    spectrum2.K = 1e-12 / (u.TeV * u.cm ** 2 * u.s)
     spectrum2.piv = 1 * u.TeV
-    spectrum2.index = -2.0
+    spectrum2.index = -2.0  
 
-    shape.lon0.fix = True
-    shape.lat0.fix = True
-    shape.sigma.fix = True
+    shape.lon0.fix=True
+    shape.lat0.fix=True
+    shape.sigma.fix=True
 
     spectrum2.piv.fix = True
     spectrum2.K.fix = True
@@ -91,7 +88,7 @@ def test_model_residual_maps(geminga_maptree, geminga_response, geminga_roi):
     # Define the JointLikelihood object (glue the data to the model)
     jl = JointLikelihood(model, data, verbose=False)
 
-    # This has the effect of loading the model cache
+    # This has the effect of loading the model cache 
     fig = hawc.display_spectrum()
 
     # the test file names
@@ -99,16 +96,13 @@ def test_model_residual_maps(geminga_maptree, geminga_response, geminga_roi):
     residual_file_name = "{0}/test_residual.hdf5".format(output)
 
     # Write the map trees for testing
-    model_map_tree = hawc.write_model_map(
-        model_file_name, poisson_fluctuate=True, test_return_map=True
-    )
-    residual_map_tree = hawc.write_residual_map(
-        residual_file_name, test_return_map=True
-    )
+    model_map_tree = hawc.write_model_map(model_file_name, poisson_fluctuate=True, test_return_map=True)
+    residual_map_tree = hawc.write_residual_map(residual_file_name, test_return_map=True)
 
     # Read the maps back in
-    hawc_model = map_tree_factory(model_file_name, roi)
-    hawc_residual = map_tree_factory(residual_file_name, roi)
+    hawc_model = map_tree_factory(model_file_name,roi)
+    hawc_residual = map_tree_factory(residual_file_name,roi)
+
 
     check_map_trees(hawc_model, model_map_tree)
     check_map_trees(hawc_residual, residual_map_tree)

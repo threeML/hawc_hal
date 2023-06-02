@@ -30,9 +30,7 @@ class PSFWrapper(object):
 
         # Memorize the total integral (will use it for normalization)
 
-        self._total_integral = self._psf_interpolated.integral(
-            self._xs[0], _INTEGRAL_OUTER_RADIUS
-        )
+        self._total_integral = self._psf_interpolated.integral(self._xs[0], _INTEGRAL_OUTER_RADIUS)
 
         # Now compute the truncation radius, which is a very conservative measurement
         # of the size of the PSF
@@ -92,9 +90,7 @@ class PSFWrapper(object):
 
         f = lambda r: fraction - old_div(self.integral(1e-4, r), self._total_integral)
 
-        radius, status = scipy.optimize.brentq(
-            f, 0.005, _INTEGRAL_OUTER_RADIUS, full_output=True
-        )
+        radius, status = scipy.optimize.brentq(f, 0.005, _INTEGRAL_OUTER_RADIUS, full_output=True)
 
         assert status.converged, "Brentq did not converged"
 
@@ -135,9 +131,7 @@ class PSFWrapper(object):
         new_ys = w1 * self.ys + w2 * other_psf.ys
 
         # Also weight the brightness interpolation points
-        new_br_interp_y = (
-            w1 * self._brightness_interp_y + w2 * other_psf._brightness_interp_y
-        )
+        new_br_interp_y = w1 * self._brightness_interp_y + w2 * other_psf._brightness_interp_y
 
         return PSFWrapper(
             self.xs,

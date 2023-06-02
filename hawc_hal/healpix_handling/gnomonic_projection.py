@@ -16,20 +16,18 @@ def get_gnomonic_projection(figure, hpx_map, **kwargs):
     :return: the array containing the projection.
     """
 
-    defaults = {
-        "coord": "C",
-        "rot": None,
-        "format": "%g",
-        "flip": "astro",
-        "xsize": 200,
-        "ysize": None,
-        "reso": 1.5,
-        "nest": False,
-        "min": None,
-        "max": None,
-        "cmap": None,
-        "norm": None,
-    }
+    defaults = {'coord': 'C',
+                'rot': None,
+                'format': '%g',
+                'flip': 'astro',
+                'xsize': 200,
+                'ysize': None,
+                'reso': 1.5,
+                'nest': False,
+                'min': None,
+                'max': None,
+                'cmap': None,
+                'norm': None}
 
     for key, default_value in list(defaults.items()):
 
@@ -49,31 +47,26 @@ def get_gnomonic_projection(figure, hpx_map, **kwargs):
     #           extent[3] - margins[3] - margins[1])
     extent = (0.05, 0.05, 0.9, 0.9)
 
-    ax = PA.HpxGnomonicAxes(
-        figure,
-        extent,
-        coord=kwargs["coord"],
-        rot=kwargs["rot"],
-        format=kwargs["format"],
-        flipconv=kwargs["flip"],
-    )
+    ax = PA.HpxGnomonicAxes(figure, extent,
+                            coord=kwargs['coord'],
+                            rot=kwargs['rot'],
+                            format=kwargs['format'],
+                            flipconv=kwargs['flip'])
 
     # Suppress warnings about nans
     with np.warnings.catch_warnings():
 
-        np.warnings.filterwarnings("ignore")
+        np.warnings.filterwarnings('ignore')
 
-        img = ax.projmap(
-            hpx_map,
-            nest=kwargs["nest"],
-            coord=kwargs["coord"],
-            vmin=kwargs["min"],
-            vmax=kwargs["max"],
-            xsize=kwargs["xsize"],
-            ysize=kwargs["ysize"],
-            reso=kwargs["reso"],
-            cmap=kwargs["cmap"],
-            norm=kwargs["norm"],
-        )
+        img = ax.projmap(hpx_map,
+                         nest=kwargs['nest'],
+                         coord=kwargs['coord'],
+                         vmin=kwargs['min'],
+                         vmax=kwargs['max'],
+                         xsize=kwargs['xsize'],
+                         ysize=kwargs['ysize'],
+                         reso=kwargs['reso'],
+                         cmap=kwargs['cmap'],
+                         norm=kwargs['norm'])
 
     return img

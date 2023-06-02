@@ -65,6 +65,7 @@ class HealpixWrapperBase(object):
 
 
 class SparseHealpix(HealpixWrapperBase):
+
     def __init__(self, partial_map, pixels_ids, nside, fill_value=UNSEEN):
 
         self._partial_map = partial_map
@@ -81,7 +82,7 @@ class SparseHealpix(HealpixWrapperBase):
         added = self.as_partial() + other_map.as_partial()
 
         sparse_added = SparseHealpix(added, self._pixels_ids, self.nside)
-
+        
         return sparse_added
 
     def __sub__(self, other_map):
@@ -126,6 +127,7 @@ class SparseHealpix(HealpixWrapperBase):
         return self._pixels_ids
 
 
+
 class DenseHealpix(HealpixWrapperBase):
     """
     A dense (fullsky) healpix map. In this case partial and complete are the same map.
@@ -136,9 +138,7 @@ class DenseHealpix(HealpixWrapperBase):
 
         self._dense_map = healpix_array
 
-        super(DenseHealpix, self).__init__(
-            nside=hp.npix2nside(healpix_array.shape[0]), sparse=False
-        )
+        super(DenseHealpix, self).__init__(nside=hp.npix2nside(healpix_array.shape[0]), sparse=False)
 
     def as_dense(self):
         """
@@ -159,3 +159,4 @@ class DenseHealpix(HealpixWrapperBase):
         assert new_values.shape == self._dense_map.shape
 
         self._dense_map[:] = new_values
+

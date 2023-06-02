@@ -3,24 +3,26 @@ from ..HAL import HAL
 from threeML import DataList, JointLikelihood
 
 
-def fit_point_source(
-    roi,
-    maptree,
-    response,
-    point_source_model,
-    bin_list,
-    confidence_intervals=False,
-    liff=False,
-    pixel_size=0.17,
-    verbose=False,
-):
+def fit_point_source(roi,
+                     maptree,
+                     response,
+                     point_source_model,
+                     bin_list,
+                     confidence_intervals=False,
+                     liff=False,
+                     pixel_size=0.17,
+                     verbose=False):
 
     data_radius = roi.data_radius.to("deg").value
 
     if not liff:
 
         # This is a 3ML plugin
-        hawc = HAL("HAWC", maptree, response, roi, flat_sky_pixels_size=pixel_size)
+        hawc = HAL("HAWC",
+                   maptree,
+                   response,
+                   roi,
+                   flat_sky_pixels_size=pixel_size)
 
         hawc.set_active_measurements(bin_list=bin_list)
 
@@ -28,7 +30,10 @@ def fit_point_source(
 
         from threeML import HAWCLike
 
-        hawc = HAWCLike("HAWC", maptree, response, fullsky=True)
+        hawc = HAWCLike("HAWC",
+                        maptree,
+                        response,
+                        fullsky=True)
 
         hawc.set_bin_list(bin_list)
 
