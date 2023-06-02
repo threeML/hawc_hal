@@ -1,16 +1,17 @@
-import os
-import os.path
-
 from setuptools import setup
+import os, os.path
 
 # Create list of data files
 
 
 def find_data_files(directory):
+
     paths = []
 
-    for path, directories, filenames in os.walk(directory):
+    for (path, directories, filenames) in os.walk(directory):
+
         for filename in filenames:
+
             paths.append(os.path.join("..", path, filename))
 
     return paths
@@ -33,7 +34,6 @@ setup(
         "hawc_hal/region_of_interest",
         "hawc_hal/convenience_functions",
         "hawc_hal/tests",
-        "hawc_hal/scripts",
     ],
     url="https://github.com/threeML/hawc_hal",
     license="BSD-3.0",
