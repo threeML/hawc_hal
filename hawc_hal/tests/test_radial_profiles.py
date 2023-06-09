@@ -14,8 +14,8 @@ from hawc_hal import HAL
 def test_fit(roi, maptree, response, point_source_model):
 
     pts_model = point_source_model
-
-    hawc = HAL("HAWC", maptree, response, roi)
+    bins = ['1', '2', '3', '4', '5', '6', '7', '8', '9']
+    hawc = HAL("HAWC", maptree, response, roi, bin_list=bins)
 
     hawc.set_active_measurements(1, 9)
 

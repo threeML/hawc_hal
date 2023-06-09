@@ -12,6 +12,7 @@ import matplotlib as mpl
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+from hawc_hal.dec_band_select import dec_index_search
 from astromodels import Parameter
 from astropy.convolution import Gaussian2DKernel
 from astropy.convolution import convolve_fft as convolve
@@ -35,6 +36,10 @@ from hawc_hal.healpix_handling import (
     FlatSkyToHealpixTransform,
     SparseHealpix,
     get_gnomonic_projection,
+)
+from hawc_hal.region_of_interest import (
+    HealpixConeROI, 
+    HealpixMapROI
 )
 from hawc_hal.log_likelihood import log_likelihood
 from hawc_hal.maptree import map_tree_factory
@@ -66,6 +71,7 @@ class HAL(PluginPrototype):
         roi,
         flat_sky_pixels_size=0.17,
         set_transits=None,
+        bin_list=None
     ):
 
         # Store ROI
@@ -80,6 +86,11 @@ class HAL(PluginPrototype):
             n_transits = None
             log.info("Using transits contained in maptree")
 
+        if roi:
+            dec_arange=[roi.ra_dec_center[1]-roi.model_radius.to(u.deg).value, roi.ra_dec_center[1]+roi.model_radius.to(u.deg).value]
+            dec_list = dec_index_search(response_file, dec_arange, use_module=True)
+            print("Using declination list=", dec_list)
+
         # Set up the flat-sky projection
         self.flat_sky_pixels_size = flat_sky_pixels_size
         self._flat_sky_projection = self._roi.get_flat_sky_projection(self.flat_sky_pixels_size)
@@ -88,7 +99,7 @@ class HAL(PluginPrototype):
         self._maptree = map_tree_factory(maptree, roi=self._roi, n_transits=n_transits)
 
         # Read detector response_file
-        self._response = hawc_response_factory(response_file)
+        self._response = hawc_response_factory(response_file, bin_list, dec_list)
 
         # Use a renormalization of the background as nuisance parameter
         # NOTE: it is fixed to 1.0 unless the user explicitly sets it free (experimental)

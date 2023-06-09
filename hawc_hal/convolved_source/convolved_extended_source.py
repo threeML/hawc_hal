@@ -50,26 +50,31 @@ class ConvolvedExtendedSource(object):
         # Figure out maximum and minimum declination to be covered
         dec_min = max(min([dec1, dec2, dec3, dec4]), lat_start)
         dec_max = min(max([dec1, dec2, dec3, dec4]), lat_stop)
-
+        log.info("Lat start = %.3f, Lat stop = %.3f" %(lat_start, lat_stop))
+        log.info("Min = %.3f, Max = %.3f" %(dec_min, dec_max))
+        # Get the defined dec bins lower edges
         # Get the defined dec bins lower edges
         lower_edges = np.array([x[0] for x in response.dec_bins])
         upper_edges = np.array([x[-1] for x in response.dec_bins])
         centers = np.array([x[1] for x in response.dec_bins])
 
         dec_bins_to_consider_idx = np.flatnonzero((upper_edges >= dec_min) & (lower_edges <= dec_max))
-
+        log.info("Central bins = %s" %(dec_bins_to_consider_idx))
         # Wrap the selection so we have always one bin before and one after.
         # NOTE: we assume that the ROI do not overlap with the very first or the very last dec bin
         # Add one dec bin to cover the last part
         dec_bins_to_consider_idx = np.append(dec_bins_to_consider_idx, [dec_bins_to_consider_idx[-1] + 1])
         # Add one dec bin to cover the first part
-        dec_bins_to_consider_idx = np.insert(dec_bins_to_consider_idx, 0, [dec_bins_to_consider_idx[0] - 1])
-
+        if (dec_bins_to_consider_idx[0]!=0):
+             dec_bins_to_consider_idx = np.insert(dec_bins_to_consider_idx, 0, [dec_bins_to_consider_idx[0] - 1])
+        #else (Rishi change code to remove dec band below 0)
+        log.info("The bins are %s" %(dec_bins_to_consider_idx))
         self._dec_bins_to_consider = [response.response_bins[centers[x]] for x in dec_bins_to_consider_idx]
 
         log.info("Considering %i dec bins for extended source %s" % (len(self._dec_bins_to_consider),
                                                                   self._name))
-
+        log.info("The bins are %s" %(dec_bins_to_consider_idx))  
+        self.return_bins = dec_bins_to_consider_idx  
         # Find central bin for the PSF
 
         dec_center = (lat_start + lat_stop) / 2.0

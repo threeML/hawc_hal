@@ -28,7 +28,7 @@ def fit_point_source(roi, maptree, response, point_source_model, liff=False):
     if not liff:
 
         # This is a 3ML plugin
-        hawc = HAL("HAWC", maptree, response, roi)
+        hawc = HAL("HAWC", maptree, response, roi, bin_list=None)
 
     else:
 
