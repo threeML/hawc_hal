@@ -1,17 +1,12 @@
 from __future__ import absolute_import
 
 import collections
-import os
-import socket
-from builtins import map, range, str
-from itertools import count
+from builtins import range, str
 from pathlib import Path
-from token import N_TOKENS
 
 import healpy as hp
 import numpy as np
 import uproot
-from matplotlib.style import library
 from threeML.io.file_utils import file_existing_and_readable, sanitize_filename
 from threeML.io.logging import setup_logger
 
@@ -55,7 +50,6 @@ def from_root_file(
     # Check that they exists and can be read
 
     if not file_existing_and_readable(map_tree_file):  # pragma: no cover
-
         raise IOError(f"MapTree {map_tree_file} does not exist or is not readable")
 
     # Make sure we have a proper ROI (or None)
@@ -76,21 +70,16 @@ def from_root_file(
 
     # Read the maptree
     with uproot.open(str(map_tree_file)) as map_infile:
-
         log.info("Reading Maptree!")
 
         try:
-
             data_bins_labels = map_infile["BinInfo/name"].array().to_numpy()
 
         except ValueError:
-
             try:
-
                 data_bins_labels = map_infile["BinInfo/id"].array().to_numpy()
 
             except ValueError as exc:
-
                 raise ValueError("Maptree has no Branch: 'id' or 'name'") from exc
 
         # HACK:workaround method of getting the Nside from maptree
@@ -143,21 +132,17 @@ def from_root_file(
         # HACK: simple way of reading the number of active pixels within
         # the define ROI
         if roi is not None:
-
             active_pixels = roi.active_pixels(
                 nside_cnt, system="equatorial", ordering="RING"
             )
 
             for pix_id in active_pixels:
-
                 healpix_map_active[pix_id] = 1.0
 
         for i in range(n_bins):
-
             name = data_bins_labels[i]
 
             try:
-
                 data_tree_prefix = f"nHit{name}/data/count"
                 bkg_tree_prefix = f"nHit{name}/bkg/count"
 
@@ -171,17 +156,19 @@ def from_root_file(
                 )
 
             except uproot.KeyInFileError:
-
                 # Sometimes, names of bins carry an extra zero
                 data_tree_prefix = f"nHit0{name}/data/count"
                 bkg_tree_prefix = f"nHit0{name}/bkg/count"
 
-                counts = map_infile[data_tree_prefix].array().to_numpy()
-                bkg = map_infile[bkg_tree_prefix].array().to_numpy()
+                counts = map_infile[data_tree_prefix].array().to_numpy() * (
+                    n_transits / max(n_durations)
+                )
+                bkg = map_infile[bkg_tree_prefix].array().to_numpy() * (
+                    n_transits / max(n_durations)
+                )
 
             # Read only elements within the ROI
             if roi is not None:
-
                 # HACK: first attempt at reading only a partial map specified
                 # by the active pixel ids.
 
@@ -203,7 +190,6 @@ def from_root_file(
 
             # Read the whole sky
             else:
-
                 this_data_analysis_bin = DataAnalysisBin(
                     name,
                     DenseHealpix(counts),
