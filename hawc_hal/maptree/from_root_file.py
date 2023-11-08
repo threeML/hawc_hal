@@ -1,7 +1,7 @@
 from __future__ import absolute_import
 
 import collections
-from builtins import str
+from builtins import range, str
 from pathlib import Path
 
 import healpy as hp
@@ -136,13 +136,12 @@ def from_root_file(
                 nside_cnt, system="equatorial", ordering="RING"
             )
 
-            healpix_map_active[active_pixels] = 1
-            # for pix_id in active_pixels:
-            # healpix_map_active[pix_id] = 1.0
+            for pix_id in active_pixels:
+                healpix_map_active[pix_id] = 1.0
 
-        # for i in range(n_bins):
-        # name = data_bins_labels[i]
-        for name in data_bins_labels:
+        for i in range(n_bins):
+            name = data_bins_labels[i]
+
             try:
                 data_tree_prefix = f"nHit{name}/data/count"
                 bkg_tree_prefix = f"nHit{name}/bkg/count"
@@ -161,12 +160,8 @@ def from_root_file(
                 data_tree_prefix = f"nHit0{name}/data/count"
                 bkg_tree_prefix = f"nHit0{name}/bkg/count"
 
-                counts = map_infile[data_tree_prefix].array().to_numpy() * (
-                    n_transits / max(n_durations)
-                )
-                bkg = map_infile[bkg_tree_prefix].array().to_numpy() * (
-                    n_transits / max(n_durations)
-                )
+                counts = map_infile[data_tree_prefix].array().to_numpy()
+                bkg = map_infile[bkg_tree_prefix].array().to_numpy()
 
             # Read only elements within the ROI
             if roi is not None:
