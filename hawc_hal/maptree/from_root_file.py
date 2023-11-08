@@ -1,7 +1,7 @@
 from __future__ import absolute_import
 
 import collections
-from builtins import range, str
+from builtins import str
 from pathlib import Path
 
 import healpy as hp
@@ -113,7 +113,7 @@ def from_root_file(
         #     n_durations
         # ), "Cannot use a higher value than that of maptree."
 
-        n_bins: int = data_bins_labels.shape[0]
+        data_bins_labels.shape[0]
         nside_cnt: int = hp.pixelfunc.npix2nside(npix_cnt)
         nside_bkg: int = hp.pixelfunc.npix2nside(npix_bkg)
 
@@ -136,12 +136,13 @@ def from_root_file(
                 nside_cnt, system="equatorial", ordering="RING"
             )
 
-            for pix_id in active_pixels:
-                healpix_map_active[pix_id] = 1.0
+            healpix_map_active[active_pixels] = 1
+            # for pix_id in active_pixels:
+            # healpix_map_active[pix_id] = 1.0
 
-        for i in range(n_bins):
-            name = data_bins_labels[i]
-
+        # for i in range(n_bins):
+        # name = data_bins_labels[i]
+        for name in data_bins_labels:
             try:
                 data_tree_prefix = f"nHit{name}/data/count"
                 bkg_tree_prefix = f"nHit{name}/bkg/count"
