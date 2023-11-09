@@ -1,7 +1,9 @@
 from __future__ import absolute_import
 
 import collections
-from builtins import range, str
+import concurrent.futures
+import itertools
+from builtins import str
 from pathlib import Path
 
 import healpy as hp
@@ -10,12 +12,17 @@ import uproot
 from threeML.io.file_utils import file_existing_and_readable, sanitize_filename
 from threeML.io.logging import setup_logger
 
-log = setup_logger(__name__)
-log.propagate = False
-
 from ..healpix_handling import DenseHealpix, SparseHealpix
 from ..region_of_interest import HealpixROIBase
 from .data_analysis_bin import DataAnalysisBin
+
+log = setup_logger(__name__)
+log.propagate = False
+
+
+def get_array(tree: uproot.ReadOnlyDirectory, prefix: str) -> np.ndarray:
+    """function to iterate over the maptree and read the data and bkg. maps"""
+    return tree[prefix].array().to_numpy()
 
 
 def from_root_file(
@@ -72,129 +79,113 @@ def from_root_file(
     with uproot.open(str(map_tree_file)) as map_infile:
         log.info("Reading Maptree!")
 
-        try:
-            data_bins_labels = map_infile["BinInfo/name"].array().to_numpy()
+        maptree_durations: np.ndarray = (
+            map_infile["BinInfo/totalDuration"].array().to_numpy()
+        )
 
-        except ValueError:
-            try:
-                data_bins_labels = map_infile["BinInfo/id"].array().to_numpy()
+        new_bin_info_name: str = "BinInfo/name"
+        legacy_bin_info_name: str = "BinInfo/id"
 
-            except ValueError as exc:
-                raise ValueError("Maptree has no Branch: 'id' or 'name'") from exc
+        if map_infile.get(new_bin_info_name, None) is not None:
+            bin_names = map_infile[new_bin_info_name]
+            nhit_naming_scheme: str = "nHit"
 
-        # HACK:workaround method of getting the Nside from maptree
-        bin_name = data_bins_labels[0]
+        else:
+            bin_names = map_infile[legacy_bin_info_name]
 
-        try:
-            data_tree_prefix = f"nHit{bin_name}/data/count"
-            bkg_tree_prefix = f"nHit{bin_name}/bkg/count"
+            nhit_naming_scheme: str = "nHit0"
 
-            npix_cnt = map_infile[data_tree_prefix].array().to_numpy().size
-            npix_bkg = map_infile[bkg_tree_prefix].array().to_numpy().size
+        data_bins_labels = bin_names.array().to_numpy()
 
-        except uproot.KeyInFileError:
-            data_tree_prefix = f"nHit0{bin_name}/data/count"
-            bkg_tree_prefix = f"nHit0{bin_name}/bkg/count"
+        data_tree_prefixes = [
+            f"{nhit_naming_scheme}{name}/data/count" for name in data_bins_labels
+        ]
+        bkg_tree_prefixes = [
+            f"{nhit_naming_scheme}{name}/bkg/count" for name in data_bins_labels
+        ]
 
-            npix_cnt = map_infile[data_tree_prefix].array().to_numpy().size
-            npix_bkg = map_infile[bkg_tree_prefix].array().to_numpy().size
+        # with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
+        with concurrent.futures.ProcessPoolExecutor(max_workers=5) as executor:
+            data_arrays = list(
+                executor.map(
+                    get_array, itertools.repeat(map_infile), data_tree_prefixes
+                )
+            )
+            bkg_arrays = list(
+                executor.map(get_array, itertools.repeat(map_infile), bkg_tree_prefixes)
+            )
+    log.info(f"Loaded {map_tree_file}")
 
-        # The map-maker underestimate the livetime of bins with low statistic
-        # by removing time intervals with zero events. Therefore, the best
-        # estimate of the livetime is the maximum of n_transits, which normally
-        # happen in the bins with high statistic
-        maptree_durations = map_infile["BinInfo/totalDuration"].array()
-        n_durations: np.ndarray = np.divide(maptree_durations, 24.0)
+    npix_cnt = data_arrays[0].size
+    npix_bkg = bkg_arrays[0].size
 
-        # use value of maptree unless otherwise specified by user
-        n_transits = max(n_durations) if transits is None else transits
+    # The map-maker underestimate the livetime of bins with low statistic
+    # by removing time intervals with zero events. Therefore, the best
+    # estimate of the livetime is the maximum of n_transits, which normally
+    # happen in the bins with high statistic
+    max_duration: float = np.divide(maptree_durations.max(), 24.0)
 
-        # assert n_transits <= max(
-        #     n_durations
-        # ), "Cannot use a higher value than that of maptree."
+    # use value of maptree unless otherwise specified by user
+    n_transits = max_duration if transits is None else transits
+    scale_factor: float = n_transits / max_duration
 
-        data_bins_labels.shape[0]
-        nside_cnt: int = hp.pixelfunc.npix2nside(npix_cnt)
-        nside_bkg: int = hp.pixelfunc.npix2nside(npix_bkg)
+    # data_bins_labels.shape[0]
+    nside_cnt: int = hp.pixelfunc.npix2nside(npix_cnt)
+    nside_bkg: int = hp.pixelfunc.npix2nside(npix_bkg)
 
-        # so far, a value of Nside of 1024  (perhaps will change) and a
-        # RING HEALPix
-        assert (
-            nside_cnt == nside_bkg
-        ), "Nside value needs to be the same for counts and bkg. maps"
+    # so far, a value of Nside of 1024  (perhaps will change) and a
+    # RING HEALPix
+    assert (
+        nside_cnt == nside_bkg
+    ), "Nside value needs to be the same for counts and bkg. maps"
 
-        assert scheme == 0, "NESTED HEALPix is not currently supported."
+    assert scheme == 0, "NESTED HEALPix is not currently supported."
 
-        data_analysis_bins = collections.OrderedDict()
+    data_analysis_bins = collections.OrderedDict()
 
-        healpix_map_active = np.zeros(hp.nside2npix(nside_cnt))
+    healpix_map_active = np.zeros(hp.nside2npix(nside_cnt))
 
-        # HACK: simple way of reading the number of active pixels within
-        # the define ROI
-        if roi is not None:
-            active_pixels = roi.active_pixels(
-                nside_cnt, system="equatorial", ordering="RING"
+    if roi is not None:
+        active_pixels = roi.active_pixels(
+            nside_cnt, system="equatorial", ordering="RING"
+        )
+
+        healpix_map_active[active_pixels] = 1.0
+
+        for name, counts, bkg in zip(data_bins_labels, data_arrays, bkg_arrays):
+            counts *= scale_factor
+            bkg *= scale_factor
+
+            counts_hpx = SparseHealpix(
+                counts[healpix_map_active > 0.0], active_pixels, nside_cnt
+            )
+            bkg_hpx = SparseHealpix(
+                bkg[healpix_map_active > 0.0], active_pixels, nside_bkg
             )
 
-            for pix_id in active_pixels:
-                healpix_map_active[pix_id] = 1.0
-
-        for i in range(n_bins):
-            name = data_bins_labels[i]
-
-            try:
-                data_tree_prefix = f"nHit{name}/data/count"
-                bkg_tree_prefix = f"nHit{name}/bkg/count"
-
-                # if using number of transitions different from the maptree
-                # then make sure counts are scaled accordingly.
-                counts: np.ndarray = map_infile[data_tree_prefix].array().to_numpy() * (
-                    n_transits / max(n_durations)
-                )
-                bkg: np.ndarray = map_infile[bkg_tree_prefix].array().to_numpy() * (
-                    n_transits / max(n_durations)
-                )
-
-            except uproot.KeyInFileError:
-                # Sometimes, names of bins carry an extra zero
-                data_tree_prefix = f"nHit0{name}/data/count"
-                bkg_tree_prefix = f"nHit0{name}/bkg/count"
-
-                counts = map_infile[data_tree_prefix].array().to_numpy()
-                bkg = map_infile[bkg_tree_prefix].array().to_numpy()
-
             # Read only elements within the ROI
-            if roi is not None:
-                # HACK: first attempt at reading only a partial map specified
-                # by the active pixel ids.
-
-                counts_hpx = SparseHealpix(
-                    counts[healpix_map_active > 0], active_pixels, nside_cnt
-                )
-                bkg_hpx = SparseHealpix(
-                    bkg[healpix_map_active > 0], active_pixels, nside_cnt
-                )
-
-                this_data_analysis_bin = DataAnalysisBin(
-                    name,
-                    counts_hpx,
-                    bkg_hpx,
-                    active_pixels_ids=active_pixels,
-                    n_transits=n_transits,
-                    scheme="RING",
-                )
-
+            this_data_analysis_bin = DataAnalysisBin(
+                name,
+                counts_hpx,
+                bkg_hpx,
+                active_pixels_ids=active_pixels,
+                n_transits=n_transits,
+                scheme="RING",
+            )
+            data_analysis_bins[name] = this_data_analysis_bin
+    else:
+        for name, counts, bkg in zip(data_bins_labels, data_arrays, bkg_arrays):
             # Read the whole sky
-            else:
-                this_data_analysis_bin = DataAnalysisBin(
-                    name,
-                    DenseHealpix(counts),
-                    DenseHealpix(bkg),
-                    active_pixels_ids=None,
-                    n_transits=n_transits,
-                    scheme="RING",
-                )
+            this_data_analysis_bin = DataAnalysisBin(
+                name,
+                DenseHealpix(counts),
+                DenseHealpix(bkg),
+                active_pixels_ids=None,
+                n_transits=n_transits,
+                scheme="RING",
+            )
 
             data_analysis_bins[name] = this_data_analysis_bin
+    log.info("Finished iterating over maptree")
 
     return data_analysis_bins, n_transits
