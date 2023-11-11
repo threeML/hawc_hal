@@ -3,41 +3,34 @@ from __future__ import absolute_import, division
 import os
 from builtins import object
 
+import astropy.units as u
 import numpy as np
 import pandas as pd
-import uproot
 from past.utils import old_div
 from threeML.io.file_utils import sanitize_filename
 from threeML.io.logging import setup_logger
 from threeML.io.rich_display import display
 
-log = setup_logger(__name__)
-log.propagate = False
-
-import astropy.units as u
-
 from ..serialize import Serialization
 from .from_hdf5_file import from_hdf5_file
 from .from_root_file import from_root_file
 
+log = setup_logger(__name__)
+log.propagate = False
 
-def map_tree_factory(map_tree_file, roi, n_transits=None):
 
+def map_tree_factory(map_tree_file, roi, n_workers: int, n_transits=None):
     # Sanitize files in input (expand variables and so on)
     map_tree_file = sanitize_filename(map_tree_file)
 
     if os.path.splitext(map_tree_file)[-1] == ".root":
+        return MapTree.from_root_file(map_tree_file, roi, n_transits, n_workers)
 
-        return MapTree.from_root_file(map_tree_file, roi, n_transits)
-
-    else:
-
-        return MapTree.from_hdf5(map_tree_file, roi, n_transits)
+    return MapTree.from_hdf5(map_tree_file, roi, n_transits)
 
 
 class MapTree(object):
     def __init__(self, analysis_bins, roi, n_transits=None):
-
         self._analysis_bins = analysis_bins
         self._roi = roi
 
@@ -55,13 +48,12 @@ class MapTree(object):
     @classmethod
     # def from_hdf5(cls, map_tree_file, roi):
     def from_hdf5(cls, map_tree_file, roi, n_transits):
-
         data_analysis_bins, transits = from_hdf5_file(map_tree_file, roi, n_transits)
 
         return cls(data_analysis_bins, roi, transits)
 
     @classmethod
-    def from_root_file(cls, map_tree_file, roi, n_transits):
+    def from_root_file(cls, map_tree_file, roi, n_transits, n_workers: int):
         """
         Create a MapTree object from a ROOT file and a ROI. Do not use this directly, use map_tree_factory instead.
 
@@ -70,7 +62,9 @@ class MapTree(object):
         :return:
         """
 
-        data_analysis_bins, transits = from_root_file(map_tree_file, roi, n_transits)
+        data_analysis_bins, transits = from_root_file(
+            map_tree_file, roi, n_transits, n_workers
+        )
 
         return cls(data_analysis_bins, roi, transits)
 
@@ -86,7 +80,6 @@ class MapTree(object):
         """
 
         for analysis_bin in self._analysis_bins:
-
             yield analysis_bin
 
     def __getitem__(self, item):
@@ -100,15 +93,12 @@ class MapTree(object):
         """
 
         try:
-
             return self._analysis_bins[item]
 
         except IndexError:
-
             raise IndexError("Analysis bin_name with index %i does not exist" % (item))
 
     def __len__(self):
-
         return len(self._analysis_bins)
 
     @property
@@ -117,16 +107,18 @@ class MapTree(object):
 
     @property
     def analysis_bins_labels(self):
-
         return list(self._analysis_bins.keys())
 
     def display(self):
-
         df = pd.DataFrame()
 
         df["Bin"] = list(self._analysis_bins.keys())
-        df["Nside"] = [self._analysis_bins[bin_id].nside for bin_id in self._analysis_bins]
-        df["Scheme"] = [self._analysis_bins[bin_id].scheme for bin_id in self._analysis_bins]
+        df["Nside"] = [
+            self._analysis_bins[bin_id].nside for bin_id in self._analysis_bins
+        ]
+        df["Scheme"] = [
+            self._analysis_bins[bin_id].scheme for bin_id in self._analysis_bins
+        ]
 
         # Compute observed counts, background counts, how many pixels we have in the ROI and
         # the sky area they cover
@@ -140,7 +132,6 @@ class MapTree(object):
         size = 0
 
         for i, bin_id in enumerate(self._analysis_bins):
-
             analysis_bin = self._analysis_bins[bin_id]
 
             sparse_obs = analysis_bin.observation_map.as_partial()
@@ -190,12 +181,11 @@ class MapTree(object):
         all_metas = []
 
         for bin_id in self._analysis_bins:
-
             analysis_bin = self._analysis_bins[bin_id]
 
-            assert bin_id == analysis_bin.name, "Bin name inconsistency: {} != {}".format(
-                bin_id, analysis_bin.name
-            )
+            assert (
+                bin_id == analysis_bin.name
+            ), "Bin name inconsistency: {} != {}".format(bin_id, analysis_bin.name)
 
             multi_index_keys.append(analysis_bin.name)
 
@@ -208,13 +198,11 @@ class MapTree(object):
         meta_df = pd.concat(all_metas, axis=1, keys=multi_index_keys).T
 
         with Serialization(filename, mode="w") as serializer:
-
             serializer.store_pandas_object("/analysis_bins", analysis_bins_df)
             serializer.store_pandas_object("/analysis_bins_meta", meta_df)
 
             # Write the ROI
             if self._roi is not None:
-
                 if self._roi.to_dict()["ROI type"] == "HealpixMapROI":
                     ROIDict = self._roi.to_dict()
                     roimap = ROIDict["roimap"]
@@ -222,9 +210,9 @@ class MapTree(object):
                     serializer.store_pandas_object("/ROI", pd.Series(roimap), **ROIDict)
 
                 else:
-
-                    serializer.store_pandas_object("/ROI", pd.Series(), **self._roi.to_dict())
+                    serializer.store_pandas_object(
+                        "/ROI", pd.Series(), **self._roi.to_dict()
+                    )
 
             else:
-
                 serializer.store_pandas_object("/ROI", pd.Series())

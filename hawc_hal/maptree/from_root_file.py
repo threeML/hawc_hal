@@ -2,15 +2,18 @@ from __future__ import absolute_import
 
 import collections
 import concurrent.futures
-import itertools
 from builtins import str
 from pathlib import Path
+from typing import Optional, Tuple, Union
 
 import healpy as hp
 import numpy as np
 import uproot
 from threeML.io.file_utils import file_existing_and_readable, sanitize_filename
 from threeML.io.logging import setup_logger
+
+from hawc_hal.region_of_interest.healpix_cone_roi import HealpixConeROI
+from hawc_hal.region_of_interest.healpix_map_roi import HealpixMapROI
 
 from ..healpix_handling import DenseHealpix, SparseHealpix
 from ..region_of_interest import HealpixROIBase
@@ -20,15 +23,52 @@ log = setup_logger(__name__)
 log.propagate = False
 
 
-def get_array(tree: uproot.ReadOnlyDirectory, prefix: str) -> np.ndarray:
+def retrieve_data(array_metadata, bin_name: str) -> Tuple[str, np.ndarray]:
     """function to iterate over the maptree and read the data and bkg. maps"""
-    return tree[prefix].array().to_numpy()
+    return bin_name, array_metadata.array().to_numpy()
+
+
+def multiprocessing_data(tree_metadata, bins_labels: np.ndarray, n_workers: int):
+    """Carry the multiprocessing of the data and bkg. maps"""
+    with concurrent.futures.ProcessPoolExecutor(max_workers=n_workers) as executor:
+        result = list(executor.map(retrieve_data, tree_metadata, bins_labels))
+    return result
+
+
+def retrieve_results(
+    map_infile: uproot.ReadOnlyDirectory,
+    bin_branch: str,
+    nhit_name_prefix: str,
+    n_workers: int,
+):
+    try:
+        data_bins_labels = map_infile[bin_branch].array().to_numpy()
+        data_tree_metadata = [
+            map_infile[f"{nhit_name_prefix}{name}/data/count"]
+            for name in data_bins_labels
+        ]
+        bkg_tree_metadata = [
+            map_infile[f"{nhit_name_prefix}{name}/bkg/count"]
+            for name in data_bins_labels
+        ]
+
+        result_data = multiprocessing_data(
+            data_tree_metadata, data_bins_labels, n_workers
+        )
+        result_bkg = multiprocessing_data(
+            bkg_tree_metadata, data_bins_labels, n_workers
+        )
+        return result_data, result_bkg
+
+    except Exception as e:
+        raise Exception(f"Error reading Maptree: {e}") from e
 
 
 def from_root_file(
     map_tree_file: Path,
-    roi: HealpixROIBase,
+    roi: Union[HealpixConeROI, HealpixMapROI],
     transits: float,
+    n_workers: int,
     scheme: int = 0,
 ):
     """Create a Maptree object from a ROOT file and a ROI.
@@ -83,41 +123,36 @@ def from_root_file(
             map_infile["BinInfo/totalDuration"].array().to_numpy()
         )
 
-        new_bin_info_name: str = "BinInfo/name"
-        legacy_bin_info_name: str = "BinInfo/id"
+        binning_scheme_name = {
+            "BinInfo/name": "nHit",
+            "BinInfo/id": "nHit0",
+        }
 
-        if map_infile.get(new_bin_info_name, None) is not None:
-            bin_names = map_infile[new_bin_info_name]
-            nhit_naming_scheme: str = "nHit"
+        bin_branch: Optional[str] = None
+        nhit_name_prefix: Optional[str] = None
+        for bin_info_name, nhit_scheme in binning_scheme_name.items():
+            if map_infile.get(bin_info_name, None) is not None:
+                nhit_name_prefix = nhit_scheme
+                bin_branch = bin_info_name
 
-        else:
-            bin_names = map_infile[legacy_bin_info_name]
+        data_bins_labels = map_infile[bin_branch].array().to_numpy()
 
-            nhit_naming_scheme: str = "nHit0"
+        # Launch processes to speed up the reading of the maptree file
+        # NOTE: The number of workers is suggested to be kept equal one less
+        # than the number of available cores in the system.
+        result_data, result_bkg = retrieve_results(
+            map_infile, bin_branch, nhit_name_prefix, n_workers
+        )
 
-        data_bins_labels = bin_names.array().to_numpy()
+        # Processes are not guaranteed to preserve order of analysis bin names
+        # Organize them into a dictionary for proper readout
+        data_dir_array = dict(result_data)
+        bkg_dir_array = dict(result_bkg)
 
-        data_tree_prefixes = [
-            f"{nhit_naming_scheme}{name}/data/count" for name in data_bins_labels
-        ]
-        bkg_tree_prefixes = [
-            f"{nhit_naming_scheme}{name}/bkg/count" for name in data_bins_labels
-        ]
-
-        # with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
-        with concurrent.futures.ProcessPoolExecutor(max_workers=5) as executor:
-            data_arrays = list(
-                executor.map(
-                    get_array, itertools.repeat(map_infile), data_tree_prefixes
-                )
-            )
-            bkg_arrays = list(
-                executor.map(get_array, itertools.repeat(map_infile), bkg_tree_prefixes)
-            )
     log.info(f"Loaded {map_tree_file}")
 
-    npix_cnt = data_arrays[0].size
-    npix_bkg = bkg_arrays[0].size
+    npix_cnt = result_data[0][1].size
+    npix_bkg = result_bkg[0][1].size
 
     # The map-maker underestimate the livetime of bins with low statistic
     # by removing time intervals with zero events. Therefore, the best
@@ -129,12 +164,9 @@ def from_root_file(
     n_transits = max_duration if transits is None else transits
     scale_factor: float = n_transits / max_duration
 
-    # data_bins_labels.shape[0]
     nside_cnt: int = hp.pixelfunc.npix2nside(npix_cnt)
     nside_bkg: int = hp.pixelfunc.npix2nside(npix_bkg)
 
-    # so far, a value of Nside of 1024  (perhaps will change) and a
-    # RING HEALPix
     assert (
         nside_cnt == nside_bkg
     ), "Nside value needs to be the same for counts and bkg. maps"
@@ -152,7 +184,10 @@ def from_root_file(
 
         healpix_map_active[active_pixels] = 1.0
 
-        for name, counts, bkg in zip(data_bins_labels, data_arrays, bkg_arrays):
+        for name in data_bins_labels:
+            counts = data_dir_array[name]
+            bkg = bkg_dir_array[name]
+
             counts *= scale_factor
             bkg *= scale_factor
 
@@ -174,8 +209,14 @@ def from_root_file(
             )
             data_analysis_bins[name] = this_data_analysis_bin
     else:
-        for name, counts, bkg in zip(data_bins_labels, data_arrays, bkg_arrays):
-            # Read the whole sky
+        # If no ROI is provided read the entire sky
+        for name in data_bins_labels:
+            counts = data_dir_array[name]
+            bkg = bkg_dir_array[name]
+
+            counts *= scale_factor
+            bkg *= scale_factor
+
             this_data_analysis_bin = DataAnalysisBin(
                 name,
                 DenseHealpix(counts),
@@ -186,6 +227,5 @@ def from_root_file(
             )
 
             data_analysis_bins[name] = this_data_analysis_bin
-    log.info("Finished iterating over maptree")
 
     return data_analysis_bins, n_transits
