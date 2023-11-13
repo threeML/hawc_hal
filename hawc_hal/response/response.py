@@ -1,9 +1,9 @@
 from __future__ import absolute_import, division
 
 import collections
+import concurrent.futures
 import os
 from builtins import object, zip
-from concurrent.futures import ProcessPoolExecutor
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -324,7 +324,9 @@ class HAWCResponse(object):
             dec_bins = list(zip(dec_bins_lower_edge, dec_bins_sim, dec_bins_upper_edge))
             number_of_dec_bins = len(dec_bins_sim)
 
-            with ProcessPoolExecutor(max_workers=n_workers) as executor:
+            with concurrent.futures.ProcessPoolExecutor(
+                max_workers=n_workers
+            ) as executor:
                 results = executor.map(
                     resp_metadata.generate_metadata, list(range(number_of_dec_bins))
                 )
