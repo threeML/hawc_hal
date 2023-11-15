@@ -998,35 +998,6 @@ class HAL(PluginPrototype):
 
         return self._clone[0]
 
-    def _compute_expectation(
-        self,
-        data_analysis_bin: DataAnalysisBin,
-        energy_bin_id: str,
-        convolved_source: Union[
-            ConvolvedPointSource, ConvolvedExtendedSource2D, ConvolvedExtendedSource3D
-        ],
-        this_model_map: Union[float, None],
-    ):
-        expectation_per_transit = convolved_source.get_source_map(
-            energy_bin_id,
-            tag=None,
-            psf_integration_method=self._psf_integration_method,
-        )
-
-        expectation_from_this_source = (
-            expectation_per_transit * data_analysis_bin.n_transits
-        )
-
-        if this_model_map is None:
-            # First addition
-            #
-            this_model_map = expectation_from_this_source
-
-        else:
-            this_model_map += expectation_from_this_source
-
-        return expectation_from_this_source
-
     def _get_expectation(
         self, data_analysis_bin, energy_bin_id, n_point_sources, n_ext_sources
     ):
