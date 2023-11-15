@@ -1,7 +1,7 @@
 from __future__ import absolute_import
 
 import collections
-import concurrent.futures
+import multiprocessing
 from builtins import str
 from pathlib import Path
 from typing import Optional, Tuple, Union
@@ -23,15 +23,19 @@ log = setup_logger(__name__)
 log.propagate = False
 
 
-def retrieve_data(array_metadata, bin_name: str) -> Tuple[str, np.ndarray]:
+def retrieve_data(args: Tuple[uproot.ReadOnlyDirectory, str]) -> Tuple[str, np.ndarray]:
     """function to iterate over the maptree and read the data and bkg. maps"""
+    array_metadata, bin_name = args
     return bin_name, array_metadata.array().to_numpy()
 
 
 def multiprocessing_data(tree_metadata, bins_labels: np.ndarray, n_workers: int):
     """Carry the multiprocessing of the data and bkg. maps"""
-    with concurrent.futures.ProcessPoolExecutor(max_workers=n_workers) as executor:
-        result = list(executor.map(retrieve_data, tree_metadata, bins_labels))
+    # with concurrent.futures.ProcessPoolExecutor(max_workers=n_workers) as executor:
+    #     result = list(executor.map(retrieve_data, tree_metadata, bins_labels))
+    with multiprocessing.Pool(processes=n_workers) as executor:
+        args = zip(tree_metadata, bins_labels)
+        result = list(executor.map(retrieve_data, args))
     return result
 
 

@@ -1,11 +1,12 @@
 from __future__ import absolute_import, division
 
 import collections
-import concurrent.futures
+import multiprocessing
 import os
 from builtins import object, zip
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Tuple
 
 import numpy as np
 import pandas as pd
@@ -68,33 +69,22 @@ def hawc_response_factory(response_file_name, n_workers: int):
 class ResponseBinMetaData:
     response_ttree_directory: uproot.ReadOnlyDirectory
 
-    def generate_metadata(self, dec_id):
-        psf_meta_dict = {}
-        energy_meta_dict = {}
-        energy_bkg_meta_dict = {}
+    def generate_metadata(self, args: Tuple[int, str]):
+        dec_id, bin_id = args
 
-        energy_meta_dict[dec_id] = [
-            self.response_ttree_directory[
-                f"dec_{dec_id:02d}/nh_{bin_id}/EnSig_dec{dec_id}_nh{bin_id}"
-            ].to_hist()
-            for bin_id in self.analysis_bins
-        ]
+        energy_hist = self.response_ttree_directory[
+            f"dec_{dec_id:02d}/nh_{bin_id}/EnSig_dec{dec_id}_nh{bin_id}"
+        ].to_hist()
 
-        energy_bkg_meta_dict[dec_id] = [
-            self.response_ttree_directory[
-                f"dec_{dec_id:02d}/nh_{bin_id}/EnBg_dec{dec_id}_nh{bin_id}"
-            ].to_hist()
-            for bin_id in self.analysis_bins
-        ]
+        energy_bkg_hist = self.response_ttree_directory[
+            f"dec_{dec_id:02d}/nh_{bin_id}/EnBg_dec{dec_id}_nh{bin_id}"
+        ].to_hist()
 
-        psf_meta_dict[dec_id] = [
-            self.response_ttree_directory[
-                f"dec_{dec_id:02d}/nh_{bin_id}/PSF_dec{dec_id}_nh{bin_id}_fit"
-            ].member("fParams")
-            for bin_id in self.analysis_bins
-        ]
+        psf_meta = self.response_ttree_directory[
+            f"dec_{dec_id:02d}/nh_{bin_id}/PSF_dec{dec_id}_nh{bin_id}_fit"
+        ].member("fParams")
 
-        return psf_meta_dict, energy_meta_dict, energy_bkg_meta_dict
+        return dec_id, bin_id, energy_hist, energy_bkg_hist, psf_meta
 
     @property
     def declination_bins_lower(self) -> np.ndarray:
@@ -324,21 +314,20 @@ class HAWCResponse(object):
             dec_bins = list(zip(dec_bins_lower_edge, dec_bins_sim, dec_bins_upper_edge))
             number_of_dec_bins = len(dec_bins_sim)
 
-            with concurrent.futures.ProcessPoolExecutor(
-                max_workers=n_workers
-            ) as executor:
-                results = executor.map(
-                    resp_metadata.generate_metadata, list(range(number_of_dec_bins))
-                )
+            with multiprocessing.Pool(processes=n_workers) as executor:
+                args = [
+                    (dec_id, bin_id)
+                    for dec_id in range(number_of_dec_bins)
+                    for bin_id in analysis_bins_arr
+                ]
+                results = list(executor.map(resp_metadata.generate_metadata, args))
 
-            psf_meta_dict = {}
-            energy_meta_dict = {}
-            energy_bkg_meta_dict = {}
-
-            for psf_meta, energy_meta, energy_bkg_meta in results:
-                psf_meta_dict.update(psf_meta)
-                energy_meta_dict.update(energy_meta)
-                energy_bkg_meta_dict.update(energy_bkg_meta)
+            energy_hists, energy_bkgs, psf_metas = {}, {}, {}
+            for result in results:
+                key = (result[0], result[1])
+                energy_hists[key] = result[2]
+                energy_bkgs[key] = result[3]
+                psf_metas[key] = result[4]
 
         # NOTE: Now we have all the info we need to build the response
         # TODO: refactor the code below and make more concise
@@ -347,14 +336,18 @@ class HAWCResponse(object):
             min_dec, dec_center, max_dec = dec_bin
             response_bins_per_dec = collections.OrderedDict()
 
-            current_hist_array = energy_meta_dict[dec_id]
-            current_hist_bkg_array = energy_bkg_meta_dict[dec_id]
-            psf_vals_array = psf_meta_dict[dec_id]
+            # current_hist_array = energy_meta_dict[dec_id]
+            # current_hist_bkg_array = energy_bkg_meta_dict[dec_id]
+            # psf_vals_array = psf_meta_dict[dec_id]
 
             for bin_idx, bin_id in enumerate(analysis_bins_arr):
-                current_hist = current_hist_array[bin_idx]
-                current_hist_bkg = current_hist_bkg_array[bin_idx]
-                current_psf_params = psf_vals_array[bin_idx]
+                # current_hist = current_hist_array[bin_idx]
+                # current_hist_bkg = current_hist_bkg_array[bin_idx]
+                # current_psf_params = psf_vals_array[bin_idx]
+
+                current_hist = energy_hists[(dec_id, bin_id)]
+                current_hist_bkg = energy_bkgs[(dec_id, bin_id)]
+                current_psf_params = psf_metas[(dec_id, bin_id)]
 
                 this_response_bin = ResponseBin.from_ttree(
                     bin_id,
