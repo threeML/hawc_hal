@@ -69,22 +69,29 @@ def hawc_response_factory(response_file_name, n_workers: int):
 class ResponseBinMetaData:
     response_ttree_directory: uproot.ReadOnlyDirectory
 
-    def generate_metadata(self, args: Tuple[int, str]):
+    def get_energy_hist(self, args: Tuple[int, str]):
         dec_id, bin_id = args
 
         energy_hist = self.response_ttree_directory[
             f"dec_{dec_id:02d}/nh_{bin_id}/EnSig_dec{dec_id}_nh{bin_id}"
-        ].to_hist()
+        ].to_boost()
+        return dec_id, bin_id, energy_hist
+
+    def get_energy_bkg_hist(self, args: Tuple[int, str]):
+        dec_id, bin_id = args
 
         energy_bkg_hist = self.response_ttree_directory[
             f"dec_{dec_id:02d}/nh_{bin_id}/EnBg_dec{dec_id}_nh{bin_id}"
-        ].to_hist()
+        ].to_boost()
+        return dec_id, bin_id, energy_bkg_hist
 
+    def get_psf_params(self, args: Tuple[int, str]):
+        dec_id, bin_id = args
         psf_meta = self.response_ttree_directory[
             f"dec_{dec_id:02d}/nh_{bin_id}/PSF_dec{dec_id}_nh{bin_id}_fit"
         ].member("fParams")
 
-        return dec_id, bin_id, energy_hist, energy_bkg_hist, psf_meta
+        return dec_id, bin_id, psf_meta
 
     @property
     def declination_bins_lower(self) -> np.ndarray:
@@ -314,20 +321,35 @@ class HAWCResponse(object):
             dec_bins = list(zip(dec_bins_lower_edge, dec_bins_sim, dec_bins_upper_edge))
             number_of_dec_bins = len(dec_bins_sim)
 
+            args = [
+                (dec_id, bin_id)
+                for dec_id in range(number_of_dec_bins)
+                for bin_id in analysis_bins_arr
+            ]
+            log.info("Before processing")
             with multiprocessing.Pool(processes=n_workers) as executor:
-                args = [
-                    (dec_id, bin_id)
-                    for dec_id in range(number_of_dec_bins)
-                    for bin_id in analysis_bins_arr
-                ]
-                results = list(executor.map(resp_metadata.generate_metadata, args))
+                results = list(executor.map(resp_metadata.get_energy_hist, args))
+                results_bkg = list(
+                    executor.map(resp_metadata.get_energy_bkg_hist, args)
+                )
+                psf_param = list(executor.map(resp_metadata.get_psf_params, args))
+            log.info("After processing")
 
-            energy_hists, energy_bkgs, psf_metas = {}, {}, {}
-            for result in results:
-                key = (result[0], result[1])
-                energy_hists[key] = result[2]
-                energy_bkgs[key] = result[3]
-                psf_metas[key] = result[4]
+        energy_hists, energy_bkgs, psf_metas = {}, {}, {}
+        for result in results:
+            key = (result[0], result[1])
+            energy_hists[key] = result[2]
+
+        for result in results_bkg:
+            key = (result[0], result[1])
+            energy_bkgs[key] = result[2]
+
+        for result in psf_param:
+            key = (result[0], result[1])
+            psf_metas[key] = result[2]
+
+            # energy_bkgs[key] = result[3]
+            # psf_metas[key] = result[4]
 
         # NOTE: Now we have all the info we need to build the response
         # TODO: refactor the code below and make more concise

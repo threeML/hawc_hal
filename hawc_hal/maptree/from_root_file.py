@@ -4,7 +4,7 @@ import collections
 import multiprocessing
 from builtins import str
 from pathlib import Path
-from typing import Optional, Tuple, Union
+from typing import Optional, Union
 
 import healpy as hp
 import numpy as np
@@ -23,49 +23,40 @@ log = setup_logger(__name__)
 log.propagate = False
 
 
-def retrieve_data(args: Tuple[uproot.ReadOnlyDirectory, str]) -> Tuple[str, np.ndarray]:
-    """function to iterate over the maptree and read the data and bkg. maps"""
-    array_metadata, bin_name = args
-    return bin_name, array_metadata.array().to_numpy()
-
-
-def multiprocessing_data(tree_metadata, bins_labels: np.ndarray, n_workers: int):
-    """Carry the multiprocessing of the data and bkg. maps"""
-    # with concurrent.futures.ProcessPoolExecutor(max_workers=n_workers) as executor:
-    #     result = list(executor.map(retrieve_data, tree_metadata, bins_labels))
-    with multiprocessing.Pool(processes=n_workers) as executor:
-        args = zip(tree_metadata, bins_labels)
-        result = list(executor.map(retrieve_data, args))
-    return result
-
-
-def retrieve_results(
+def get_array_from_file(
+    bin_id: str,
     map_infile: uproot.ReadOnlyDirectory,
-    bin_branch: str,
-    nhit_name_prefix: str,
-    n_workers: int,
+    hpx_map: np.ndarray,
+    roi: Optional[Union[HealpixConeROI, HealpixMapROI]] = None,
 ):
-    try:
-        data_bins_labels = map_infile[bin_branch].array().to_numpy()
-        data_tree_metadata = [
-            map_infile[f"{nhit_name_prefix}{name}/data/count"]
-            for name in data_bins_labels
-        ]
-        bkg_tree_metadata = [
-            map_infile[f"{nhit_name_prefix}{name}/bkg/count"]
-            for name in data_bins_labels
+    if roi is not None:
+        return bin_id, map_infile[f"nHit{bin_id}/data/count"].array().to_numpy()[
+            hpx_map > 0.0
         ]
 
-        result_data = multiprocessing_data(
-            data_tree_metadata, data_bins_labels, n_workers
-        )
-        result_bkg = multiprocessing_data(
-            bkg_tree_metadata, data_bins_labels, n_workers
-        )
-        return result_data, result_bkg
+    return bin_id, map_infile[f"nHit{bin_id}/data/count"].array().to_numpy()
 
-    except Exception as e:
-        raise Exception(f"Error reading Maptree: {e}") from e
+
+def get_bkg_array_from_file(
+    bin_id: str,
+    map_infile: uproot.ReadOnlyDirectory,
+    hpx_map: np.ndarray,
+    roi: Optional[Union[HealpixConeROI, HealpixMapROI]] = None,
+):
+    if roi is not None:
+        return bin_id, map_infile[f"nHit{bin_id}/bkg/count"].array().to_numpy()[
+            hpx_map > 0.0
+        ]
+
+    return bin_id, map_infile[f"nHit{bin_id}/bkg/count"].array().to_numpy()
+
+
+def worker_func(args):
+    return get_array_from_file(*args)
+
+
+def worker_func_bkg(args):
+    return get_bkg_array_from_file(*args)
 
 
 def from_root_file(
@@ -127,36 +118,57 @@ def from_root_file(
             map_infile["BinInfo/totalDuration"].array().to_numpy()
         )
 
-        binning_scheme_name = {
-            "BinInfo/name": "nHit",
-            "BinInfo/id": "nHit0",
-        }
+        # binning_scheme_name = {
+        #     "BinInfo/name": "nHit",
+        #     "BinInfo/id": "nHit0",
+        # }
 
-        bin_branch: Optional[str] = None
-        nhit_name_prefix: Optional[str] = None
-        for bin_info_name, nhit_scheme in binning_scheme_name.items():
-            if map_infile.get(bin_info_name, None) is not None:
-                nhit_name_prefix = nhit_scheme
-                bin_branch = bin_info_name
+        data_bins_labels = map_infile["BinInfo/name"].array().to_numpy()
+        npix_cnt = map_infile[f"nHit{data_bins_labels[0]}/data/count"].member(
+            "fEntries"
+        )
+        npix_bkg = map_infile[f"nHit{data_bins_labels[0]}/bkg/count"].member("fEntries")
 
-        data_bins_labels = map_infile[bin_branch].array().to_numpy()
+        # Get nside from number of pixels
+        nside_cnt: int = hp.pixelfunc.npix2nside(npix_cnt)
+        nside_bkg: int = hp.pixelfunc.npix2nside(npix_bkg)
+
+        assert (
+            nside_cnt == nside_bkg
+        ), "Nside value needs to be the same for counts and bkg. maps"
+
+        healpix_map_active = np.zeros(hp.nside2npix(nside_cnt))
+
+        # NOTE: read only the pixels within the ROI
+        if roi is not None:
+            active_pixels = roi.active_pixels(
+                nside_cnt, system="equatorial", ordering="RING"
+            )
+
+            healpix_map_active[active_pixels] = 1.0
+
+        signal_data_info = [
+            (name, map_infile, healpix_map_active, roi) for name in data_bins_labels
+        ]
 
         # Launch processes to speed up the reading of the maptree file
         # NOTE: The number of workers is suggested to be kept equal one less
         # than the number of available cores in the system.
-        result_data, result_bkg = retrieve_results(
-            map_infile, bin_branch, nhit_name_prefix, n_workers
-        )
+        with multiprocessing.Pool(processes=n_workers) as executor:
+            result_data = list(executor.map(worker_func, signal_data_info))
+            result_bkg = list(executor.map(worker_func_bkg, signal_data_info))
+
+        # bin_branch: Optional[str] = None
+        # nhit_name_prefix: Optional[str] = None
+        # for bin_info_name, nhit_scheme in binning_scheme_name.items():
+        #     if map_infile.get(bin_info_name, None) is not None:
+        #         nhit_name_prefix = nhit_scheme
+        #         bin_branch = bin_info_name
 
         # Processes are not guaranteed to preserve order of analysis bin names
         # Organize them into a dictionary for proper readout
         data_dir_array = dict(result_data)
         bkg_dir_array = dict(result_bkg)
-
-    log.info(f"Loaded {map_tree_file}")
-
-    npix_cnt = result_data[0][1].size
-    npix_bkg = result_bkg[0][1].size
 
     # The map-maker underestimate the livetime of bins with low statistic
     # by removing time intervals with zero events. Therefore, the best
@@ -168,26 +180,11 @@ def from_root_file(
     n_transits = max_duration if transits is None else transits
     scale_factor: float = n_transits / max_duration
 
-    nside_cnt: int = hp.pixelfunc.npix2nside(npix_cnt)
-    nside_bkg: int = hp.pixelfunc.npix2nside(npix_bkg)
-
-    assert (
-        nside_cnt == nside_bkg
-    ), "Nside value needs to be the same for counts and bkg. maps"
-
     assert scheme == 0, "NESTED HEALPix is not currently supported."
 
     data_analysis_bins = collections.OrderedDict()
 
-    healpix_map_active = np.zeros(hp.nside2npix(nside_cnt))
-
     if roi is not None:
-        active_pixels = roi.active_pixels(
-            nside_cnt, system="equatorial", ordering="RING"
-        )
-
-        healpix_map_active[active_pixels] = 1.0
-
         for name in data_bins_labels:
             counts = data_dir_array[name]
             bkg = bkg_dir_array[name]
@@ -195,12 +192,8 @@ def from_root_file(
             counts *= scale_factor
             bkg *= scale_factor
 
-            counts_hpx = SparseHealpix(
-                counts[healpix_map_active > 0.0], active_pixels, nside_cnt
-            )
-            bkg_hpx = SparseHealpix(
-                bkg[healpix_map_active > 0.0], active_pixels, nside_bkg
-            )
+            counts_hpx = SparseHealpix(counts, active_pixels, nside_cnt)
+            bkg_hpx = SparseHealpix(bkg, active_pixels, nside_bkg)
 
             # Read only elements within the ROI
             this_data_analysis_bin = DataAnalysisBin(
