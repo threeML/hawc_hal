@@ -19,7 +19,7 @@ log = setup_logger(__name__)
 log.propagate = False
 
 
-def map_tree_factory(map_tree_file, roi, n_workers: int, n_transits=None):
+def map_tree_factory(map_tree_file, roi, n_workers: int = 1, n_transits=None):
     # Sanitize files in input (expand variables and so on)
     map_tree_file = sanitize_filename(map_tree_file)
 
