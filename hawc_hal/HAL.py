@@ -4,16 +4,19 @@ import collections
 import contextlib
 import copy
 from builtins import range, str
-from typing import Union
+from threading import RLock
+from typing import Callable, Optional
 
 import astromodels
 import healpy as hp
 import matplotlib.pyplot as plt
+import mplhep as hep
 import numpy as np
 import pandas as pd
 from astromodels import Parameter
 from astropy.convolution import Gaussian2DKernel
 from astropy.convolution import convolve_fft as convolve
+from numpy.typing import NDArray
 from past.utils import old_div
 from scipy.stats import poisson
 from threeML.io.logging import setup_logger
@@ -28,6 +31,7 @@ from hawc_hal.convolved_source import (
     ConvolvedPointSource,
     ConvolvedSourcesContainer,
 )
+from hawc_hal.flat_sky_projection import FlatSkyProjection
 from hawc_hal.healpix_handling import (
     FlatSkyToHealpixTransform,
     SparseHealpix,
@@ -38,36 +42,62 @@ from hawc_hal.maptree import map_tree_factory
 from hawc_hal.maptree.data_analysis_bin import DataAnalysisBin
 from hawc_hal.maptree.map_tree import MapTree
 from hawc_hal.psf_fast import PSFConvolutor
+from hawc_hal.region_of_interest.healpix_cone_roi import HealpixConeROI
+from hawc_hal.region_of_interest.healpix_map_roi import HealpixMapROI
 from hawc_hal.response import hawc_response_factory
 from hawc_hal.util import ra_to_longitude
 
 log = setup_logger(__name__)
 log.propagate = False
 
+ndarray = NDArray[np.float64]
+
 
 class HAL(PluginPrototype):
-    """
-    The HAWC Accelerated Likelihood plugin for 3ML.
-    :param name: name for the plugin
-    :param maptree: Map Tree (either ROOT or hdf5 format)
-    :param response: Response of HAWC (either ROOT or hd5 format)
-    :param roi: a ROI instance describing the Region Of Interest
-    :param flat_sky_pixels_size: size of the pixel for the flat sky projection (Hammer Aitoff)
-    """
+    """The HAWC Accelerated Likelihood plugin for 3ML."""
+
+    # """
+    # The HAWC Accelerated Likelihood plugin for 3ML.
+    # :param name: name for the plugin
+    # :param maptree: Map Tree (either ROOT or hdf5 format)
+    # :param response: Response of HAWC (either ROOT or hd5 format)
+    # :param roi: a ROI instance describing the Region Of Interest
+    # :param flat_sky_pixels_size: size of the pixel for the flat sky projection (Hammer Aitoff)
+    # """
 
     def __init__(
         self,
-        name,
-        maptree,
-        response_file,
-        roi,
+        name: str,
+        maptree: str,
+        response_file: str,
+        roi: HealpixConeROI | HealpixMapROI,
         flat_sky_pixels_size: float = 0.17,
         n_workers: int = 1,
-        set_transits=None,
+        set_transits: Optional[float] = None,
     ):
+        """The HAWC Accelerated Likelihood plugin for 3ML.
+
+        Parameters
+        ----------
+        name : str
+            HAL instance name
+        maptree : str
+            HAWC map tree file (either ROOT or hdf5 format)
+        response_file : str
+            HAWC response file (either ROOT or hdf5 format)
+        roi : HealpixConeROI | HealpixMapROI
+            Region of interest (ROI)
+        flat_sky_pixels_size : float, optional
+            Size of pixel for the flat sky projection (Hammer Aitoff), by default 0.17
+        n_workers : int, optional
+            Number of workers used for multiprocessing (experimental for now), by default 1
+        set_transits : Optional[float], optional
+            Specify the number of transits if not using the maximum number read from the map tree, by default None
+        """
         # Store ROI
         self._roi = roi
         self._n_workers = n_workers
+        self.lock = RLock()
 
         # optionally specify n_transits
         if set_transits is not None:
@@ -76,12 +106,12 @@ class HAL(PluginPrototype):
 
         else:
             n_transits = None
-            log.info("Using transits contained in maptree")
+            log.info("Using maximum number of transits from maptree...")
 
         # Set up the flat-sky projection
         self.flat_sky_pixels_size = flat_sky_pixels_size
-        self._flat_sky_projection = self._roi.get_flat_sky_projection(
-            self.flat_sky_pixels_size
+        self._flat_sky_projection: FlatSkyProjection = (
+            self._roi.get_flat_sky_projection(self.flat_sky_pixels_size)
         )
 
         # Read map tree (data)
@@ -93,6 +123,10 @@ class HAL(PluginPrototype):
         self._response = hawc_response_factory(
             response_file_name=response_file, n_workers=self._n_workers
         )
+
+        # Get dictionaries for caching
+        # TODO: figure out a smart way of caching
+        # self._cached_pnt_source_params = CacheDict(size_limit=20, n_elements_kept=10)
 
         # Use a renormalization of the background as nuisance parameter
         # NOTE: it is fixed to 1.0 unless the user explicitly sets it free (experimental)
@@ -126,7 +160,7 @@ class HAL(PluginPrototype):
         self._all_planes = list(self._maptree.analysis_bins_labels)
 
         # The active planes list always contains the list of *indexes* of the active planes
-        self._active_planes = None
+        self._active_planes: Optional[list[str]] = None
 
         # Set up the transformations from the flat-sky projection to Healpix, as well as the list of active pixels
         # (one for each energy/nHit bin). We make a separate transformation because different energy bins might have
@@ -175,27 +209,30 @@ class HAL(PluginPrototype):
         self._clone = None
 
         # Integration method for the PSF (see psf_integration_method)
-        self._psf_integration_method = "exact"
+        self._psf_integration_method: str = "exact"
 
     @property
-    def psf_integration_method(self):
+    def psf_integration_method(self) -> str:
         """
         Get or set the method for the integration of the PSF.
 
-        * "exact" is more accurate but slow, if the position is free to vary it adds a lot of time to the fit. This is
-        the default, to be used when the position of point sources are fixed. The computation in that case happens only
-        once so the impact on the run time is negligible.
-        * "fast" is less accurate (up to an error of few percent in flux) but a lot faster. This should be used when
-        the position of the point source is free, because in that case the integration of the PSF happens every time
-        the position changes, so several times during the fit.
+        Parameters
+        ----------
 
-        If you have a fit with a free position, use "fast". When the position is found, you can fix it, switch to
-        "exact" and redo the fit to obtain the most accurate measurement of the flux. For normal sources the difference
-        will be small, but for very bright sources it might be up to a few percent (most of the time < 1%). If you are
-        interested in the localization contour there is no need to rerun with "exact".
+            * "exact" is more accurate but slow, if the position is free to vary it adds a lot of time to the fit. This is
+            the default, to be used when the position of point sources are fixed. The computation in that case happens only
+            once so the impact on the run time is negligible.
+            * "fast" is less accurate (up to an error of few percent in flux) but a lot faster. This should be used when
+            the position of the point source is free, because in that case the integration of the PSF happens every time
+            the position changes, so several times during the fit.
 
-        :param mode: either "exact" or "fast"
-        :return: None
+        Notes:
+        ------
+            If you have a fit with a free position, use "fast". When the position is found, you can fix it, switch to
+            "exact" and redo the fit to obtain the most accurate measurement of the flux. For normal sources the difference
+            will be small, but for very bright sources it might be up to a few percent (most of the time < 1%). If you are
+            interested in the localization contour there is no need to rerun with "exact". Either "exact" or "fast"
+
         """
 
         return self._psf_integration_method
@@ -209,12 +246,20 @@ class HAL(PluginPrototype):
 
         self._psf_integration_method = mode.lower()
 
-    def _setup_psf_convolutors(self):
-        central_response_bins = self._response.get_response_dec_bin(
-            self._roi.ra_dec_center[1]
-        )
+    def _setup_psf_convolutors(self, source_declination: float):
+        """Set up the PSF convolutors at the source declination
 
-        self._psf_convolutors = collections.OrderedDict()
+        Parameters
+        ----------
+        source_declination : float
+            Source declination in degrees
+        """
+        # central_response_bins = self._response.get_response_dec_bin(
+        #     self._roi.ra_dec_center[1]
+        # )
+        central_response_bins = self._response.get_response_dec_bin(source_declination)
+
+        self._psf_convolutors: dict[str, PSFConvolutor] = collections.OrderedDict()
         for bin_id in central_response_bins:
             # Only set up PSF convolutors for active bins.
             if bin_id in self._active_planes:
@@ -249,7 +294,9 @@ class HAL(PluginPrototype):
         """
         return sum(self._saturated_model_like_per_maptree.values())
 
-    def set_active_measurements(self, bin_id_min=None, bin_id_max=None, bin_list=None):
+    def set_active_measurements(
+        self, bin_id_min=None, bin_id_max=None, bin_list=None
+    ) -> None:
         """
         Set the active analysis bins to use during the analysis. It can be used in two ways:
 
@@ -270,6 +317,8 @@ class HAL(PluginPrototype):
         """
 
         # Check for legal input
+        # ? LEGACY CODE: naming scheme of bins has changed and no longer follows
+        # ? the integer nHit convention. Should this code be removed?
         if bin_id_min is not None:
             assert (
                 bin_id_max is not None
@@ -299,7 +348,6 @@ class HAL(PluginPrototype):
             self._active_planes = []
 
             for this_bin in bin_list:
-                # if not this_bin in self._all_planes:
                 if this_bin not in self._all_planes:
                     raise ValueError(
                         f"Bin {this_bin} is not contained in this maptree."
@@ -310,7 +358,7 @@ class HAL(PluginPrototype):
         if self._likelihood_model:
             self.set_model(self._likelihood_model)
 
-    def display(self, verbose=False):
+    def display(self, verbose=False) -> None:
         """
         Prints summary of the current object content.
         """
@@ -349,7 +397,7 @@ class HAL(PluginPrototype):
         log.info("-------------------------------")
         log.info(self._active_planes)
 
-    def set_model(self, likelihood_model_instance):
+    def set_model(self, likelihood_model_instance: astromodels.Model) -> None:
         """
         Set the model to be used in the joint minimization. Must be a LikelihoodModel instance.
         """
@@ -361,24 +409,40 @@ class HAL(PluginPrototype):
         self._convolved_ext_sources.reset()
 
         # For each point source in the model, build the convolution class
+        pnt_sources: list[astromodels.PointSource] = list(
+            self._likelihood_model.point_sources.values()
+        )
 
-        for source in list(self._likelihood_model.point_sources.values()):
-            this_convolved_point_source = ConvolvedPointSource(
-                source, self._response, self._flat_sky_projection
-            )
+        if pnt_sources:
+            for source in pnt_sources:
+                this_convolved_point_source = ConvolvedPointSource(
+                    source, self._response, self._flat_sky_projection
+                )
 
-            self._convolved_point_sources.append(this_convolved_point_source)
+                self._convolved_point_sources.append(this_convolved_point_source)
 
         # Samewise for extended sources
-        ext_sources = list(self._likelihood_model.extended_sources.values())
+        ext_sources: list[astromodels.ExtendedSource] = list(
+            self._likelihood_model.extended_sources.values()
+        )
 
         # NOTE: ext_sources evaluate to False if empty
         if ext_sources:
             # We will need to convolve
-
-            self._setup_psf_convolutors()
+            roi_dec_center: float = self._roi.ra_dec_center[1]
 
             for source in ext_sources:
+                #  Choosing the center location of the PSF at center of ROI
+                #  may pose a significant issue for very large ROIs
+                if hasattr(source.spatial_shape, "lat0"):
+                    # load normal extended source model
+                    self._setup_psf_convolutors(source.spatial_shape.lat0.value)
+
+                else:
+                    # loading a template source model if no lat0 available from
+                    # spatial_shape
+                    self._setup_psf_convolutors(roi_dec_center)
+
                 if source.spatial_shape.n_dim == 2:
                     this_convolved_ext_source = ConvolvedExtendedSource2D(
                         source, self._response, self._flat_sky_projection
@@ -429,7 +493,7 @@ class HAL(PluginPrototype):
         center = hp.ang2vec(longitude, latitude, lonlat=True)
 
         for i, energy_id in enumerate(self._active_planes):
-            data_analysis_bin = self._maptree[energy_id]
+            data_analysis_bin: DataAnalysisBin = self._maptree[energy_id]
             this_nside = data_analysis_bin.observation_map.nside
 
             radial_bin_pixels = hp.query_disc(
@@ -758,7 +822,7 @@ class HAL(PluginPrototype):
         yerr_high = np.zeros_like(total_counts)
 
         for i, energy_id in enumerate(self._active_planes):
-            data_analysis_bin = self._maptree[energy_id]
+            data_analysis_bin: DataAnalysisBin = self._maptree[energy_id]
 
             this_model_map_hpx = self._get_expectation(
                 data_analysis_bin, energy_id, n_point_sources, n_ext_sources
@@ -810,6 +874,15 @@ class HAL(PluginPrototype):
         )
 
     def _plot_spectrum(self, net_counts, yerr, model_only, residuals, residuals_err):
+        alice_style = copy.deepcopy(hep.style.ALICE)
+
+        alice_style["xtick.top"] = False
+        alice_style["ytick.right"] = False
+        alice_style["xtick.minor.visible"] = False
+        alice_style["ytick.minor.visible"] = True
+
+        plt.style.use(alice_style)
+
         fig, subs = plt.subplots(
             2, 1, gridspec_kw={"height_ratios": [2, 1], "hspace": 0}, figsize=(14, 8)
         )
@@ -848,21 +921,119 @@ class HAL(PluginPrototype):
 
         return fig
 
-    @property
-    def number_of_workers(self):
+    def _process_bin(
+        self,
+        bin_id: str,
+        this_data_analysis_bin: DataAnalysisBin,
+        n_point_sources: int,
+        n_ext_sources: int,
+        bkg_renorm: float,
+    ) -> tuple[str, float]:
         """
-        Get or set the number of workers to use for the parallelization of the computation of the likelihood.
-        """
-        return self._n_workers
+        Process a single bin, returning the expectation for the model.
 
-    def get_log_like(self, individual_bins=False, return_null=False):
+        Parameters
+        ----------
+        bin_id: str
+            The bin ID
+        data_analysis_bin: DataAnalysisBin
+            The data analysis bin
+        n_point_sources: int
+            The number of point sources
+        n_ext_sources: int
+            The number of extended sources
+        bkg_renorm: float
+            The background renormalization factor
+
+        Returns
+        -------
+        tuple[str, float]
+            Analysis bin id with its corresponding log-likelihood
+        """
+
+        this_model_map_hpx = self._get_expectation(
+            this_data_analysis_bin,
+            bin_id,
+            n_point_sources,
+            n_ext_sources,
+        )
+
+        obs = this_data_analysis_bin.observation_map.as_partial()
+        bkg = this_data_analysis_bin.background_map.as_partial() * bkg_renorm
+
+        this_pseudo_log_like = log_likelihood(obs, bkg, this_model_map_hpx)
+
+        this_log_like = (
+            this_pseudo_log_like
+            - self._log_factorials[bin_id]
+            - self._saturated_model_like_per_maptree[bin_id]
+        )
+
+        return bin_id, this_log_like
+
+    def _multithreading_log_like(
+        self,
+        n_point_sources: int,
+        n_ext_sources: int,
+        bkg_renorm: float,
+        n_jobs: int = 5,
+    ) -> list[tuple[str, float]]:
+        """Multithreading log-likelihood calculation for active bin in the analysis
+
+        Parameters
+        ----------
+        n_point_sources : int
+            Number of point sources present in model
+        n_ext_sources : int
+            Number of extended sources present in model
+        bkg_renorm : float
+            Background renormalization factor
+        n_jobs : int, optional
+            Number of threads to use, by default 5
+
+        Returns
+        -------
+        list[tuple[str, float]]
+            List of tuples with bin_id and log-likelihood
+        """
+        from concurrent.futures import ThreadPoolExecutor, as_completed
+        from functools import partial
+
+        # launches a thread pool with the number of threads specified by n_jobs
+        with ThreadPoolExecutor(n_jobs) as pool:
+            tasks = [
+                pool.submit(
+                    partial(
+                        self._process_bin,
+                        bin_id,
+                        self._maptree[bin_id],
+                        n_point_sources,
+                        n_ext_sources,
+                        bkg_renorm,
+                    )
+                )
+                for bin_id in self._active_planes
+            ]
+
+        # processe the result of a thread as oon as it becomes available
+        results = [future.result() for future in as_completed(tasks)]
+
+        return results
+
+    def get_log_like(
+        self, individual_bins=False, return_null=False
+    ) -> float | tuple[float, dict[str, float]]:
         """
         Return the value of the log-likelihood with the current values for the
-        parameters
+        parameters.
+
+        Parameters
+        ----------
+        individual_bins: bool
+            If True, return the log-likelihood for each bin
+        return_null: bool
+            If True, return 0.0 instead of the log-likelihood
         """
-        # NOTE: multi-processing definition done a as global variable
-        # done this way to avoid pickling issues
-        # global process_bin
 
         if return_null is True:
             n_point_sources = 0
@@ -878,42 +1049,49 @@ class HAL(PluginPrototype):
             ), "The number of sources has changed. Please re-assign the model to the plugin."
 
         # This will hold the total log-likelihood
-
         total_log_like = 0
-        log_like_per_bin = {}
+        log_like_per_bin: dict[str, float] = {}
 
-        for bin_id in self._active_planes:
-            data_analysis_bin = self._maptree[bin_id]
+        # Now compare with observation
+        bkg_renorm = list(self._nuisance_parameters.values())[0].value
+        multithread_log_like_results = self._multithreading_log_like(
+            n_point_sources, n_ext_sources, bkg_renorm
+        )
+        total_log_like = sum(result[1] for result in multithread_log_like_results)
+        if individual_bins is True:
+            log_like_per_bin = dict(multithread_log_like_results)
 
-            this_model_map_hpx = self._get_expectation(
-                data_analysis_bin, bin_id, n_point_sources, n_ext_sources
-            )
-            # Now compare with observation
-            bkg_renorm = list(self._nuisance_parameters.values())[0].value
+        # for bin_id in self._active_planes:
+        #     this_data_analysis_bin: DataAnalysisBin = self._maptree[bin_id]
 
-            obs: np.ndarray = data_analysis_bin.observation_map.as_partial()
-            bkg: np.ndarray = data_analysis_bin.background_map.as_partial() * bkg_renorm
+        #     this_model_map_hpx = self._get_expectation(
+        #         this_data_analysis_bin,
+        #         bin_id,
+        #         n_point_sources,
+        #         n_ext_sources,
+        #     )
 
-            this_pseudo_log_like = log_likelihood(obs, bkg, this_model_map_hpx)
+        #     obs = this_data_analysis_bin.observation_map.as_partial()
+        #     bkg = this_data_analysis_bin.background_map.as_partial() * bkg_renorm
 
-            total_log_like += (
-                this_pseudo_log_like
-                - self._log_factorials[bin_id]
-                - self._saturated_model_like_per_maptree[bin_id]
-            )
+        #     this_pseudo_log_like = log_likelihood(obs, bkg, this_model_map_hpx)
 
-            if individual_bins is True:
-                log_like_per_bin[bin_id] = (
-                    this_pseudo_log_like
-                    - self._log_factorials[bin_id]
-                    - self._saturated_model_like_per_maptree[bin_id]
-                )
+        #     this_log_like = (
+        #         this_pseudo_log_like
+        #         - self._log_factorials[bin_id]
+        #         - self._saturated_model_like_per_maptree[bin_id]
+        #     )
+
+        #     total_log_like += this_log_like
+
+        #     if individual_bins is True:
+        #         log_like_per_bin[bin_id] = this_log_like
 
         if individual_bins is True:
             for k in log_like_per_bin:
                 log_like_per_bin[k] /= total_log_like
             return total_log_like, log_like_per_bin
-        # else:
+
         return total_log_like
 
     def write(self, response_file_name, map_tree_file_name):
@@ -998,90 +1176,254 @@ class HAL(PluginPrototype):
 
         return self._clone[0]
 
-    def _get_expectation(
-        self, data_analysis_bin, energy_bin_id, n_point_sources, n_ext_sources
-    ):
-        # Compute the expectation from the model
+    @staticmethod
+    def _calculate_point_source_expectation(
+        pts_id: int,
+        energy_bin_id: str,
+        data_analysis_bin: DataAnalysisBin,
+        convolved_source_container: ConvolvedSourcesContainer,
+        lock: RLock,
+        psf_integration_method: str = "exact",
+    ) -> ndarray:
+        """
+        Compute the expected counts for a point source
 
-        this_model_map = None
+        Parameters
+        ----------
+        pts_id : int
+            Assigned id of the point source
+        energy_bin_id : str
+            Analysis bin defined from maptree and response function
+        data_analysis_bin : DataAnalysisBin
+            Data analysis bin with observed counts and background
+        convolved_source_container : ConvolvedSourcesContainer
+            Container with convolved point sources
+        lock : RLock
+            Lock to use for thread safety
+        psf_integration_method : str
+            Method to use for PSF integration. Options are 'exact' and 'fast'
 
-        for pts_id in range(n_point_sources):
-            this_conv_pnt_src: ConvolvedPointSource = self._convolved_point_sources[
-                pts_id
-            ]
+        Returns
+        -------
+        NDArray[np.float64]
+            Expected counts for a point source
+        """
+        this_conv_src: ConvolvedPointSource = convolved_source_container[pts_id]
 
-            expectation_per_transit = this_conv_pnt_src.get_source_map(
+        # ? multithreading for point sources causes racing conditions,
+        # ? not sure what is going on and this requires more of an in-depth look
+        # ? For now, a lock is put in place to prevent such conditions
+        with lock:
+            expectation_per_transit = this_conv_src.get_source_map(
                 energy_bin_id,
                 tag=None,
-                psf_integration_method=self._psf_integration_method,
+                psf_integration_method=psf_integration_method,
             )
 
-            expectation_from_this_source = (
-                expectation_per_transit * data_analysis_bin.n_transits
-            )
+        expectation_from_this_source = (
+            expectation_per_transit * data_analysis_bin.n_transits
+        )
 
-            if this_model_map is None:
-                # First addition
+        return expectation_from_this_source
 
-                this_model_map = expectation_from_this_source
+    @staticmethod
+    def _worker_func(
+        energy_bin_id: str,
+        convolved_source: ConvolvedExtendedSource2D | ConvolvedExtendedSource3D,
+    ) -> ndarray:
+        """Utility function to evaluate the expected counts from an extended source
 
-            else:
-                this_model_map += expectation_from_this_source
+        Parameters
+        ----------
+        energy_bin_id : str
+            Analysis bin defined from maptree and response function
+        convolved_source : ConvolvedExtendedSource2D | ConvolvedExtendedSource3D
+            Convolved extended source
+
+        Returns
+        -------
+        ndarray
+            Convolved extended source image
+        """
+        return convolved_source.get_source_map(energy_bin_id)
+
+    @staticmethod
+    def _extended_source_expectation(
+        energy_bin_id: str,
+        n_ext_sources: int,
+        worker_func: Callable[
+            [str, ConvolvedExtendedSource2D | ConvolvedExtendedSource3D], ndarray
+        ],
+        convolved_source_container: ConvolvedSourcesContainer,
+        n_jobs: int = 5,
+    ) -> ndarray:
+        """Calculate the expected counts from extended sources
+
+        Parameters
+        ----------
+        energy_bin_id : str
+            Analysis bin defined from maptree and response function
+        n_ext_sources : int
+            Number of extended sources present in the model
+        worker_func : Callable[[str, ConvolvedExtendedSource2D | ConvolvedExtendedSource3D], ndarray]
+            Function to calculate the expected counts from an extended source
+        convolved_source_container : ConvolvedSourcesContainer
+            Container with convolved extended sources
+        n_jobs : int, optional
+            Number of threads to use, by default 5
+
+        Returns
+        -------
+        ndarray
+            Expected counts from extended sources for convolution with the PSF
+        """
+        extended_source_map = None
+
+        # ? Can this for loop be parellelized?
+        from concurrent.futures import ThreadPoolExecutor, as_completed
+        from functools import partial
+
+        with ThreadPoolExecutor(n_jobs) as executor:
+            tasks = [
+                executor.submit(
+                    partial(
+                        worker_func,
+                        energy_bin_id,
+                        convolved_source_container[ext_id],
+                    )
+                )
+                for ext_id in range(n_ext_sources)
+            ]
+        extended_source_map = np.sum(
+            [future.result() for future in as_completed(tasks)], axis=0
+        )
+        # ? Leaving this code here for more thorough testing
+        # for ext_id in range(n_ext_sources):
+        #     this_cnv_source: ConvolvedExtendedSource2D | ConvolvedExtendedSource3D = (
+        #         convolved_source_container[ext_id]
+        #     )
+
+        #     this_ext_source = this_cnv_source.get_source_map(energy_bin_id)
+
+        #     if extended_source_map is None:
+        #         extended_source_map = this_ext_source
+        #     else:
+        #         extended_source_map += this_ext_source
+
+        return extended_source_map
+
+    @staticmethod
+    def _get_model_map_from_ext_source(
+        energy_bin_id: str,
+        psf_convolutors: dict[str, PSFConvolutor],
+        data_analysis_bin: DataAnalysisBin,
+        extended_src_model_map: NDArray[np.float64],
+    ) -> ndarray:
+        """Calculate the model map for an extended source by convolving with the PSF
+
+        Parameters
+        ----------
+        energy_bin_id : str
+            Analysis bin defined from maptree and response function
+        psf_convolutors : dict[str, PSFConvolutor]
+            Dictionary with the PSF convolutors for each analysis bin
+        data_analysis_bin : DataAnalysisBin
+            Observation analysis bin with observed counts and background
+        extended_src_model_map : NDArray[np.float64]
+            Map with expected counts per transit for extended sources within model
+
+        Returns
+        -------
+        NDArray[np.float64]
+            Returns the expected counts using the current state of the likelihood
+        """
+        return (
+            psf_convolutors[energy_bin_id].extended_source_image(extended_src_model_map)
+            * data_analysis_bin.n_transits
+        )
+
+    def _get_expectation(
+        self,
+        data_analysis_bin: DataAnalysisBin,
+        energy_bin_id: str,
+        n_point_sources: int,
+        n_ext_sources: int,
+    ) -> ndarray | float:
+        """Calculate the model map for a given analysis bin with the number of
+        sources present in the model
+
+        Parameters
+        ----------
+        data_analysis_bin : DataAnalysisBin
+            Observation analysis bin with observed counts and background
+        energy_bin_id : str
+            Analysis bin defined from maptree and response function
+        n_point_sources : int
+            Number of point sources present within the likelihood model instance
+        n_ext_sources : int
+            Number of extended sources present within the likelihood model instance
+
+        Returns
+        -------
+        NDArray[np.float64]
+            Returns the expected counts using the current state of the likelihood
+            model instance.
+        """
+
+        # Compute the expectation from the model
+        this_model_map = None
+
+        # first process the point sources
+        if n_point_sources > 0:
+            # ? Can this for loop be parellelized?
+            for pts_id in range(n_point_sources):
+                expectation_from_this_source = self._calculate_point_source_expectation(
+                    pts_id,
+                    energy_bin_id,
+                    data_analysis_bin,
+                    self._convolved_point_sources,
+                    self.lock,
+                    self._psf_integration_method,
+                )
+
+                if this_model_map is None:
+                    this_model_map = expectation_from_this_source
+                else:
+                    this_model_map += expectation_from_this_source
 
         # Now process extended sources
         if n_ext_sources > 0:
-            this_ext_model_map = None
+            # this_ext_model_map = None
 
-            for ext_id in range(n_ext_sources):
-                this_conv_src: Union[
-                    ConvolvedExtendedSource2D, ConvolvedExtendedSource3D
-                ] = self._convolved_ext_sources[ext_id]
-
-                expectation_per_transit = this_conv_src.get_source_map(energy_bin_id)
-
-                if this_ext_model_map is None:
-                    # First addition
-
-                    this_ext_model_map = expectation_per_transit
-
-                else:
-                    this_ext_model_map += expectation_per_transit
+            tot_ext_sources_expectation_per_transit = self._extended_source_expectation(
+                energy_bin_id,
+                n_ext_sources,
+                self._worker_func,
+                self._convolved_ext_sources,
+            )
 
             # Now convolve with the PSF
+            extended_source_expectation = self._get_model_map_from_ext_source(
+                energy_bin_id,
+                self._psf_convolutors,
+                data_analysis_bin,
+                tot_ext_sources_expectation_per_transit,
+            )
+
             if this_model_map is None:
-                # Only extended sources
-
-                this_model_map = (
-                    self._psf_convolutors[energy_bin_id].extended_source_image(
-                        this_ext_model_map
-                    )
-                    * data_analysis_bin.n_transits
-                )
-
+                this_model_map = extended_source_expectation
             else:
-                this_model_map += (
-                    self._psf_convolutors[energy_bin_id].extended_source_image(
-                        this_ext_model_map
-                    )
-                    * data_analysis_bin.n_transits
-                )
-
-        # Now transform from the flat sky projection to HEALPiX
+                this_model_map += extended_source_expectation
 
         if this_model_map is not None:
-            # First divide for the pixel area because we need to interpolate brightness
-            # this_model_map = old_div(this_model_map, self._flat_sky_projection.project_plane_pixel_area)
-            this_model_map = (
-                this_model_map / self._flat_sky_projection.project_plane_pixel_area
-            )
+            # Now transform from the flat sky projection to HEALPiX
 
-            this_model_map_hpx = self._flat_sky_to_healpix_transform[energy_bin_id](
-                this_model_map, fill_value=0.0
-            )
-
-            # Now multiply by the pixel area of the new map to go back to flux
-            this_model_map_hpx *= hp.nside2pixarea(
-                data_analysis_bin.nside, degrees=True
+            this_model_map_hpx = self._convert_from_flat_to_hpx(
+                energy_bin_id,
+                this_model_map,
+                self._flat_sky_projection,
+                data_analysis_bin,
+                self._flat_sky_to_healpix_transform,
             )
 
         else:
@@ -1090,6 +1432,48 @@ class HAL(PluginPrototype):
             this_model_map_hpx = 0.0
 
         return this_model_map_hpx
+
+    @staticmethod
+    def _convert_from_flat_to_hpx(
+        energy_bin_id: str,
+        model_map: NDArray[np.float64],
+        flat_sky_projection: FlatSkyProjection,
+        data_analysis_bin: DataAnalysisBin,
+        flat_sky_to_healpix_transform: dict[str, FlatSkyToHealpixTransform],
+    ) -> ndarray:
+        """Convert a flat sky projection to a HEALPiX projection
+
+        Parameters
+        ----------
+        energy_bin_id : str
+            Analysis bin defined from maptree and response function
+        model_map : NDArray[np.float64]
+            Map with expected counts per transit for sources within model
+        flat_sky_projection : FlatSkyProjection
+            Flat sky projection of the data analysis bin
+        data_analysis_bin : DataAnalysisBin
+            Observation analysis bin with observed counts and background
+        flat_sky_to_healpix_transform : dict[str, FlatSkyToHealpixTransform]
+            Dictionary with the flat sky to HEALPiX transform for each analysis bin
+
+        Returns
+        -------
+        NDArray[np.float64]
+            Returns the expected counts model map in HEALPiX projection
+        """
+
+        # First divide for the pixel area because we need to interpolate brightness
+
+        model_map = np.divide(model_map, flat_sky_projection.project_plane_pixel_area)
+
+        model_map_hpx = flat_sky_to_healpix_transform[energy_bin_id](
+            model_map, fill_value=0.0
+        )
+
+        # Now multiply by the pixel area of the new map to go back to flux
+        model_map_hpx *= hp.nside2pixarea(data_analysis_bin.nside, degrees=True)
+
+        return model_map_hpx
 
     @staticmethod
     def _represent_healpix_map(
@@ -1200,6 +1584,7 @@ class HAL(PluginPrototype):
             vmin = min(np.nanmin(proj_model), np.nanmin(proj_data))
             vmax = max(np.nanmax(proj_model), np.nanmax(proj_data))
 
+            # TODO: Change the following to f-strings
             # Plot model
             images[0] = subs[i][0].imshow(
                 proj_model, origin="lower", vmin=vmin, vmax=vmax
@@ -1366,6 +1751,7 @@ class HAL(PluginPrototype):
         if fluctuate:
             poisson_set = self.get_simulated_dataset("model map")
 
+        # TODO: parallelize this for loop
         for plane_id in self._active_planes:
             data_analysis_bin = self._maptree[plane_id]
 
