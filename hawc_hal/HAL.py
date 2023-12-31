@@ -211,6 +211,17 @@ class HAL(PluginPrototype):
         # Integration method for the PSF (see psf_integration_method)
         self._psf_integration_method: str = "exact"
 
+    def __getstate__(self):
+        """Remove the lock before pickling"""
+        state = self.__dict__.copy()
+        del state["lock"]
+        return state
+
+    def __setstate__(self, state) -> None:
+        """Set the lock after unpickling"""
+        self.__dict__.update(state)
+        self.lock = RLock()
+
     @property
     def psf_integration_method(self) -> str:
         """
