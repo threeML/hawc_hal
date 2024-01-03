@@ -250,3 +250,21 @@ m.write("roi_maptree.hd5")
 ```
 
 ### Radial profile examples will come soon
+
+Get a radial profile with the following function. The arguments specify the location of the source,
+the maximum radius for which to evaluate the radial profile, the analysis bins for which to evaluate
+the radial bin (can be individual or set to all the bins used during the fit) and the number of bins
+to use for the radial profile
+
+```
+fig, df = hawc.plot_radial_profile(ra, dec, max_radius, active_planes, n_radial_bins)
+```
+
+The figure can simply be saved just like a normal figure
+
+```
+fig.savefig(f"{outdir}/{source_name}_radial_profile", dpi=300)
+```
+
+The function returns a figure and a dataframe (in case you need to calculate the surface brightness of the
+radial profile)
