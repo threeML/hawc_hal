@@ -149,7 +149,7 @@ class HAL(PluginPrototype):
         # python3 new way of doing things
         super().__init__(name, self._nuisance_parameters)
 
-        self._likelihood_model = None
+        self._likelihood_model: Optional[astromodels.Model | None] = None
 
         # These lists will contain the maps for the point sources
         self._convolved_point_sources = ConvolvedSourcesContainer()
@@ -157,10 +157,10 @@ class HAL(PluginPrototype):
         self._convolved_ext_sources = ConvolvedSourcesContainer()
 
         # All energy/nHit bins are loaded in memory
-        self._all_planes = list(self._maptree.analysis_bins_labels)
+        self._all_planes: list[str] = list(self._maptree.analysis_bins_labels)
 
         # The active planes list always contains the list of *indexes* of the active planes
-        self._active_planes: Optional[list[str]] = None
+        self._active_planes: Optional[list[str] | None] = None
 
         # Set up the transformations from the flat-sky projection to Healpix, as well as the list of active pixels
         # (one for each energy/nHit bin). We make a separate transformation because different energy bins might have
@@ -190,7 +190,7 @@ class HAL(PluginPrototype):
 
         # This will contain a list of PSF convolutors for extended sources, if there is any in the model
 
-        self._psf_convolutors = None
+        self._psf_convolutors: Optional[dict[str, PSFConvolutor] | None] = None
 
         # Pre-compute the log-factorial factor in the likelihood, so we do not keep to computing it over and over
         # again.
@@ -1047,11 +1047,11 @@ class HAL(PluginPrototype):
         """
 
         if return_null is True:
-            n_point_sources = 0
-            n_ext_sources = 0
+            n_point_sources: int = 0
+            n_ext_sources: int = 0
         else:
-            n_point_sources = self._likelihood_model.get_number_of_point_sources()
-            n_ext_sources = self._likelihood_model.get_number_of_extended_sources()
+            n_point_sources = self._likelihood_model.get_number_of_point_sources()  # type: ignore
+            n_ext_sources = self._likelihood_model.get_number_of_extended_sources()  # type: ignore
 
             # Make sure that no source has been added since we filled the cache
             assert (
