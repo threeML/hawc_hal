@@ -8,9 +8,12 @@ import pandas as pd
 import scipy.integrate
 import scipy.interpolate
 import scipy.optimize
+from numpy.typing import NDArray
 from past.utils import old_div
 
 _INTEGRAL_OUTER_RADIUS = 15.0
+
+ndarray = NDArray[np.float64]
 
 
 class InvalidPSFError(ValueError):
@@ -165,18 +168,28 @@ class PSFWrapper(object):
 
     @staticmethod
     def psf_func(ang_dist: float, psf_best_fit_params: np.ndarray) -> float:
-        """
-        ### Analytical function of PSF
-        * The analytical form of PSF needs to be declared here given
-        that uproot is simply an I/O framework meant to read the
-        information from TTree objects, with no ROOT functionality
+        """Analytical function of PSF
 
-        Args:
-            ang_dist (float): angular distances
-            psf_best_fit_params (np.ndarray): best-fit parameters read from response file
+        Parameters
+        ----------
+        ang_dist : float
+            Angular distances
 
-        Returns:
-            float: Returns expected counts provided with angular distances as input
+        psf_best_fit_params : np.ndarray
+            best-fit parameters read from the ROOT response file
+
+
+        Returns
+        -------
+        float
+            Expected counts provided with angular distances as input
+        Notes
+        -----
+
+            The function is declared here given that uproot is simply an I/O
+            framework meant to read the information from TTree objects with no
+            ROOT functionality.
+
         """
         return psf_best_fit_params[0] * (
             ang_dist
@@ -193,15 +206,21 @@ class PSFWrapper(object):
         )
 
     @classmethod
-    def psf_eval(cls, fun_parameters):
-        """Evaluate the PSF function
+    def psf_eval(cls, fun_parameters: ndarray):
+        """Eavluate the PSF function and retrieve expected counts
 
-        Args:
-            fun_parameters (list): Best-fit parameters read from response file
+        Parameters
+        ----------
+        fun_parameters : NDArray[np.float64]
+            Best-fit parameters read from response file
 
-        Returns:
-            PSFWrapper: returns an instance os PSF with tuple
-            of (angular distances, expected counts)
+
+        Returns
+        -------
+        PSFWrapper
+                Returns an instance of PSF with tuple
+                of (angular distances, expected counts)
+
         """
 
         # uproot has no methods to act on histograms. Therefore, using scipy
