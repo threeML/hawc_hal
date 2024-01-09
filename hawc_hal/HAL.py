@@ -557,7 +557,8 @@ class HAL(PluginPrototype):
         active_planes: list = None,
         max_radius: float = 3.0,
         n_radial_bins: int = 30,
-        model_to_subtract: astromodels.Model = None,
+        delta_step: float = 0.5,
+        model_to_subtract: Optional[astromodels.Model | None] = None,
         subtract_model_from_model: bool = False,
     ):
         """Calculates radial profiles for a source in units of excess counts
@@ -590,7 +591,8 @@ class HAL(PluginPrototype):
         good_planes = [plane_id in active_planes for plane_id in self._active_planes]
         plane_ids = set(active_planes) & set(self._active_planes)
 
-        offset = 0.5
+        # offset = 0.5
+        offset = delta_step
         delta_r = 1.0 * max_radius / n_radial_bins
         radii = np.array([delta_r * (r + offset) for r in range(n_radial_bins)])
 
@@ -702,10 +704,11 @@ class HAL(PluginPrototype):
         self,
         ra: float,
         dec: float,
-        active_planes: list = None,
+        active_planes: Optional[list[str] | None] = None,
         max_radius: float = 3.0,
         n_radial_bins: int = 30,
-        model_to_subtract: astromodels.Model = None,
+        delta_step: float = 0.8,
+        model_to_subtract: Optional[astromodels.Model | None] = None,
         subtract_model_from_model: bool = False,
     ):
         """Plots radial profiles of data-background & model
@@ -745,6 +748,7 @@ class HAL(PluginPrototype):
             active_planes,
             max_radius,
             n_radial_bins,
+            delta_step,
             model_to_subtract,
             subtract_model_from_model,
         )
@@ -1595,7 +1599,7 @@ class HAL(PluginPrototype):
             vmin = min(np.nanmin(proj_model), np.nanmin(proj_data))
             vmax = max(np.nanmax(proj_model), np.nanmax(proj_data))
 
-            # TODO: Change the following to f-strings
+            # FIXME: Change the following to f-strings
             # Plot model
             images[0] = subs[i][0].imshow(
                 proj_model, origin="lower", vmin=vmin, vmax=vmax
