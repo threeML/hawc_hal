@@ -475,7 +475,8 @@ class HAL(PluginPrototype):
         :param dec: Declination coordinate for center of radial profile
         :param radius: Distance from center of radial profile (assumed in degrees)
         :return: Returns a tuple of numy arrays with area of given radius from center of radial
-        profile (steradian), signal excess, background and model counts only for the pixels within the specified radius. This method is called within the get_radial_profile_method()
+        profile (steradian), signal excess, background and model counts only for the pixels within
+        the specified radius. This method is called within the get_radial_profile_method()
         :rtype: tuple[ndarray,...]
         """
 
