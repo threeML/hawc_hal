@@ -38,14 +38,14 @@ class EnergyBin:
     _upper_edges: np.ndarray = field(init=False)
 
     def _log_log_spectrum(self, log_energy: float, log_log_shape: str) -> float:
-        """Evaluate the differential flux from log10(simulate energy) values
+        """Evluate the differential flux from log10(simulated energy) values
 
-        Args:
-            log_energy (float): simulated energy in log10 scale
-            parameters (np.ndarray): best-fit parameters obtained from response file
-
-        Returns:
-            float: returns differential flux in units (TeV^-1 cm^-2 s^-1) in log10 scale
+        :param log_energy: simulated energy in log10 scale units (TeV)
+        :type log_energy: float
+        :param log_log_shape: best-fit paraemters obtained from response file
+        :type log_log_shape: str
+        :raises ValueError: There is an unknown spectral shape provided
+        :return: Differential flux in units (TeV^-1 cm^-2 s^-1) in log10 scale
         """
         parameters = self.log_log_params
 
@@ -181,17 +181,29 @@ class ResponseBin(object):
         dec_center: np.ndarray,
         max_dec: np.ndarray,
     ):
-        """
-        Obtain the information from Response ROOT file
+        """Read in the response file with ROOT format and organize all the necessary
+        information
 
-        #### Args:
-            * root_file (object): ROOT object reading information with uproot functionality
-            * dec_id (int): declination band id
-            * analysis_bin_id (str): data analysis name
-            * log_log_params (np.ndarray): params from LogLogSpectrum TF1
-            * min_dec (np.ndarray): numpy array with lower declination bin edges
-            * dec_center (np.ndarray): numpy array with declination center values
-            * max_dec (np.ndarray): numpy array with upper declination bin edges
+        :param analysis_bin_id: Active analysis bin name defined in the response file
+        :type analysis_bin_id: str
+        :param energy_hist: Energy histogram from response file
+        :type energy_hist: boost_histogram
+        :param energy_hist_bkg: Background energy histogram from response file
+        :type energy_hist_bkg: boost_histogram
+        :param psf_fit_params: Best-fit PSF parameters for the active analysis_bin
+        :type psf_fit_params: list[float]
+        :param log_log_params: Best-fit params of the LogLogSpectrum TF1
+        :type log_log_params: np.ndarray
+        :param log_log_shape: Name of the spectral shape used to fit the PSF TF1
+        :type log_log_shape: str
+        :param min_dec: Lower declination edges
+        :type min_dec: np.ndarray
+        :param dec_center: Declination bin centers
+        :type dec_center: np.ndarray
+        :param max_dec: Upper declination edges
+        :type max_dec: np.ndarray
+        :return: ResponseBin object with all the necessary information for a given analysis_bin
+        :rtype: ResponseBin
         """
 
         # NOTE: Load all the information to the EnergyBin class for each bin_name

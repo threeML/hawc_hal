@@ -100,26 +100,21 @@ def get_array_from_file(
     hpx_map: NDArray[np.float64],
     roi: Optional[HealpixConeROI | HealpixMapROI] = None,
 ) -> tuple[str, NDArray[np.float64]]:
-    """Load the signal array from a ROOT maptree file
+    """Load the signal array from a ROOT maptree
 
-    Parameters
-    ----------
-    binning_scheme : str
-        prefix string that handles legacy naming schemes
-    bin_id : str
-        Analysis bin name from the maptree file
-    map_infile : uproot.ReadOnlyDirectory
-        Uproot object that handles the reading of the maptree file
-    hpx_map : NDArray[np.float64]
-        Healpix map array that specifies the active ROI from the active pixels
-    roi : Optional[HealpixConeROI  |  HealpixMapROI], optional
-        ROI object specifying whether there is an active ROI if None,
-        then the whole sky is loaded, by default None
-
-    Returns
-    -------
-    tuple[str, NDArray[np.float64]]
-        Returns the active analysis bin with its corresponding signal array
+    :param legacy_convention: True if there is a zero prefix in the analysis bin name
+    :type legacy_convention: bool
+    :param bin_id: Analysis bin from the maptree file
+    :type bin_id: str
+    :param map_infile: Uproot object that handles the reading of the maptree file
+    :type map_infile: uproot.ReadOnlyDirectory
+    :param hpx_map: Healpix map array that specifies the active pixels within the ROI
+    :type hpx_map: NDArray[np.float64]
+    :param roi: ROI instance specyfing the region of interest only load a partial
+    segment of the map. If set to None, it loads the full sky map (more memory intensive)
+    :type roi: Optional[HealpixConeROI | HealpixMapROI], optional
+    :return: Returns teh active analysis bin with its corresponding signal array.
+    :rtype: tuple[str, NDArray[np.float64]]
     """
 
     current_bin_id = bin_id.zfill(2) if legacy_convention else bin_id
@@ -142,24 +137,20 @@ def get_bkg_array_from_file(
 ) -> tuple[str, NDArray[np.float64]]:
     """Load the background array from a ROOT maptree file
 
-    Parameters
-    ----------
-    binning_scheme : str
-        prefix string that handles legacy naming schemes
-    bin_id : str
-        Analysis bin name from the maptree file
-    map_infile : uproot.ReadOnlyDirectory
-        Uproot object that handles the reading of the maptree file
-    hpx_map : NDArray[np.float64]
-        Healpix map array that specifies the active ROI from the active pixels
-    roi : Optional[HealpixConeROI  |  HealpixMapROI], optional
-        ROI object specifying whether there is an active ROI if None,
-        then the whole sky is loaded, by default None
-
-    Returns
-    -------
-    tuple[str, NDArray[np.float64]]
-        Returns the active analysis bin with its corresponding background array
+    :param legacy_convention: boolean to check if there is a zero prefix
+    in the analysis bin name
+    :type legacy_convention: bool
+    :param bin_id: Analysis bin from the maptree file
+    :type bin_id: str
+    :param map_infile: uproot.ReadOnlyDirectory object that handles the
+    reading of the maptree file
+    :type map_infile: uproot.ReadOnlyDirectory
+    :param hpx_map: Healpix map array that specifies the active pixels within the ROI
+    :type hpx_map: NDArray[np.float64]
+    :param roi: ROI object specifying whether there is an active ROI if None,
+    then the whole sky is loaded, by default None
+    :type roi: Optional[HealpixConeROI | HealpixMapROI], optional
+    :return: Returns the active analysis bin with its corresponding background array
     """
     current_bin_id = bin_id.zfill(2) if legacy_convention else bin_id
     if roi is not None:
@@ -178,30 +169,19 @@ def from_root_file(
     n_workers: int,
     scheme: int = 0,
 ):
-    """Create a Maptree object from a ROOT file. Do not use this derectly, use map_tree_factory instead.
+    """Create a Maptree object from a ROOT file.
+    Do not use this directly, use the maptree_factory method instead.
 
-    Parameters
-    ----------
-    map_tree_file : Path
-        Mapree ROOT file
-    roi : Union[HealpixConeROI, HealpixMapROI]
-        Region of interest set with either HealpixConeROI or HealpixMapROI
-    transits : float
-        Manual specification of the number of transits
-    n_workers : int
-        Number of workers used for multiprocessing
-    scheme : int, optional
-        RING or NESTED HEALPix scheme (default RING:0), by default 0
-
-    Returns
-    -------
-    tuple[dic[str,DataAnalysisBin], float] :
-        Returns the analysis bin id and a DataAnalysisBin object
-
-    Raises
-    ------
-    IOError
-        This will be raised if the file does not exist or is corrupted
+    :param map_tree_file: Maptree ROOT file
+    :param roi:  User defined region of interest (ROI)
+    :param transits: Number of transits specified within maptree.
+    If not specified assume the maximum number of transits for all binss.
+    :param n_workers: Numbrer of processes used for parallel reading of ROOT files
+    :param scheme: RING or NESTED Healpix scheme (default RING:0), by default 0
+    :raises IOError: Raised if file does not exist or is corrupted
+    :return: Return dictionary with DataAnalysis objects for the active bins and
+    the number of transits
+    :rtype: tuple[dict[str, DataAnalysisBin], float]
     """
 
     # from ..root_handler import open_ROOT_file, root_numpy, tree_to_ndarray

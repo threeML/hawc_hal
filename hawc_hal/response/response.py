@@ -336,26 +336,18 @@ class HAWCResponse(object):
 
     @classmethod
     def from_root_file(cls, response_file_name: Path, n_workers: int = 1):
-        """Read the response ROOT file. Do not use directly, use the
-        hawc_response_factory method instead.
+        """Read the response ROOT file. Do not use directly, use the hawc_response_factory()
+        method instead.
 
-        Parameters
-        ----------
-        response_file_name : Path
-            Response ROOT file path
-        n_workers : int
-            Number of workers to use for multiprocessing
+        :param response_file_name: file path to response ROOT file
+        :type response_file_name: Path
+        :param n_workers: number of processes to parallelize reading of ROOT file with uproot
+        :type n_workers: int
+        :raises IOError: File is either nonexistent or corrupt
+        :return: HAWCResponse object containing the response bins for all declinations within
+        the ROOT file
+        :rtype: HAWCREsponse
 
-        Returns
-        -------
-        HAWCResponse :
-            HAWC response file object containing the response bins for declinations
-            within the ROOT file
-
-        Raises
-        ------
-        IOError
-            This exception will be raised if the file provided does not exists or is not readable
         """
 
         # Make sure file is readable
@@ -429,17 +421,15 @@ class HAWCResponse(object):
 
         return cls(response_file_name, dec_bins, response_bins)
 
-    def get_response_dec_bin(self, dec, interpolate=False):
-        """Get the response for the provided declination bin, optionally interpolating the PSF
+    def get_response_dec_bin(self, dec: float, interpolate=False):
+        """Get the response bin for a given declination.
 
-
-        Args:
-            dec (float): Declination where the response is desired
-            interpolate (bool, optional): If True, PSF is interpolated between the two
-            closest response bins. Defaults to False.
-
-        Returns:
-            PSFWrapper: To be added later.
+        :param dec: user provided source or ROI declination
+        :type dec: float
+        :param interpolate: Interpolate over response bins, defaults to False
+        :type interpolate: bool
+        :return: Dictionary of response bins that coincide with the user provided declination
+        :rtype: OrderedDict[str, HAWCResponseBin]
         """
 
         # Sort declination bins by distance to the provided declination
