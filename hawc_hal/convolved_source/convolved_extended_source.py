@@ -34,32 +34,21 @@ def _select_with_wrap_around(
     coord_stop: float,
     wrap: Tuple[float, float] = (360.0, 0.0),
 ) -> nbdarray:
-    """
-    Select pixels covered by an extended source image. The selection is based on
-    the range between the coord start and coord stopping values.
+    """Select pixels covered by an extended source image. The selection is
+    based on the range between the coordinted start and the coordinate stopping values
 
-    Parameters
-    ----------
-    coordinate_array : np.ndarray
-        Array holding coordinates defined by the flat projecting of the ROI
-    coord_start : float
-        Lower bound range coordinate value
-    coord_stop : float
-        Upper bound range coordinate value
-    wrap : Tuple[float, float], optional
-        wrap around for the coordinate values for RA: (360, 0) and
-        for declinations it is (-90, 90), by default (360.0, 0.0)
-
-    Returns
-    -------
-    NDArray[np.bool_]
-        returns a boolean array with the same shape as the coordinate array
-
-    Notes:
-    ------
-    The wrap around is in place to ensure coordinates obey the boundaries correctly.
-    For RA, the boundary is set at (360, 0). For declinations, the boundary is set
-    at (-90, 90).
+    :param coordinate_array: Array with coordinates defined by the flat
+    projection of the ROI
+    :param coord_start: Lower bound for the coordinate window
+    :type coord_start: float
+    :param coord_stop: Upper bound for the coordinate window
+    :type coord_stop: float
+    :param wrap: Specifies a wrap around to ensure coordinates obey
+    the appropriate coordinate boundaries. For RA the wrap around
+    is (360, 0) and for declinations it is (-90, 90). Default is (360, 0)
+    :type wrap: Tuple[float, float]
+    :return: Boolean array that is True only for the pixels covered by
+    the spatial image footing
     """
 
     # NOTE: here arr -> coordinate array, start -> starting coordinate and stop -> stopping coordinate
@@ -87,16 +76,15 @@ class ConvolvedExtendedSource:
         response: HAWCResponse,
         flat_sky_projection: FlatSkyProjection,
     ) -> None:
-        """Convolve an extended source with the PSF per energy bin.
+        """Convolve an extended source image with the PSF per energy bin.
 
-        Parameters
-        ----------
-        source : ExtendedSource
-            An extended source object (must be a likelihood model instance)
-        response : HAWCResponse
-            A HAWC detector response object (required to read the response bins)
-        flat_sky_projection : FlatSkyProjection
-            Flat sky projection of the ROI (region of interest)
+        :param source: Extended source object (must instantiated via a likelihood
+        model instance)
+        :type source: ExtendedSource
+        :param response: Detector response object (required to read the response bins)
+        :type response: HAWCResponse
+        :param flat_sky_projection: Flat sky projection of the ROI (region of interest)
+        :type flat_sky_projection: FlatSkyProjection
         """
         # Let's read the essential information for the convolution of
         # of an extended source
@@ -144,21 +132,23 @@ class ConvolvedExtendedSource:
     def _calculate_foot_print(
         this_flat_sky_projection: FlatSkyProjection, source: ExtendedSource
     ) -> tuple[float, float]:
-        """Calculates the footprint of the extended source on the flat sky projection.
+        """Calculates the footprint of the extended source on a flat sky projection.
+        - Maximum declination is determined from minimum value between the declination
+        boundaries from extended source and those of the ROI.
+        - Minimum declination is determined from maximum value between the boundaries
+        in declination from the extended source and those of the ROI.
 
-        Parameters
-        ----------
-        this_flat_sky_projection : FlatSkyProjection
-            Flat sky projection of the ROI
-        source : ExtendedSource
-            An extended source object (must be a likelihood model instance)
 
-        Returns
-        -------
-        Tuple[float, float]
-            The minimum and maximum declination values to be covered by the extended source
+        :param this_flat_sky_projection: Flat sky projection of the user specified ROI
+        :type this_flat_sky_projection: FlatSkyProjection
+        :param source: Extended source object (must instantiated via a likelihood model
+        instance
+        :type source: ExtendedSource
+        :return: Declination boundaries necessary to cover the extended source footprint
+        :rtype: tuple[float, float]
         """
-        # Get the footprint (i.e., the coordinates of the 4 points limiting the projections)
+        # Get the footprint (i.e., the coordinates of the 4 points limiting the
+        # projections)
         (
             (_, dec1),
             (_, dec2),
@@ -177,25 +167,19 @@ class ConvolvedExtendedSource:
     def _get_dec_bins_to_consider(
         self, dec_min: float, dec_max: float
     ) -> list[HAWCResponse]:
-        """Calculate the declination bins to consider for the extended source.
+        """Calculate the declination bins to consider for the current extended source.
 
-        Parameters
-        ----------
-        dec_min : float
-            Lower bound declination value
-        dec_max : float
-            Upper bound declination value
+        There is a wrap around to ensure there's always one bin before and after.
+        The ROI is assumed to not overlap with the very first or the very last
+        dec bin.
 
-        Returns
-        -------
-        list[HAWCResponse]
-            Ordered list of HAWC response bins to consider for the extended source
-
-        Notes
-        ------
-            There is a wrap around to ensure there's always one bin before and after.
-            The ROI is assumed to not overlap with the very first or the very last
-            dec bin.
+        :param dec_min: Lower bound declination value
+        :type dec_min: float
+        :param dec_max: Upper bound declination value
+        :type dec_max: float
+        :return: List of HAWC response bins to use for the convolution of the
+        extended source
+        :rtype: list[HAWCResponse]
         """
         # Get the defined dec bins lower edges, upper edges, and centers
         dec_bins_array = np.array(self._response.dec_bins)
@@ -230,18 +214,14 @@ class ConvolvedExtendedSource:
     ) -> dict[int, ResponseBin]:
         """Retrieve the central response bins for the extended source.
 
-        Parameters
-        ----------
-        source : ExtendedSource
-            An extended source object (must be a likelihood model instance)
-        response : HAWCResponse
-            HAWC detector response object (required to read the response bins)
-
-        Returns
-        -------
-        dict[int, ResponseBin]
-            Dictionary containing the central response bins for the extended source
-            (if interpolation is set to False, then just retrieve the declination bin)
+        :param source: An extended source object (must be a likelihood model instance)
+        :type source: ExtendedSource
+        :param response: HAWC detector response object (required to read the response bins)
+        :type response: HAWCResponse
+        :return: Dictionary containing the central response bins that coincide with the
+        extended source (if interpolation is set to False, then just retrieve the declination
+        bin)
+        :rtype: dict[int, ResponseBin]
         """
         _, (lat_start, lat_stop) = source.get_boundaries()
 
@@ -256,16 +236,13 @@ class ConvolvedExtendedSource:
 
     @property
     def _get_wrapped_around_ras(self) -> nbdarray:
-        """
-        Find the pixels covered by the right ascension boundaries of the
+        """Find the pixels covered by the right ascension boundaries of the
         extended source. The selection is based on the range between the
         coord start and coord stopping values.
 
-        Returns
-        -------
-        NDArray[np.bool_]
-            Returns of boolean array with the right ascension values within the
-            extended source boundaries
+        :return: Returns of boolean array with the right ascension values within the
+        extended source boundaries
+        :rtype: NDArray[np.bool_]
         """
         (lon_start, lon_stop), _ = self._source.get_boundaries()
         idx_lon = _select_with_wrap_around(
@@ -279,11 +256,9 @@ class ConvolvedExtendedSource:
         extended source. The selection is based on the range between the
         coord start and coord stopping values.
 
-        Returns
-        -------
-        NDArray[np.bool_]
-            Returns of boolean array with the declination values within the
-            extended source boundaries
+        :return: Returns of boolean array with the declination values within the
+        extended source boundaries
+        :rtype: NDArray[np.bool_]
         """
         _, (lat_start, lat_stop) = self._source.get_boundaries()
         idx_lat = _select_with_wrap_around(
@@ -295,13 +270,9 @@ class ConvolvedExtendedSource:
     def calculate_energy_centers_keV(self) -> ndarray:
         """Retrieve the energy centers from the central response bins.
 
-        Returns
-        -------
-        NDArray[np.float64]
-            Returns the energy centers in units of keV (as required by threeML)
-        Notes
-        -----
-        The definition of energy centers is the same for all bins, so it doesn't matter which bin we read them from. The energy centers are converted to keV (as required by threeML).
+        :return:  Returns the energy centers in units of TeV (converted from keV which
+        is the convention used in threeML)
+        :rtype: NDArray[np.float64]
         """
         return (
             self._central_response_bins[
@@ -311,14 +282,12 @@ class ConvolvedExtendedSource:
         )
 
     def _setup_callbacks(self, callback) -> None:
-        """Register a callback for changes in all free parameters and all linked parameters. Check if a parameter is link to another, the other might be
-        connected to a different source, so we add a callback to that so that the flux
-        is recomputed if needed.
+        """Register the callback for parameter changes that are free and those that
+        are linked. Check if the parameter has changed, if so then register a callback.
+        This is put in place to prevent unnecessary flux calculations for extended sources.
 
-        Parameters
-        ----------
-        callback : function
-            Callback to parameters that have changed values
+        :param callback: Callcack function to register
+        :type callback:
         """
         # Register call back with all free parameters and all linked parameters.
         # If a parameter is linked to another one, the other one might be in
@@ -336,26 +305,22 @@ class ConvolvedExtendedSource:
                 aux_variable.add_callback(callback)
 
     def get_source_map(self, energy_bin_id: str, tag=None):
-        """Perform the convolution of an extended source map with the PSF per energy bin.
+        """Register a callback for changes in the free parameters of the extended
+        source. It keeps tracks of when a parameter changes. When a change occurs the
+        function will register a callback which will indicate that the source
+        flux need to be computed inside the get_source_map() method. This
+        placed so that the computation is avoided when no parameters changes
+        during sampling.
 
-        Parameters
-        ----------
-        energy_bin_id : str
-            Analysis bin id defined in HAWC's maptree and response files
-        tag : str, optional
-            Optional tag to define one source from the other, by default None
-
-        Returns
-        -------
-        NDAarray[np.float64]
-            Convolved imaged only for the pixels within the flat sky projection
+        :param this_parameter: Astromodels parameer instance capable of registering
+        callbacks for when its value changes.
+        :type this_parameter: Parameter
         """
         raise NotImplementedError("You need to implement this in derived classes")
 
 
 class ConvolvedExtendedSource3D(ConvolvedExtendedSource):
-    """
-    A class used to represent a 3D convolved extended source.
+    """A class used to represent a 3D convolved extended source.
 
     This class is a child of the ConvolvedExtendedSource class and
     is used to handle 3D convolved extended sources.
@@ -368,16 +333,11 @@ class ConvolvedExtendedSource3D(ConvolvedExtendedSource):
         response: HAWCResponse,
         flat_sky_projection: FlatSkyProjection,
     ):
-        """Convolved extended source
+        """Convolved extended source class
 
-        Parameters
-        ----------
-        source : ExtendedSource
-            Extended source object (must be likelihood model instance)
-        response : HAWCResponse
-            HAWC detector response object (required to read the response bins)
-        flat_sky_projection : FlatSkyProjection
-            Flat sky projection of the ROI
+        :param source: Extended source instance defined in the likelihood model
+        :param response: HAWC detector response object (required to read the response bins)
+        :param flat_sky_projection: Flat sky projection of the ROI
         """
 
         super().__init__(source, response, flat_sky_projection)
@@ -391,16 +351,16 @@ class ConvolvedExtendedSource3D(ConvolvedExtendedSource):
         self._setup_callbacks(self._parameter_change_callback)
 
     def _parameter_change_callback(self, this_parameter: Parameter) -> None:
-        """Register a callback for changes in the free parameters of the extended sources.
+        """Register a callback for changes in the free parameters of the extended
+        source. It keeps tracks of when a parameter changes. When a change occurs the
+        function will register a callback which will indicate that the source
+        flux need to be computed inside the get_source_map() method. This
+        placed so that the computation is avoided when no parameters changes
+        during sampling.
 
-        Parameters
-        ----------
-        this_parameter : Parameter
-            An astromodels parameter instance capable of registering callbacks for
-            when parameters change values.
-        Notes
-        -----
-        This function is called when a parameter changes value. It is used to keep track of the parameter values. When there is a parameter change the function will recompute the flux. The flux is not recomputed immediately, but only when the get_source_map method is called. This is done to avoid recomputing the flux multiple times when more than one parameter changes at the same time (like for example during sampling).
+        :param this_parameter: Astromodels parameer instance capable of registering
+        callbacks for when its value changes.
+        :type this_parameter: Parameter
         """
         # A parameter has changed, we need to recompute the function.
         # NOTE: we do not recompute it here because if more than one
@@ -419,30 +379,21 @@ class ConvolvedExtendedSource3D(ConvolvedExtendedSource):
         response_bin_sim_diff_photon_fluxes: ndarray,
         pixel_area_rad2: float,
     ) -> ndarray:
-        """
-        Reweights the spectrum separately for two response bins
+        """Reweights the spectrum separately for two response bins.
 
-        Parameters
-        ----------
-        fluxes_array : NDArray[np.float64]
-            Array of fluxes
-        response_bin_sim_diff_photon_fluxes : NDArray[np.float64]
-            Differential photon fluxes per bin
-        pixel_area_rad2 : float
-            Pixel area in units of rad^2
-
-        Returns
-        -------
-        NDArray[np.float64]
-            Returns the scale of fluxes array from the model expected simulated
-            differential fluxes from the response bins.
-        Notes
-        -----
-        The spectrum is weighted separately for two response bins. The scale is the
-        same because the sim_differential_photon_fluxes are the same (the simulation
-        used to make the response use the same spectrum for each bin). What changes
-        between the two bins is the observed signal per bin (the
+        :param fluxes_array:  Array of fluxes
+        :type fluxes_array: NDArray[np.float64]
+        :param response_bin_sim_diff_photon_fluxes: Differential photon fluxes per bin
+        :type response_bin_sim_diff_photon_fluxes: NDArray[np.float64]
+        :param pixel_area_rad2: Pixel area in units of rad^2
+        :type fluxes_array: NDArray[np.float64]
+        :return: Returns the scale of fluxes array from the model expected simulated
+        differential fluxes from the response bins. The spectrum is weighted separately
+        for two response bins. The scale is the same because the sim_differential_photon_fluxes
+        are the same (the simulation used to make the response use the same spectrum for
+        each bin). What changes between the two bins is the observed signal per bin (the
         sim_signal_events_per_bin member).
+        :rtype: NDArray[np.float64]
         """
         # NOTE: the sim_differential_photon_fluxes are the same for every bin,
         # so it doesn't matter which they are read from
@@ -457,21 +408,18 @@ class ConvolvedExtendedSource3D(ConvolvedExtendedSource):
         response_bin1_center: ndarray,
         response_bin2_center: ndarray,
     ) -> tuple[ndarray, ndarray]:
-        """Calculate the interpolation weights for the two responses.
+        """Calculate the interpolation weights between two central response bins that
+        are within the footprint of the extended source.
 
-        Parameters
-        ----------
-        flat_sky_projection_decs_array : NDArray[np.float64]
-            Array of declinations
-        response_bin1_center : NDArray[np.float64]
-            Response bin object
-        response_bin2_center : NDArray[np.float64]
-            Response bin object
-
-        Returns
-        -------
-        Tuple[NDArray[np.float64], NDArray[np.float64]]
-            Returns the interpolation weights for the two responses
+        :param flat_sky_projection_decs_array: Array of declination coordinates
+        on the flat sky projection
+        :type flat_sky_projection_decs_array: NDArray[np.float64]
+        :param response_bin1_center: First central response bin
+        :type response_bin1_center: NDArray[np.float64]
+        :param response_bin2_center: Second central response bin
+        :type response_bin2_center: NDArray[np.float64]
+        :return: the interpolation weights for the two responses considered
+        :rtype: tuple[NDArray[np.float64], NDArray[np.float64]]
         """
         # Compute the interpolation weights for the two responses
         w1 = np.divide(
@@ -493,25 +441,22 @@ class ConvolvedExtendedSource3D(ConvolvedExtendedSource):
         response_bin1_signal_evts_per_bin: ndarray,
         response_bin2_signal_evts_per_bin: ndarray,
     ) -> ndarray:
-        """Calculate the model image.
+        """Evaluate the model image.
 
-        Parameters
-        ----------
-        weight1 : NDArray[np.float64]
-            Array of weights
-        weight2 : NDArray[np.float64]
-            Array of weights
-        scale : NDArray[np.float64]
-            Array of scales
-        response_bin1_signal_evts_per_bin : NDArray[np.float64]
-            Response bin object
-        response_bin2_signal_evts_per_bin : NDArray[np.float64]
-            Response bin object
-
-        Returns
-        -------
-        NDArray[np.float64]
-            Returns the model image
+        :param weight1: Computed weight for the first response bin
+        :type weight1: NDArray[np.float64]
+        :param weight2: Computed weight for the second response bin
+        :type weight1: NDArray[np.float64]
+        :param scale: Scale of fluxes array from the model expected simulated
+        :type scale: NDArray[np.float64]
+        :param response_bin1_signal_evts_per_bin: Number of signal events for first bin
+        considered
+        :type weight1: NDArray[np.float64]
+        :param response_bin2_signal_evts_per_bin: Number of signal events for the second bin
+        considered
+        :type weight1: NDArray[np.float64]
+        :return: Returns model image
+        :rtype: NDArray[np.float64]
         """
         return (
             weight1
@@ -533,17 +478,12 @@ class ConvolvedExtendedSource3D(ConvolvedExtendedSource):
     ) -> ndarray:
         """Perform the convolution of an extended source map with the PSF per energy bin.
 
-        Parameters
-        ----------
-        energy_bin_id : str
-            Analysis bin id defined in HAWC's maptree and response files
-        tag : str, optional
-            Optional tag to define one source from the other, by default None
-
-        Returns
-        -------
-        NDAarray[np.float64]
-            Convolved imaged only for the pixels within the flat sky projection
+        :param tag: Optional tag to ensure sources are treated uniquely
+        :type tag: str
+        :param energy_bin_id: Analysis bin id defined in HAWC's maptree and response files
+        :type energy_bin_id: str
+        :return: Convolved image only for the pixels within the flat sky projection
+        :rtype: NDArray[np.float64]
         """
 
         # We do not use the memoization in astromodels because we are doing
@@ -631,14 +571,10 @@ class ConvolvedExtendedSource3D(ConvolvedExtendedSource):
 
 
 class ConvolvedExtendedSource2D(ConvolvedExtendedSource3D):
-    """Class for convolved 2D extended sources. It inherits all the methods
+    """Class for a 2D convolved extended source. This class inherits all the methods
     from the more complex 3D extended source class, but it is simpler to use
     and much faster to compute.
 
-    Parameters
-    ----------
-    ConvolvedExtendedSource3D : ConvolvedExtendedSource
-        Convolved extended source class
     """
 
     # def __init__(self, source, response, flat_sky_projection):

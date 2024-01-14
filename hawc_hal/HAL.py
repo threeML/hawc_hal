@@ -16,6 +16,7 @@ import pandas as pd
 from astromodels import Parameter
 from astropy.convolution import Gaussian2DKernel
 from astropy.convolution import convolve_fft as convolve
+from matplotlib.figure import Figure
 from numpy.typing import NDArray
 from past.utils import old_div
 from scipy.stats import poisson
@@ -77,22 +78,22 @@ class HAL(PluginPrototype):
     ):
         """The HAWC Accelerated Likelihood plugin for 3ML.
 
-        Parameters
-        ----------
-        name : str
-            HAL instance name
-        maptree : str
-            HAWC map tree file (either ROOT or hdf5 format)
-        response_file : str
-            HAWC response file (either ROOT or hdf5 format)
-        roi : HealpixConeROI | HealpixMapROI
-            Region of interest (ROI)
-        flat_sky_pixels_size : float, optional
-            Size of pixel for the flat sky projection (Hammer Aitoff), by default 0.17
-        n_workers : int, optional
-            Number of workers used for multiprocessing (experimental for now), by default 1
-        set_transits : Optional[float], optional
-            Specify the number of transits if not using the maximum number read from the map tree, by default None
+        :param name: instance name for plugin
+        :type name: str
+        :param maptree: HAWC maptree file (either ROOT or hdf5 format)
+        :type maptree: str
+        :param response_file: HAWC response file (either ROOT or hdf5 format)
+        :type response_file: str
+        :param roi: User specified region of interest (ROI)
+        :type roi: HealpixConeROI | HealpixMapROI
+        :param flat_sky_pixels_size: Size of pixel for the flat sky projection (Hammer Aitoff),
+        by default 0.17
+        :type flat_sky_pixels_size: float
+        :param n_workers: Number of processes for parallel reading of ROOT files and
+        :type n_workers: int
+        number of threads using for likelihood calculations during sampling
+        :param set_transits: Number of transits for current Maptree, by default None
+        :type set_transits: float
         """
         # Store ROI
         self._roi = roi
@@ -224,32 +225,31 @@ class HAL(PluginPrototype):
 
     @property
     def psf_integration_method(self) -> str:
-        """
-        Get or set the method for the integration of the PSF.
+        """Get or set the method for the integration of the PSF
+        * "exact" is more accurate but slow, if the position is free to vary it adds a
+        lot of time to the fit. This is the default, to be used when the position of
+        point sources are fixed. The computation in that case happens only once so
+        the impact on the run time is negligible.
+        * "fast" is less accurate (up to an error of few percent in flux) but a lot faster.
+        This should be used when the position of the point source is free, because
+        in that case the integration of the PSF happens every time the position
+        changes, so several times during the fit.
 
-        Parameters
-        ----------
+        If you have a fit with a free position, use "fast". When the position is found,
+        you can fix it, switch to "exact" and redo the fit to obtain the most accurate
+        measurement of the flux. For normal sources the difference will be small, but
+        for very bright sources it might be up to a few percent (most of the time < 1%).
+        If you are interested in the localization contour there is no need to rerun with
+        "exact". Either "exact" or "fast"
 
-            * "exact" is more accurate but slow, if the position is free to vary it adds a lot of time to the fit. This is
-            the default, to be used when the position of point sources are fixed. The computation in that case happens only
-            once so the impact on the run time is negligible.
-            * "fast" is less accurate (up to an error of few percent in flux) but a lot faster. This should be used when
-            the position of the point source is free, because in that case the integration of the PSF happens every time
-            the position changes, so several times during the fit.
-
-        Notes:
-        ------
-            If you have a fit with a free position, use "fast". When the position is found, you can fix it, switch to
-            "exact" and redo the fit to obtain the most accurate measurement of the flux. For normal sources the difference
-            will be small, but for very bright sources it might be up to a few percent (most of the time < 1%). If you are
-            interested in the localization contour there is no need to rerun with "exact". Either "exact" or "fast"
-
+        :return: PSF integration method
+        :rtype: str
         """
 
         return self._psf_integration_method
 
     @psf_integration_method.setter
-    def psf_integration_method(self, mode):
+    def psf_integration_method(self, mode) -> None:
         assert mode.lower() in [
             "exact",
             "fast",
@@ -257,13 +257,12 @@ class HAL(PluginPrototype):
 
         self._psf_integration_method = mode.lower()
 
-    def _setup_psf_convolutors(self, source_declination: float):
+    def _setup_psf_convolutors(self, source_declination: float) -> None:
         """Set up the PSF convolutors at the source declination
 
-        Parameters
-        ----------
-        source_declination : float
-            Source declination in degrees
+        :param source_declination: user provided declination for a source [degrees]
+        :type source_declination: float
+        :return: none
         """
         # central_response_bins = self._response.get_response_dec_bin(
         #     self._roi.ra_dec_center[1]
@@ -466,25 +465,18 @@ class HAL(PluginPrototype):
 
                 self._convolved_ext_sources.append(this_convolved_ext_source)
 
-    def get_excess_background(self, ra: float, dec: float, radius: float):
-        """Calculates excess (data-bkg), background, and model counts at
-        different radial distances from origin of radial profile.
+    def get_excess_background(
+        self, ra: float, dec: float, radius: float
+    ) -> tuple[ndarray, ...]:
+        """Calculates the excess (data - bkg), background, and model counts at
+        different radial distances from origin of radial profile
 
-
-        Parameters
-        ----------
-        ra : float
-            RA of origin of radial profile
-        dec : float
-           Dec of origin of radial profile
-        radius : float
-           distance from origin of radial profile
-
-        Returns
-        -------
-           returns a tuple of numpy arrays with info of areas (steradian) and
-           signal excess, background, and model in units of counts to be used
-           in the get_radial_profile method.
+        :param ra: RA coordinate for center of radial profile
+        :param dec: Declination coordinate for center of radial profile
+        :param radius: Distance from center of radial profile (assumed in degrees)
+        :return: Returns a tuple of numy arrays with area of given radius from center of radial
+        profile (steradian), signal excess, background and model counts only for the pixels within the specified radius. This method is called within the get_radial_profile_method()
+        :rtype: tuple[ndarray,...]
         """
 
         radius_radians = np.deg2rad(radius)
@@ -554,34 +546,35 @@ class HAL(PluginPrototype):
         self,
         ra: float,
         dec: float,
-        active_planes: list = None,
+        active_planes: Optional[list[str] | None] = None,
         max_radius: float = 3.0,
         n_radial_bins: int = 30,
         delta_step: float = 0.5,
         model_to_subtract: Optional[astromodels.Model | None] = None,
         subtract_model_from_model: bool = False,
-    ):
-        """Calculates radial profiles for a source in units of excess counts
-           per steradian
+    ) -> tuple[ndarray, ndarray, ndarray, ndarray, list[str]]:
+        """calculates the radial profiles for a source in units of excess counts/steradian
 
-        Args:
-            ra (float): RA of origin of radial profile
-            dec (float): Declincation of origin of radial profile
-            active_planes (np.ndarray, optional): List of active planes over
-            which to average. Defaults to None.
-            max_radius (float, optional): Radius up to which evaluate the
-            radial profile. Defaults to 3.0.
-            n_radial_bins (int, optional): Number of radial bins to use for
-            the profile. Defaults to 30.
-            model_to_subtract (astromodels.model, optional): Another model to
-            subtract from the data excess. Defaults to None.
-            subtract_model_from_model (bool, optional): If True, and
-            model_to_subtract is not None,
-            subtract model from model too. Defaults to False.
-
-        Returns:
-            tuple(np.ndarray): returns list of radial distances, excess expected
-            counts, excess counts, counts uncertainty, and list of sorted active_planes
+        :param ra: RA coordinate for origin of radial profile
+        :type ra: float
+        :param dec: Dec coordinate of origin of radial profile
+        :type dec: float
+        :param active_planes: Active analysis bins during analysis
+        :type active_planes: list[str]
+        :param max_radius: Radius up to which evaluate the radial profile, defaults to 3.0
+        :type max_radius: float
+        :param n_radial_bins: Number of bins to use for the radial profile
+        :type n_radial_bins: int
+        :param delta_step: Step in radial profile annuli, defaults to 0.5
+        :type delta_step: float
+        :param model_to_subtract: Another model to subtract from the data excess,
+        defaults to None
+        :type model_to_subtract: astromodels.Model
+        :param subtract_model_from_model: If True, subtract the model_to_subtract
+        from initial model, defaults to False
+        :type subtract_model_from_model: bool
+        :return: Radial distances, model expected counts, excess signal counts, uncertainty, and list of active analysis bins
+        :rtype: tuple[ndarray, ..., list[str]]
         """
         # default is to use all active bins
         if active_planes is None:
@@ -710,30 +703,31 @@ class HAL(PluginPrototype):
         delta_step: float = 0.8,
         model_to_subtract: Optional[astromodels.Model | None] = None,
         subtract_model_from_model: bool = False,
-    ):
-        """Plots radial profiles of data-background & model
+    ) -> tuple[Figure, pd.DataFrame]:
+        """Plots radial profiles of excess signal with signal+background as uncertainty and
+        the model.
 
-        Args:
-            ra (float): RA of origin of radial profile
-            dec (float): Declination of origin of radial profile.
-            active_planes (np.ndarray, optional): List of analysis bins over
-            which to average.
-            Defaults to None.
-            max_radius (float, optional): Radius up to which the radial profile
-            is evaluate; also used as the radius for the disk to calculate the
-            gamma/hadron weights. Defaults to 3.0.
-            n_radial_bins (int, optional): number of radial bins used for ring
-            calculation. Defaults to 30.
-            model_to_subtract (astromodels.model, optional): Another model that
-            is to be subtracted from the data excess. Defaults to None.
-            subtract_model_from_model (bool, optional): If True and
-            model_to_subtract is not None, subtract from model too.
-            Defaults to False.
-
-        Returns:
-            tuple(matplotlib.pyplot.Figure, pd.DataFrame): plot of data-background
-            & model radial profile for source and a dataframe with all
-            values for easy retrieval
+        :param ra: RA coordinate of origin of radial profile
+        :type ra: float
+        :param dec: Dec coordinate of origin of radial profile
+        :type dec: float
+        :param active_planes: List of active analysis bins
+        :type active_planes: list[str]
+        :param max_radius: Radius up to which the radial profile is evaluated. Also used as
+        the radius to calculate the gamma/hadron weights since background is
+        treated as cosmic-rays.
+        :type max_radius: float
+        :param n_radial_bins: Number of bins to use for the radial profile, defaults to 30
+        :type n_radial_bins: int
+        :param delta_step: Step in radial profile annuli, defaluts to 0.8
+        :type delta_step: float
+        :param model_to_subtract: Another model to subtract from data, defaults to None.
+        :type model_to_subtract: astromodels.Model
+        :param subtract_model_from_model: If True, subtract the model_to_subtract
+        from initial model, defaults to False.
+        :type subtract_model_from_model: bool
+        :return: Figure and a pandas dataframe to use for surface brightness
+        :rtype: pd.DataFrame, matplotlib.figure.Figure
         """
 
         (
@@ -1195,28 +1189,23 @@ class HAL(PluginPrototype):
         lock: RLock,
         psf_integration_method: str = "exact",
     ) -> ndarray:
-        """
-        Compute the expected counts for a point source
+        """Compute the expected counts for a point source
 
-        Parameters
-        ----------
-        pts_id : int
-            Assigned id of the point source
-        energy_bin_id : str
-            Analysis bin defined from maptree and response function
-        data_analysis_bin : DataAnalysisBin
-            Data analysis bin with observed counts and background
-        convolved_source_container : ConvolvedSourcesContainer
-            Container with convolved point sources
-        lock : RLock
-            Lock to use for thread safety
-        psf_integration_method : str
-            Method to use for PSF integration. Options are 'exact' and 'fast'
-
-        Returns
-        -------
-        NDArray[np.float64]
-            Expected counts for a point source
+        :param pts_id: Assigned id of the point source
+        :type pts_id: int
+        :param energy_bin_id: Analysis bin defined from maptree and response function
+        :type energy_bin_id: str
+        :param data_analysis_bin:  Data analysis bin with observed counts and background
+        :type data_analysis_bin: DataAnalysisBin
+        :param convolved_source_container: Container with convolved point sources
+        :type convolved_source_container: ConvolvedSourcesContainer
+        :param lock: Lock to use for thread safety with point sources
+        :type lock: RLock
+        :param psf_integration_method: Method to use for PSF integration. Options are:
+        'exact' and 'fast'
+        :type psf_integration_method: str
+        :return: Expected counts map for a point source
+        :rtype: ndarray
         """
         this_conv_src: ConvolvedPointSource = convolved_source_container[pts_id]
 
@@ -1487,9 +1476,9 @@ class HAL(PluginPrototype):
 
     def display_fit(self, smoothing_kernel_sigma=0.1, display_colorbar=False):
         """
-        Make a figure containing 4 maps for each active analysis bins with respectively model, data,
-        background and residuals. The model, data and residual maps are smoothed, the background
-        map is not.
+        Make a figure containing 4 maps for each active analysis bins with respectively
+        model, data, background and residuals. The model, data and residual maps are
+        smoothed, the background map is not.
 
         :param smoothing_kernel_sigma: sigma for the Gaussian smoothing kernel, for all but
         background maps
