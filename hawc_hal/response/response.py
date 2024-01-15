@@ -26,7 +26,8 @@ _instances = {}
 
 def hawc_response_factory(response_file_name, n_workers: int = 1):
     """
-    A factory function for the response which keeps a cache, so that the same response is not read over and
+    A factory function for the response which keeps a cache, so that
+    the same response is not read over and
     over again.
 
     :param response_file_name:
@@ -230,10 +231,12 @@ class HAWCResponse(object):
         if len(dec_bins) < 2:
             #   log.warning("Only {0} dec bins given in {1}, will not try to interpolate.".format(len(dec_bins), response_file_name))
             log.warning(
-                f"Only {len(dec_bins)} dec bins given in {response_file_name}, will not try to interpolate."
+                f"Only {len(dec_bins)} dec bins given in {response_file_name}, will "
+                "not try to interpolate."
             )
             log.warning(
-                "Single-dec-bin mode is intended for development work only at this time and may not work with extended sources."
+                "Single-dec-bin mode is intended for development work only "
+                "at this time and may not work with extended sources."
             )
 
     @classmethod
@@ -428,7 +431,8 @@ class HAWCResponse(object):
         :type dec: float
         :param interpolate: Interpolate over response bins, defaults to False
         :type interpolate: bool
-        :return: Dictionary of response bins that coincide with the user provided declination
+        :return: Dictionary of response bins that coincide with the user provided
+        declination
         :rtype: OrderedDict[str, HAWCResponseBin]
         """
 
@@ -491,10 +495,11 @@ class HAWCResponse(object):
         return len(list(self._response_bins.values())[0])
 
     def display(self, verbose=False):
-        """
-        Prints summary of the current object content.
+        """Prints summary of the current object content.
 
-        :param verbose bool: Prints the full list of declinations and analysis bins.
+        :param verbose: Whether to print the full list of declinations and
+        analysis bins, defaults to False
+        :type verbose: bool
         """
 
         # log.info("Response file: %s" % self._response_file_name)
@@ -510,13 +515,11 @@ class HAWCResponse(object):
         if verbose:
             log.info(list(self._response_bins.values())[0].keys())
 
-    def write(self, filename):
-        """
-        Write the response to HDF5 file.
+    def write(self, filename: str) -> None:
+        """Write the response file to an HDF5 file
 
-        Args:
-            filename (str): Output file name. WARNING: it will be overwritten if
-            file already exists.
+        :param filename: path to output response file
+        :type filename: str
         """
 
         filename = sanitize_filename(filename)

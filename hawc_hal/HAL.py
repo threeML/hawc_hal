@@ -111,8 +111,8 @@ class HAL(PluginPrototype):
 
         # Set up the flat-sky projection
         self.flat_sky_pixels_size = flat_sky_pixels_size
-        self._flat_sky_projection: FlatSkyProjection = (
-            self._roi.get_flat_sky_projection(self.flat_sky_pixels_size)
+        self._flat_sky_projection: FlatSkyProjection = self._roi.get_flat_sky_projection(
+            self.flat_sky_pixels_size
         )
 
         # Read map tree (data)
@@ -298,7 +298,8 @@ class HAL(PluginPrototype):
 
     def get_saturated_model_likelihood(self):
         """
-        Returns the likelihood for the saturated model (i.e. a model exactly equal to observation - background).
+        Returns the likelihood for the saturated model (i.e. a model exactly
+        equal to observation - background).
 
         :return:
         """
@@ -310,18 +311,21 @@ class HAL(PluginPrototype):
         """
         Set the active analysis bins to use during the analysis. It can be used in two ways:
 
-        - Specifying a range: if the response and the maptree allows it, you can specify a minimum id and a maximum id
-        number. This only works if the analysis bins are numerical, like in the normal fHit analysis. For example:
+        - Specifying a range: if the response and the maptree allows it, you can
+        specify a minimum id and a maximum id number. This only works if the analysis
+        bins are numerical, like in the normal fHit analysis. For example:
 
             > set_active_measurement(bin_id_min=1, bin_id_max=9)
 
-        - Specifying a list of bins as strings. This is more powerful, as allows to select any bins, even
-        non-contiguous bins. For example:
+        - Specifying a list of bins as strings. This is more powerful, as allows to
+        select any bins, even non-contiguous bins. For example:
 
             > set_active_measurement(bin_list=[list])
 
-        :param bin_id_min: minimum bin (only works for fHit analysis. For the others, use bin_list)
-        :param bin_id_max: maximum bin (only works for fHit analysis. For the others, use bin_list)
+        :param bin_id_min: minimum bin (only works for fHit analysis. For the others,
+        use bin_list)
+        :param bin_id_max: maximum bin (only works for fHit analysis. For the others,
+        use bin_list)
         :param bin_list: a list of analysis bins to use
         :return: None
         """
@@ -342,9 +346,7 @@ class HAL(PluginPrototype):
             for this_bin in range(bin_id_min, bin_id_max + 1):
                 this_bin = str(this_bin)
                 if this_bin not in self._all_planes:
-                    raise ValueError(
-                        f"Bin {this_bin} is not contained in this maptree."
-                    )
+                    raise ValueError(f"Bin {this_bin} is not contained in this maptree.")
 
                 self._active_planes.append(this_bin)
 
@@ -359,9 +361,7 @@ class HAL(PluginPrototype):
 
             for this_bin in bin_list:
                 if this_bin not in self._all_planes:
-                    raise ValueError(
-                        f"Bin {this_bin} is not contained in this maptree."
-                    )
+                    raise ValueError(f"Bin {this_bin} is not contained in this maptree.")
 
                 self._active_planes.append(this_bin)
 
@@ -475,8 +475,9 @@ class HAL(PluginPrototype):
         :param dec: Declination coordinate for center of radial profile
         :param radius: Distance from center of radial profile (assumed in degrees)
         :return: Returns a tuple of numy arrays with area of given radius from center of radial
-        profile (steradian), signal excess, background and model counts only for the pixels within
-        the specified radius. This method is called within the get_radial_profile_method()
+        profile (steradian), signal excess, background and model counts only for
+        the pixels within the specified radius. This method is called within the
+        get_radial_profile_method()
         :rtype: tuple[ndarray,...]
         """
 
@@ -501,10 +502,7 @@ class HAL(PluginPrototype):
             this_nside = data_analysis_bin.observation_map.nside
 
             radial_bin_pixels = hp.query_disc(
-                this_nside,
-                center,
-                radius_radians,
-                inclusive=False,
+                this_nside, center, radius_radians, inclusive=False
             )
 
             # calculate the areas per bin by the product
@@ -513,9 +511,7 @@ class HAL(PluginPrototype):
 
             # NOTE: select active pixels according to each radial bin
             bin_active_pixel_indexes = np.intersect1d(
-                self._active_pixels[energy_id],
-                radial_bin_pixels,
-                return_indices=True,
+                self._active_pixels[energy_id], radial_bin_pixels, return_indices=True
             )[1]
 
             # obtain the excess, background, and expected excess at
@@ -574,7 +570,8 @@ class HAL(PluginPrototype):
         :param subtract_model_from_model: If True, subtract the model_to_subtract
         from initial model, defaults to False
         :type subtract_model_from_model: bool
-        :return: Radial distances, model expected counts, excess signal counts, uncertainty, and list of active analysis bins
+        :return: Radial distances, model expected counts, excess signal counts,
+        uncertainty, and list of active analysis bins
         :rtype: tuple[ndarray, ..., list[str]]
         """
         # default is to use all active bins
@@ -594,10 +591,7 @@ class HAL(PluginPrototype):
         # The area of each ring is then given by the difference between two
         # subsequent circe areas.
         area = np.array(
-            [
-                self.get_excess_background(ra, dec, r + offset * delta_r)[0]
-                for r in radii
-            ]
+            [self.get_excess_background(ra, dec, r + offset * delta_r)[0] for r in radii]
         )
 
         temp = area[1:] - area[:-1]
@@ -605,10 +599,7 @@ class HAL(PluginPrototype):
 
         # signals
         signal = np.array(
-            [
-                self.get_excess_background(ra, dec, r + offset * delta_r)[1]
-                for r in radii
-            ]
+            [self.get_excess_background(ra, dec, r + offset * delta_r)[1] for r in radii]
         )
 
         temp = signal[1:] - signal[:-1]
@@ -616,10 +607,7 @@ class HAL(PluginPrototype):
 
         # backgrounds
         bkg = np.array(
-            [
-                self.get_excess_background(ra, dec, r + offset * delta_r)[2]
-                for r in radii
-            ]
+            [self.get_excess_background(ra, dec, r + offset * delta_r)[2] for r in radii]
         )
 
         temp = bkg[1:] - bkg[:-1]
@@ -630,10 +618,7 @@ class HAL(PluginPrototype):
         # model
         # convert 'top hat' excess into 'ring' excesses.
         model = np.array(
-            [
-                self.get_excess_background(ra, dec, r + offset * delta_r)[3]
-                for r in radii
-            ]
+            [self.get_excess_background(ra, dec, r + offset * delta_r)[3] for r in radii]
         )
 
         temp = model[1:] - model[:-1]
@@ -770,9 +755,7 @@ class HAL(PluginPrototype):
 
         plt.plot(radii, excess_model, color="red", label="Model")
 
-        plt.legend(
-            bbox_to_anchor=(1.0, 1.0), loc="upper right", numpoints=1, fontsize=16
-        )
+        plt.legend(bbox_to_anchor=(1.0, 1.0), loc="upper right", numpoints=1, fontsize=16)
         plt.axhline(0, color="deepskyblue", linestyle="--")
 
         x_limits = [0, max_radius]
@@ -879,9 +862,7 @@ class HAL(PluginPrototype):
 
         yerr = [yerr_high, yerr_low]
 
-        return self._plot_spectrum(
-            net_counts, yerr, model_only, residuals, residuals_err
-        )
+        return self._plot_spectrum(net_counts, yerr, model_only, residuals, residuals_err)
 
     def _plot_spectrum(self, net_counts, yerr, model_only, residuals, residuals_err):
         alice_style = copy.deepcopy(hep.style.ALICE)
@@ -957,10 +938,7 @@ class HAL(PluginPrototype):
         """
 
         this_model_map_hpx = self._get_expectation(
-            this_data_analysis_bin,
-            bin_id,
-            n_point_sources,
-            n_ext_sources,
+            this_data_analysis_bin, bin_id, n_point_sources, n_ext_sources
         )
 
         obs = this_data_analysis_bin.observation_map.as_partial()
@@ -977,11 +955,7 @@ class HAL(PluginPrototype):
         return bin_id, this_log_like
 
     def _multithreading_log_like(
-        self,
-        n_point_sources: int,
-        n_ext_sources: int,
-        bkg_renorm: float,
-        n_jobs: int = 5,
+        self, n_point_sources: int, n_ext_sources: int, bkg_renorm: float, n_jobs: int = 5
     ) -> list[tuple[str, float]]:
         """Perform log-likelihood using multithreading for all active analysis
         bins
@@ -1060,7 +1034,7 @@ class HAL(PluginPrototype):
         # Now compare with observation
         bkg_renorm = list(self._nuisance_parameters.values())[0].value
         multithread_log_like_results = self._multithreading_log_like(
-            n_point_sources, n_ext_sources, bkg_renorm
+            n_point_sources, n_ext_sources, bkg_renorm, n_jobs=self._n_workers
         )
         total_log_like = sum(result[1] for result in multithread_log_like_results)
         if individual_bins is True:
@@ -1215,9 +1189,7 @@ class HAL(PluginPrototype):
         # ? For now, a lock is put in place to prevent such conditions
         with lock:
             expectation_per_transit = this_conv_src.get_source_map(
-                energy_bin_id,
-                tag=None,
-                psf_integration_method=psf_integration_method,
+                energy_bin_id, tag=None, psf_integration_method=psf_integration_method
             )
 
         expectation_from_this_source = (
@@ -1277,9 +1249,7 @@ class HAL(PluginPrototype):
             tasks = [
                 executor.submit(
                     partial(
-                        worker_func,
-                        energy_bin_id,
-                        convolved_source_container[ext_id],
+                        worker_func, energy_bin_id, convolved_source_container[ext_id]
                     )
                 )
                 for ext_id in range(n_ext_sources)
@@ -1380,6 +1350,7 @@ class HAL(PluginPrototype):
                 n_ext_sources,
                 self._worker_func,
                 self._convolved_ext_sources,
+                n_jobs=self._n_workers,
             )
 
             # Now convolve with the PSF
@@ -1571,9 +1542,7 @@ class HAL(PluginPrototype):
             subs[i][0].set_title("model, bin {}".format(data_analysis_bin.name))
 
             # Plot data map
-            images[1] = subs[i][1].imshow(
-                proj_data, origin="lower", vmin=vmin, vmax=vmax
-            )
+            images[1] = subs[i][1].imshow(proj_data, origin="lower", vmin=vmin, vmax=vmax)
             subs[i][1].set_title("excess, bin {}".format(data_analysis_bin.name))
 
             # Plot background map.
@@ -1693,9 +1662,7 @@ class HAL(PluginPrototype):
             raise ValueError(f"{plane_id} not a plane in the current model")
 
         model_map = SparseHealpix(
-            self._get_expectation(
-                self._maptree[plane_id], plane_id, n_pt_src, n_ext_src
-            ),
+            self._get_expectation(self._maptree[plane_id], plane_id, n_pt_src, n_ext_src),
             self._active_pixels[plane_id],
             self._maptree[plane_id].observation_map.nside,
         )
@@ -1769,17 +1736,13 @@ class HAL(PluginPrototype):
         if return_map:
             return new_map_tree
 
-    def write_model_map(
-        self, file_name, poisson_fluctuate=False, test_return_map=False
-    ):
+    def write_model_map(self, file_name, poisson_fluctuate=False, test_return_map=False):
         """
         This function writes the model map to a file.
         The interface is based off of HAWCLike for consistency
         """
         if test_return_map:
-            log.warning(
-                "test_return_map=True should only be used for testing purposes!"
-            )
+            log.warning("test_return_map=True should only be used for testing purposes!")
         return self._write_a_map(file_name, "model", poisson_fluctuate, test_return_map)
 
     def write_residual_map(self, file_name, test_return_map=False):
@@ -1788,7 +1751,5 @@ class HAL(PluginPrototype):
         The interface is based off of HAWCLike for consistency
         """
         if test_return_map:
-            log.warning(
-                "test_return_map=True should only be used for testing purposes!"
-            )
+            log.warning("test_return_map=True should only be used for testing purposes!")
         return self._write_a_map(file_name, "residual", False, test_return_map)
