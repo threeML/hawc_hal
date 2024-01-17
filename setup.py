@@ -59,7 +59,12 @@ setup(
         "mplhep",
         "hist",
     ],
-    entry_points={"console_scripts": ["hdf5tofits = scripts.hal_hdf5_to_fits:main"]},
+    entry_points={
+        "console_scripts": [
+            "hdf5tofits = scripts.hal_hdf5_to_fits:main",
+            "halfitpointsrc = scripts.hal_fit_point_source:main",
+        ]
+    },
     # NOTE: we use '' as package name because the extra_files already contain the full path from here
     package_data={"": extra_files},
 )
