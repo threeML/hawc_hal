@@ -2,7 +2,6 @@ from __future__ import division
 
 import copy
 from builtins import object, zip
-from typing import Self
 
 import numpy as np
 import pandas as pd
@@ -11,6 +10,9 @@ import scipy.interpolate
 import scipy.optimize
 from numpy.typing import NDArray
 from past.utils import old_div
+from typing_extensions import Self
+
+# from typing import Self # available on python 3.11+
 
 _INTEGRAL_OUTER_RADIUS = 15.0
 

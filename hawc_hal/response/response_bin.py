@@ -1,14 +1,15 @@
 """ Generate ResponseBin for HAWC Likelihood plugin"""
 from dataclasses import dataclass, field
-from typing import Self
 
 import boost_histogram as bh
 import numpy as np
 import pandas as pd
 from numpy.typing import NDArray
+from typing_extensions import Self
 
 from ..psf_fast import InvalidPSF, InvalidPSFError, PSFWrapper
 
+# from typing import Self # available on python 3.11+
 # NOTE: definition of a few constants to be used thorought the module
 LOG_BASE: int = 10
 ndarray = NDArray[np.float64]
