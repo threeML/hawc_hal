@@ -1,17 +1,16 @@
+import os
+import os.path
+
 from setuptools import setup
-import os, os.path
 
 # Create list of data files
 
 
 def find_data_files(directory):
-
     paths = []
 
-    for (path, directories, filenames) in os.walk(directory):
-
+    for path, directories, filenames in os.walk(directory):
         for filename in filenames:
-
             paths.append(os.path.join("..", path, filename))
 
     return paths
@@ -34,6 +33,7 @@ setup(
         "hawc_hal/region_of_interest",
         "hawc_hal/convenience_functions",
         "hawc_hal/tests",
+        "scripts",
     ],
     url="https://github.com/threeML/hawc_hal",
     license="BSD-3.0",
@@ -59,8 +59,12 @@ setup(
         "mplhep",
         "hist",
     ],
-    # NOTE: we use '' as package name because the extra_files already contain the full path from here
-    package_data={
-        "": extra_files,
+    entry_points={
+        "console_scripts": [
+            "hdf5tofits = scripts.hal_hdf5_to_fits:main",
+            "halfitpointsrc = scripts.hal_fit_point_source:main",
+        ]
     },
+    # NOTE: we use '' as package name because the extra_files already contain the full path from here
+    package_data={"": extra_files},
 )
