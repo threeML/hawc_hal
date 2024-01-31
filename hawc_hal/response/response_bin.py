@@ -1,29 +1,29 @@
 """ Generate ResponseBin for HAWC Likelihood plugin"""
-from builtins import object
 from dataclasses import dataclass, field
+from typing import Self
 
 import boost_histogram as bh
 import numpy as np
 import pandas as pd
+from numpy.typing import NDArray
 
 from ..psf_fast import InvalidPSF, InvalidPSFError, PSFWrapper
 
 # NOTE: definition of a few constants to be used thorought the module
 LOG_BASE: int = 10
+ndarray = NDArray[np.float64]
+dataframe = pd.DataFrame
 
 
 @dataclass
 class EnergyBin:
     """
-    # EnergyBin
-    ### Intermediate class to retrieve values from energy histograms of ROOT file
-
-    #### Args:
-        * signal_events (np.ndarray): simulated signal events
-        * bkg_events (np.ndarray): simulated background events
-        * log_log_params (np.ndarray): best-fit parameters obtained from response file
-        * log_log_shape (str): spectral shape
-
+    Constructor arguments:
+    :param bin_name: Name of the analysis bin
+    :param signal_events: Simulated signal events
+    :param bkg_events: Simulated background events
+    :param log_log_params: Best-fit parameters obtained from response file
+    :param log_log_shape: Spectral shape
     """
 
     bin_name: str
@@ -33,12 +33,12 @@ class EnergyBin:
     log_log_shape: str
 
     # Variables to be initialized with the _get_edges method
-    _lower_edges: np.ndarray = field(init=False)
-    _centers: np.ndarray = field(init=False)
-    _upper_edges: np.ndarray = field(init=False)
+    _lower_edges: ndarray = field(init=False)
+    _centers: ndarray = field(init=False)
+    _upper_edges: ndarray = field(init=False)
 
     def _log_log_spectrum(self, log_energy: float, log_log_shape: str) -> float:
-        """Evluate the differential flux from log10(simulated energy) values
+        """Evaluate the differential flux from log10(simulated energy) values
 
         :param log_energy: simulated energy in log10 scale units (TeV)
         :type log_energy: float
@@ -112,7 +112,7 @@ class EnergyBin:
         return self.bin_name
 
 
-class ResponseBin(object):
+class ResponseBin:
     """
     Stores detector response for one declination band and one analysis
     bin (called "name" or "analysis_bin_id" below).
@@ -174,34 +174,25 @@ class ResponseBin(object):
         analysis_bin_id: str,
         energy_hist: bh.Histogram,
         energy_hist_bkg: bh.Histogram,
-        psf_fit_params: list[float],
-        log_log_params: np.ndarray,
+        psf_fit_params: ndarray,
+        log_log_params: ndarray,
         log_log_shape: str,
-        min_dec: np.ndarray,
-        dec_center: np.ndarray,
-        max_dec: np.ndarray,
-    ):
+        min_dec: ndarray,
+        dec_center: ndarray,
+        max_dec: ndarray,
+    ) -> Self:
         """Read in the response file with ROOT format and organize all the necessary
         information
 
         :param analysis_bin_id: Active analysis bin name defined in the response file
-        :type analysis_bin_id: str
         :param energy_hist: Energy histogram from response file
-        :type energy_hist: boost_histogram
         :param energy_hist_bkg: Background energy histogram from response file
-        :type energy_hist_bkg: boost_histogram
         :param psf_fit_params: Best-fit PSF parameters for the active analysis_bin
-        :type psf_fit_params: list[float]
         :param log_log_params: Best-fit params of the LogLogSpectrum TF1
-        :type log_log_params: np.ndarray
         :param log_log_shape: Name of the spectral shape used to fit the PSF TF1
-        :type log_log_shape: str
         :param min_dec: Lower declination edges
-        :type min_dec: np.ndarray
         :param dec_center: Declination bin centers
-        :type dec_center: np.ndarray
         :param max_dec: Upper declination edges
-        :type max_dec: np.ndarray
         :return: ResponseBin object with all the necessary information for a given analysis_bin
         :rtype: ResponseBin
         """
@@ -210,11 +201,7 @@ class ResponseBin(object):
         # and for the complex processing of the differential flux,
         # energy lower_edges, centers, upper_edges
         energy_bin = EnergyBin(
-            analysis_bin_id,
-            energy_hist,
-            energy_hist_bkg,
-            log_log_params,
-            log_log_shape,
+            analysis_bin_id, energy_hist, energy_hist_bkg, log_log_params, log_log_shape
         )
 
         # Now let's see what has been simulated, i.e., the differential flux
@@ -252,16 +239,17 @@ class ResponseBin(object):
             psf_fun,
         )
 
-    def to_pandas(self):
-        """Save the information from Response file into a pandas.DataFrame
+    def to_pandas(self) -> tuple[dataframe, dict[str, ndarray], dataframe]:
+        """Organizes information a response ROOT file into a dataframe for later storage
+        in a file with HDF5 format
 
-        Returns:
-            tuple(pd.DataFrame): returns a tuple of pd.DataFrame, Response function metadata,
-            and PSFWrapper instance
+        :return: Tuple that contains essential information from the response file:
+        simulated declination bins, signal events and simulated background events,
+        and the expected counts from the PSF
         """
 
         # In the metadata let's save all single values (floats)
-        meta = {
+        meta: dict[str, ndarray] = {
             "min_dec": self._min_dec,
             "max_dec": self._max_dec,
             "declination_center": self._dec_center,
@@ -285,14 +273,19 @@ class ResponseBin(object):
 
         return df, meta, self.psf.to_pandas()
 
-    def combine_with_weights(self, other_response_bin, dec_center, w1, w2):
+    def combine_with_weights(
+        self, other_response_bin: Self, dec_center: float, w1: ndarray, w2: ndarray
+    ):
         """
-        Produce another response bin which is the weighted sum of this one and the other one passed.
+        Produce another response bin which is the weighted sum of this one and
+        the other one passed.
 
-        :param other_response_bin:
-        :param w1:
-        :param w2:
-        :return:
+        :param other_response_bin: another response bin for which to evaluate
+        the weighted sum
+        :param w1: weights for current instance of response bin
+        :param w2: weights for other instance of response bin
+        :return: New instance of response bin with combined weights with combined
+        weights
         """
 
         assert np.isclose(w1 + w2, 1.0), "Weights are not properly normalized"
@@ -345,7 +338,7 @@ class ResponseBin(object):
             new_psf,
         )
 
-        return new_response_bin
+        return new_response_bin  # type: ResponseBin
 
     @property
     def name(self):

@@ -1,7 +1,6 @@
 from __future__ import absolute_import, division
 
 import os
-from builtins import object
 
 import astropy.units as u
 import numpy as np
@@ -29,7 +28,7 @@ def map_tree_factory(map_tree_file, roi, n_workers: int = 1, n_transits=None):
     return MapTree.from_hdf5(map_tree_file, roi, n_transits)
 
 
-class MapTree(object):
+class MapTree:
     def __init__(self, analysis_bins, roi, n_transits=None):
         self._analysis_bins = analysis_bins
         self._roi = roi
@@ -183,9 +182,9 @@ class MapTree(object):
         for bin_id in self._analysis_bins:
             analysis_bin = self._analysis_bins[bin_id]
 
-            assert (
-                bin_id == analysis_bin.name
-            ), "Bin name inconsistency: {} != {}".format(bin_id, analysis_bin.name)
+            assert bin_id == analysis_bin.name, "Bin name inconsistency: {} != {}".format(
+                bin_id, analysis_bin.name
+            )
 
             multi_index_keys.append(analysis_bin.name)
 

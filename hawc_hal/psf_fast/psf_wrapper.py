@@ -2,6 +2,7 @@ from __future__ import division
 
 import copy
 from builtins import object, zip
+from typing import Self
 
 import numpy as np
 import pandas as pd
@@ -14,6 +15,29 @@ from past.utils import old_div
 _INTEGRAL_OUTER_RADIUS = 15.0
 
 ndarray = NDArray[np.float64]
+
+
+# This is a class that, whatever you try to use it for, will raise an exception.
+# This is to make sure that we never use an invalid PSF without knowing it
+class InvalidPSF:
+    # It can be useful to copy an invalid PSF. For instance HAL.get_simulated_dataset() makes a
+    # copy of the HAL instance, including detector response, which can contain InvalidPSF (which
+    # is fine as long as they are not used).
+    def __deepcopy__(self, memo):
+        return InvalidPSF()
+
+    # This allow the Invalid PSF to be saved in the HDF file
+    def to_pandas(self):
+        items = (("xs", []), ("ys", []))
+
+        return pd.DataFrame.from_dict(dict(items))
+
+    def __getattribute__(self, item):
+        # White list of available attributes
+        if item in ["__deepcopy__", "to_pandas"]:
+            return object.__getattribute__(self, item)
+
+        raise InvalidPSFError("Trying to use an invalid PSF")
 
 
 class InvalidPSFError(ValueError):
@@ -168,29 +192,17 @@ class PSFWrapper(object):
 
     @staticmethod
     def psf_func(ang_dist: float, psf_best_fit_params: np.ndarray) -> float:
-        """Analytical function of PSF
+        """Analytical definition of PSF
 
-        Parameters
-        ----------
-        ang_dist : float
-            Angular distances
-
-        psf_best_fit_params : np.ndarray
-            best-fit parameters read from the ROOT response file
-
-
-        Returns
-        -------
-        float
-            Expected counts provided with angular distances as input
-        Notes
-        -----
-
-            The function is declared here given that uproot is simply an I/O
-            framework meant to read the information from TTree objects with no
-            ROOT functionality.
-
+        :param ang_dist: Angular distances
+        :param psf_best_fit_params: best-fit parameters read from the ROOT response file
+        :return: Expected counts as function of angular distance
         """
+
+        # NOTE: The function is declared here given that uproot is simply an I/O
+        # framework meant to read the information from TTree objects with no
+        # ROOT functionality.
+
         return psf_best_fit_params[0] * (
             ang_dist
             * (
@@ -206,21 +218,11 @@ class PSFWrapper(object):
         )
 
     @classmethod
-    def psf_eval(cls, fun_parameters: ndarray):
-        """Eavluate the PSF function and retrieve expected counts
+    def psf_eval(cls, fun_parameters: ndarray) -> InvalidPSF | Self:
+        """Evaluate the PSF function and retrieve the expected counts
 
-        Parameters
-        ----------
-        fun_parameters : NDArray[np.float64]
-            Best-fit parameters read from response file
-
-
-        Returns
-        -------
-        PSFWrapper
-                Returns an instance of PSF with tuple
-                of (angular distances, expected counts)
-
+        :param fun_parameters: Best-fit parameters obtained from ROOT response file
+        :return: Returns an instance of PSF with tuple of radial distance and expected counts
         """
 
         # uproot has no methods to act on histograms. Therefore, using scipy
@@ -235,9 +237,7 @@ class PSFWrapper(object):
             return InvalidPSF()
 
         radial_dists = np.logspace(-3, np.log10(_INTEGRAL_OUTER_RADIUS), 500)
-        expected_cnts = np.array(
-            [cls.psf_func(x, fun_parameters) for x in radial_dists]
-        )
+        expected_cnts = np.array([cls.psf_func(x, fun_parameters) for x in radial_dists])
 
         assert np.all(np.isfinite(radial_dists))
         assert np.all(np.isfinite(expected_cnts))
@@ -261,26 +261,3 @@ class PSFWrapper(object):
     @property
     def kernel_radius(self):
         return self._kernel_radius
-
-
-# This is a class that, whatever you try to use it for, will raise an exception.
-# This is to make sure that we never use an invalid PSF without knowing it
-class InvalidPSF(object):
-    # It can be useful to copy an invalid PSF. For instance HAL.get_simulated_dataset() makes a
-    # copy of the HAL instance, including detector response, which can contain InvalidPSF (which
-    # is fine as long as they are not used).
-    def __deepcopy__(self, memo):
-        return InvalidPSF()
-
-    # This allow the Invalid PSF to be saved in the HDF file
-    def to_pandas(self):
-        items = (("xs", []), ("ys", []))
-
-        return pd.DataFrame.from_dict(dict(items))
-
-    def __getattribute__(self, item):
-        # White list of available attributes
-        if item in ["__deepcopy__", "to_pandas"]:
-            return object.__getattribute__(self, item)
-
-        raise InvalidPSFError("Trying to use an invalid PSF")
