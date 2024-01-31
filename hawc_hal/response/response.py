@@ -3,10 +3,11 @@ from __future__ import absolute_import, division
 import collections
 import multiprocessing
 import os
-from builtins import object, zip
+from builtins import zip
 from dataclasses import dataclass
 from pathlib import Path
 
+import boost_histogram as bh
 import numpy as np
 import pandas as pd
 import uproot
@@ -23,15 +24,20 @@ log = setup_logger(__name__)
 log.propagate = False
 _instances = {}
 
+ndarray = NDArray[np.float64]
+nstrarray = NDArray[np.string_]
 
-def hawc_response_factory(response_file_name, n_workers: int = 1):
-    """
-    A factory function for the response which keeps a cache, so that
-    the same response is not read over and
-    over again.
 
-    :param response_file_name:
-    :return: an instance of HAWCResponse
+def hawc_response_factory(response_file_name: str, n_workers: int = 1):
+    """A factory function for the response which keeps a cache, so that the
+    same response is not read over and over again.
+
+    :param response_file_name: response file name (ROOT or HDF5)
+    :param n_workers: number of processes to parallelize reading of ROOT file
+    with uproot, defaults to 1
+    :raises NotImplementedError: extension of the response file is not recognized
+    :return: New instance of HAWCResponse
+    :rtype: HAWCResponse
     """
 
     response_file_name = sanitize_filename(response_file_name, abspath=True)
@@ -75,14 +81,17 @@ class ResponseMetaData:
     @staticmethod
     def get_energy_hist(
         response_ttree_directory: uproot.ReadOnlyDirectory, dec_id: int, bin_id: str
-    ):
-        """Read in the signal energy histogram from response file"""
+    ) -> tuple[int, str, bh.Histogram]:
+        """Retrieve the signal energy histogram from response file
 
-        # dec_id, bin_id = args
+        :param response_ttree_directory:  read only directory for response file
+        :param dec_id: declination bin
+        :param bin_id: active analysis bin id
+        :raises KeyError: unknown binning scheme in response file
+        :return: tuple of declination bin, analysis bin id, and energy histogram
+        """
 
-        energy_hist_prefix = (
-            f"dec_{dec_id:02d}/nh_{bin_id}/EnSig_dec{dec_id}_nh{bin_id}"
-        )
+        energy_hist_prefix = f"dec_{dec_id:02d}/nh_{bin_id}/EnSig_dec{dec_id}_nh{bin_id}"
         if response_ttree_directory.get(energy_hist_prefix, None) is not None:
             energy_hist = response_ttree_directory[energy_hist_prefix]
 
@@ -102,9 +111,15 @@ class ResponseMetaData:
     @staticmethod
     def get_energy_bkg_hist(
         response_ttree_directory: uproot.ReadOnlyDirectory, dec_id: int, bin_id: str
-    ):
-        """Read in the background energy histogram from response file"""
-        # dec_id, bin_id = args
+    ) -> tuple[int, str, bh.Histogram]:
+        """Retrieves the background energy histogram from response file
+
+        :param response_ttree_directory: uproot read only directory for response file
+        :param dec_id: declination bin id
+        :param bin_id: active analysis bin id
+        :raises KeyError: raised if the binning scheme is not recognized
+        :return: tuple of declination bin id, analysis bin id, and background energy histogram
+        """
 
         energy_bkg_prefix = f"dec_{dec_id:02d}/nh_{bin_id}/EnBg_dec{dec_id}_nh{bin_id}"
 
@@ -126,9 +141,15 @@ class ResponseMetaData:
     @staticmethod
     def get_psf_params(
         response_ttree_directory: uproot.ReadOnlyDirectory, dec_id: int, bin_id: str
-    ):
-        """Read the list of best-fit params from PSF fit from response file"""
-        # dec_id, bin_id = args
+    ) -> tuple[int, str, ndarray]:
+        """Read the list of best-fit PSF parameters from response file
+
+        :param response_ttree_directory: read only directory for response file
+        :param dec_id: declination bin id
+        :param bin_id: active analysis bin id
+        :raises KeyError: raised if the binning scheme is not recognized
+        :return: tuple of declination bin, analysis bin id and best-fit PSF parameters
+        """
         psf_prefix = f"dec_{dec_id:02d}/nh_{bin_id}/PSF_dec{dec_id}_nh{bin_id}_fit"
 
         if response_ttree_directory.get(psf_prefix, None) is not None:
@@ -146,8 +167,12 @@ class ResponseMetaData:
         raise KeyError("Unknown binning scheme in response file")
 
     @property
-    def declination_bins_lower(self) -> NDArray[np.float64]:
-        """Get the simulation declination bin lower edges within ROOT response file"""
+    def declination_bins_lower(self) -> ndarray:
+        """Retrieve the simulation declination bin lower edges within ROOT response file
+
+        :raises KeyError: DecBins/lowerEdge is not found in response file
+        :return: array of declination bin lower edges
+        """
         if self.response_ttree_directory.get("DecBins/lowerEdge", None) is not None:
             return (
                 self.response_ttree_directory["DecBins/lowerEdge"]
@@ -159,8 +184,12 @@ class ResponseMetaData:
             raise KeyError("DecBins/lowerEdge not found in response file")
 
     @property
-    def declination_bins_upper(self) -> NDArray[np.float64]:
-        """Get the simulation declination bin upper edges within ROOT response file"""
+    def declination_bins_upper(self) -> ndarray:
+        """Retrieve the simulation declination bin upper edges within ROOT response file
+
+        :raises KeyError: DecBins/upperEdge is not found in response file
+        :return: array of declination bin upper edges
+        """
         if self.response_ttree_directory.get("DecBins/upperEdge", None) is not None:
             return (
                 self.response_ttree_directory["DecBins/upperEdge"]
@@ -172,8 +201,12 @@ class ResponseMetaData:
             raise KeyError("DecBins/upperEdge not found in response file")
 
     @property
-    def declination_bins_center(self) -> NDArray[np.float64]:
-        """Get the simulation declination bin centers within ROOT response file"""
+    def declination_bins_center(self) -> ndarray:
+        """Retrieve the simulation declination bin centers within ROOT response file
+
+        :raises KeyError: DecBins/simdec not found in response file
+        :return: array of declination bin centers
+        """
         if self.response_ttree_directory.get("DecBins/simdec", None) is not None:
             return (
                 self.response_ttree_directory["DecBins/simdec"]
@@ -185,8 +218,12 @@ class ResponseMetaData:
             raise KeyError("DecBins/simdec not found in response file")
 
     @property
-    def analysis_bins(self) -> NDArray[np.string_]:
-        """Get the analysis bin names within ROOT response file"""
+    def analysis_bins(self) -> nstrarray:
+        """Retireve the analysis bin names within ROOT response file
+
+        :raises KeyError: unknown binning scheme in response file
+        :return: array of analysis bin names
+        """
         if self.response_ttree_directory.get("AnalysisBins/name", None) is not None:
             return (
                 self.response_ttree_directory["AnalysisBins/name"]
@@ -205,8 +242,12 @@ class ResponseMetaData:
         raise KeyError("Unknown binning scheme in response file")
 
     @property
-    def log_log_params(self) -> np.ndarray:
-        """Read the best-fit params from PSF fit from ROOT file"""
+    def log_log_params(self) -> ndarray:
+        """Retrieve the PSF best-fit params from ROOT file
+
+        :raises KeyError: LogLogSpectrum not found in response file
+        :return: array of best-fit params from PSF fit
+        """
         if self.response_ttree_directory.get("LogLogSpectrum", None) is not None:
             return np.array(
                 self.response_ttree_directory["LogLogSpectrum"].member("fParams")  # type: ignore
@@ -215,14 +256,18 @@ class ResponseMetaData:
 
     @property
     def spectrum_shape(self) -> str:
-        """Read the best-fit params from PSF fit from ROOT file"""
+        """Retrieve the spectral shape to fit PSF
+
+        :raises KeyError: LogLogSpectrum not found in response file
+        :return: string of spectral shape used for fitting response function
+        """
         if self.response_ttree_directory.get("LogLogSpectrum", None) is not None:
             return self.response_ttree_directory["LogLogSpectrum"].member("fTitle")  # type: ignore
 
         raise KeyError("LogLogSpectrum not found in response file")
 
 
-class HAWCResponse(object):
+class HAWCResponse:
     def __init__(self, response_file_name, dec_bins, response_bins):
         self._response_file_name = response_file_name
         self._dec_bins = dec_bins
@@ -231,12 +276,10 @@ class HAWCResponse(object):
         if len(dec_bins) < 2:
             #   log.warning("Only {0} dec bins given in {1}, will not try to interpolate.".format(len(dec_bins), response_file_name))
             log.warning(
-                f"Only {len(dec_bins)} dec bins given in {response_file_name}, will "
-                "not try to interpolate."
+                f"Only {len(dec_bins)} dec bins given in {response_file_name}, will not try to interpolate."
             )
             log.warning(
-                "Single-dec-bin mode is intended for development work only "
-                "at this time and may not work with extended sources."
+                "Single-dec-bin mode is intended for development work only at this time and may not work with extended sources."
             )
 
     @classmethod
@@ -303,9 +346,7 @@ class HAWCResponse(object):
                     :, "sim_signal_events_per_bin"
                 ].values
 
-                this_psf = PSFWrapper.from_pandas(
-                    psf_dfs.loc[dec_center, energy_bin, :]
-                )
+                this_psf = PSFWrapper.from_pandas(psf_dfs.loc[dec_center, energy_bin, :])
 
                 this_response_bin = ResponseBin(
                     energy_bin,
@@ -431,8 +472,7 @@ class HAWCResponse(object):
         :type dec: float
         :param interpolate: Interpolate over response bins, defaults to False
         :type interpolate: bool
-        :return: Dictionary of response bins that coincide with the user provided
-        declination
+        :return: Dictionary of response bins that coincide with the user provided declination
         :rtype: OrderedDict[str, HAWCResponseBin]
         """
 
@@ -495,11 +535,10 @@ class HAWCResponse(object):
         return len(list(self._response_bins.values())[0])
 
     def display(self, verbose=False):
-        """Prints summary of the current object content.
+        """
+        Prints summary of the current object content.
 
-        :param verbose: Whether to print the full list of declinations and
-        analysis bins, defaults to False
-        :type verbose: bool
+        :param verbose bool: Prints the full list of declinations and analysis bins.
         """
 
         # log.info("Response file: %s" % self._response_file_name)
@@ -509,17 +548,17 @@ class HAWCResponse(object):
         if verbose:
             log.info(self._dec_bins)
         # log.info("Number of energy/nHit planes per dec bin_name: %s" % (self.n_energy_planes))
-        log.info(
-            f"Number of energy/nHit planes per dec bin_name: {self.n_energy_planes}"
-        )
+        log.info(f"Number of energy/nHit planes per dec bin_name: {self.n_energy_planes}")
         if verbose:
             log.info(list(self._response_bins.values())[0].keys())
 
-    def write(self, filename: str) -> None:
-        """Write the response file to an HDF5 file
+    def write(self, filename):
+        """
+        Write the response to HDF5 file.
 
-        :param filename: path to output response file
-        :type filename: str
+        Args:
+            filename (str): Output file name. WARNING: it will be overwritten if
+            file already exists.
         """
 
         filename = sanitize_filename(filename)
