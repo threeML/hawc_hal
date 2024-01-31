@@ -398,8 +398,7 @@ class ConvolvedExtendedSource3D(ConvolvedExtendedSource):
         # NOTE: the sim_differential_photon_fluxes are the same for every bin,
         # so it doesn't matter which they are read from
         return np.divide(
-            (fluxes_array * pixel_area_rad2),
-            response_bin_sim_diff_photon_fluxes,
+            (fluxes_array * pixel_area_rad2), response_bin_sim_diff_photon_fluxes
         )
 
     @staticmethod
@@ -459,23 +458,11 @@ class ConvolvedExtendedSource3D(ConvolvedExtendedSource):
         :rtype: NDArray[np.float64]
         """
         return (
-            weight1
-            * np.sum(
-                scale * response_bin1_signal_evts_per_bin,
-                axis=1,
-            )
-            + weight2
-            * np.sum(
-                scale * response_bin2_signal_evts_per_bin,
-                axis=1,
-            )
+            weight1 * np.sum(scale * response_bin1_signal_evts_per_bin, axis=1)
+            + weight2 * np.sum(scale * response_bin2_signal_evts_per_bin, axis=1)
         ) * TeVtokeV
 
-    def get_source_map(
-        self,
-        energy_bin_id: str,
-        tag=None,
-    ) -> ndarray:
+    def get_source_map(self, energy_bin_id: str, tag=None) -> ndarray:
         """Perform the convolution of an extended source map with the PSF per energy bin.
 
         :param tag: Optional tag to ensure sources are treated uniquely
