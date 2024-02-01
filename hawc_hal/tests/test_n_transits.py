@@ -19,7 +19,7 @@ def test_transits(maptree, roi):
     # Case 1: specify number of transits
 
     n_transits = 777.7
-    maptree_ntransits = map_tree_factory(maptree,roi_,n_transits)
+    maptree_ntransits = map_tree_factory(maptree,roi_,n_transits=n_transits, n_workers=1)
 
     # does the maptree return the specified transits?
     check_n_transits(maptree_ntransits, n_transits)
