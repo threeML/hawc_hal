@@ -1244,7 +1244,6 @@ class HAL(PluginPrototype):
         energy_bin_id: str,
         n_ext_sources: int,
         convolved_source_container: ConvolvedSourcesContainer,
-        n_jobs: int = 5,
     ) -> ndarray:
         """Calculate the expected counts from extended sources within model
 
@@ -1260,38 +1259,22 @@ class HAL(PluginPrototype):
         :rtype: ndarray
         """
         extended_source_map = None
+        for ext_id in range(n_ext_sources):
+            this_cnv_source: ConvolvedExtendedSource2D | ConvolvedExtendedSource3D = (
+                convolved_source_container[ext_id]
+            )
 
-        from concurrent.futures import ThreadPoolExecutor, as_completed
-        from functools import partial
+            this_ext_source = this_cnv_source.get_source_map(energy_bin_id)
 
-        with ThreadPoolExecutor(n_jobs) as executor:
-            tasks = [
-                executor.submit(
-                    partial(
-                        self._worker_func,
-                        energy_bin_id,
-                        convolved_source_container[ext_id],
-                    )
-                )
-                for ext_id in range(n_ext_sources)
-            ]
-        extended_source_map = np.sum(
-            [future.result() for future in as_completed(tasks)], axis=0
-        )
-        # ? Leaving this code here for more thorough testing
-        # for ext_id in range(n_ext_sources):
-        #     this_cnv_source: ConvolvedExtendedSource2D | ConvolvedExtendedSource3D = (
-        #         convolved_source_container[ext_id]
-        #     )
+            if extended_source_map is None:
+                extended_source_map = this_ext_source
+            else:
+                extended_source_map += this_ext_source
 
-        #     this_ext_source = this_cnv_source.get_source_map(energy_bin_id)
+        if extended_source_map is not None:
+            return extended_source_map
 
-        #     if extended_source_map is None:
-        #         extended_source_map = this_ext_source
-        #     else:
-        #         extended_source_map += this_ext_source
-
-        return extended_source_map
+        raise ValueError("No extended sources found in the model")
 
     @staticmethod
     def _get_model_map_from_ext_source(
@@ -1370,7 +1353,6 @@ class HAL(PluginPrototype):
                 energy_bin_id,
                 n_ext_sources,
                 self._convolved_ext_sources,
-                n_jobs=self._n_workers,
             )
 
             # Now convolve with the PSF
