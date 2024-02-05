@@ -1213,23 +1213,6 @@ class HAL(PluginPrototype):
 
         return expectation_from_this_source
 
-    @staticmethod
-    def _worker_func(
-        energy_bin_id: str,
-        convolved_source: ConvolvedExtendedSource2D | ConvolvedExtendedSource3D,
-    ) -> ndarray:
-        """Utility function to evaluate the expected counts from an extended source using
-        multiple threads
-
-        :param energy_bin_id: Analysis bin defined from maptree and response function
-        :type energy_bin_id: str
-        :param convolved_source: Convolved extended source image on flat geometry
-        :type convolved_source: ConvolvedExtendedSource2D | ConvolvedExtendedSource3D
-        :return: Projected convolved extended source image
-        :rtype: ndarray
-        """
-        return convolved_source.get_source_map(energy_bin_id)
-
     def _extended_source_expectation(
         self,
         energy_bin_id: str,
