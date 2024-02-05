@@ -90,7 +90,7 @@ roi = HealpixConeROI(data_radius=data_radius,
 maptree = ... # This can be either a ROOT or a hdf5 file
 response = ... # This can be either a ROOT or hdf5 file
 
-# enable multiprocessing by enabling the number of workers > 1
+# enable multiprocessing by setting the number of workers > 1
 hawc = HAL("HAWC",
            maptree,
            response,
