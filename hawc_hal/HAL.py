@@ -4,6 +4,7 @@ import collections
 import contextlib
 import copy
 from builtins import range, str
+from functools import partial
 from threading import RLock
 from typing import Optional
 
@@ -16,6 +17,9 @@ import pandas as pd
 from astromodels import Parameter
 from astropy.convolution import Gaussian2DKernel
 from astropy.convolution import convolve_fft as convolve
+from dask import config
+from dask.base import compute
+from dask.delayed import delayed
 from matplotlib.figure import Figure
 from numpy.typing import NDArray
 from past.utils import old_div
@@ -79,21 +83,14 @@ class HAL(PluginPrototype):
         """The HAWC Accelerated Likelihood plugin for 3ML.
 
         :param name: instance name for plugin
-        :type name: str
         :param maptree: HAWC maptree file (either ROOT or hdf5 format)
-        :type maptree: str
         :param response_file: HAWC response file (either ROOT or hdf5 format)
-        :type response_file: str
         :param roi: User specified region of interest (ROI)
-        :type roi: HealpixConeROI | HealpixMapROI
         :param flat_sky_pixels_size: Size of pixel for the flat sky projection (Hammer Aitoff),
         by default 0.17
-        :type flat_sky_pixels_size: float
         :param n_workers: Number of processes for parallel reading of ROOT files and
-        :type n_workers: int
         number of threads using for likelihood calculations during sampling
         :param set_transits: Number of transits for current Maptree, by default None
-        :type set_transits: float
         """
         # Store ROI
         self._roi = roi
@@ -1001,13 +998,9 @@ class HAL(PluginPrototype):
                 "set_active_measurements() to set them."
             )
 
-        from concurrent.futures import ThreadPoolExecutor, as_completed
-        from functools import partial
-
-        # launches a thread pool with the number of threads specified by n_jobs
-        with ThreadPoolExecutor(n_jobs) as pool:
+        with config.set(scheduler="threads", num_workers=n_jobs):
             tasks = [
-                pool.submit(
+                delayed(
                     partial(
                         self._process_bin,
                         bin_id,
@@ -1016,14 +1009,12 @@ class HAL(PluginPrototype):
                         n_ext_sources,
                         bkg_renorm,
                     )
-                )
+                )()
                 for bin_id in self._active_planes
             ]
+            log_likes_per_bin = compute(*tasks)
 
-        # processe the result of a thread as oon as it becomes available
-        results = [future.result() for future in as_completed(tasks)]
-
-        return results
+        return list(log_likes_per_bin)
 
     def get_log_like(
         self, individual_bins=False, return_null=False
