@@ -998,6 +998,8 @@ class HAL(PluginPrototype):
                 "set_active_measurements() to set them."
             )
 
+        from dask.base import persist
+
         with config.set(scheduler="threads", num_workers=n_jobs):
             tasks = [
                 delayed(
@@ -1012,8 +1014,9 @@ class HAL(PluginPrototype):
                 )()
                 for bin_id in self._active_planes
             ]
-            log_likes_per_bin = compute(*tasks)
+            log_likes_per_bin = persist(*tasks)
 
+        log_likes_per_bin = compute(*log_likes_per_bin)
         return list(log_likes_per_bin)
 
     def get_log_like(
@@ -1088,7 +1091,7 @@ class HAL(PluginPrototype):
 
         return total_log_like
 
-    def write(self, response_file_name, map_tree_file_name):
+    def write(self, response_file_name: str, map_tree_file_name: str) -> None:
         """
         Write this dataset to disk in HDF format.
 
