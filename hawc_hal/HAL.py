@@ -940,18 +940,12 @@ class HAL(PluginPrototype):
         """Process a single bin, returning the expectation for the model.
 
         :param bin_id: Analysis bin defined in the maptree and response file
-        :type bin_id: str
         :param this_data_analysis_bin: Observation analysis bin with data and
         background maps
-        :type this_data_analysis_bin: DataAnalysisBin
         :param n_point_sources: Number of point sources within model instance
-        :type n_point_sources: int
         :param n_ext_sources: Number of extended sources within model instance
-        :type n_ext_sources: int
         :param bkg_renorm: Background renormalization factor
-        :type bkg_renorm: float
         :return: Aanalysis bin id with its corresponding log-likelihood
-        :rtype: tuple[str, float]
         """
 
         this_model_map_hpx = self._get_expectation(
@@ -982,14 +976,10 @@ class HAL(PluginPrototype):
         bins
 
         :param n_point_sources: Number of point sources within model instance
-        :type n_point_sources: int
         :param n_ext_sources: Number of extended sources within model instance
-        :type n_ext_sources: int
         :param bkg_renorm: Background renormalization factor
-        :type bkg_renorm: float
         :param n_jobs: Number of threads to use, default 5
         :return: List of active analysis bin and their corresponding log-likelihood
-        :rtype: list[tuple[str, float]]
         """
 
         if self._active_planes is None:
@@ -1020,11 +1010,11 @@ class HAL(PluginPrototype):
         return list(log_likes_per_bin)
 
     def get_log_like(
-        self, individual_bins=False, return_null=False
+        self, individual_bins: bool = False, return_null: bool = False
     ) -> float | tuple[float, dict[str, float]]:
         """Compute the log-likelihood for current model parameters
 
-        :param individual_bins: retrun the log-likelihood for each bin, default False
+        :param individual_bins: return the log-likelihood for each bin, default False
         :type individual_bins: bool
         :param return_null: return 0.0 instead of the log-likelihood, default False
         :type return_null:
@@ -1185,20 +1175,13 @@ class HAL(PluginPrototype):
         """Compute the expected counts for a point source
 
         :param pts_id: Assigned id of the point source
-        :type pts_id: int
         :param energy_bin_id: Analysis bin defined from maptree and response function
-        :type energy_bin_id: str
         :param data_analysis_bin:  Data analysis bin with observed counts and background
-        :type data_analysis_bin: DataAnalysisBin
         :param convolved_source_container: Container with convolved point sources
-        :type convolved_source_container: ConvolvedSourcesContainer
         :param lock: Lock to use for thread safety with point sources
-        :type lock: RLock
         :param psf_integration_method: Method to use for PSF integration. Options are:
         'exact' and 'fast'
-        :type psf_integration_method: str
         :return: Expected counts map for a point source
-        :rtype: ndarray
         """
         this_conv_src: ConvolvedPointSource = convolved_source_container[pts_id]
 
@@ -1225,15 +1208,9 @@ class HAL(PluginPrototype):
         """Calculate the expected counts from extended sources within model
 
         :param energy_bin_id: Analysis bin defined from maptree and response function
-        :type energy_bin_id: str
         :param n_ext_sources: Number of extended sources in the model instance
-        :type: n_ext_sources: int
         :param convolved_source_container: Container for the extended sources
-        :type convolved_source_container: ConvolvedSourcesContainer
-        :param n_jobs: Number of threads to use for the computation of model map, defaults to: 5
-        :type n_jobs: int, optional
         :return: Expected counts from the extended sources for convolution with the PSF
-        :rtype: ndarray
         """
         extended_source_map = None
         for ext_id in range(n_ext_sources):
@@ -1263,16 +1240,12 @@ class HAL(PluginPrototype):
         """Calculate model map for an extended source by convolving with the PSF
 
         :param energy_bin_id: Analysis bin defined from maptree and response function
-        :type energy_bin_id: str
         :param psf_convolutors: Dictionary with the PSF convolutors for each analysis bin
-        :type psf_convolutors: dict[str, PSFConvolutor]
         :param data_analysis_bin:  Observation analysis bin instance with observed counts
         and background
-        :type data_analysis_bin: DataAnalysisBin
         :param extended_src_model_map: Map with expected counts per transit for
         extended sources within model
         :return: Returns the expected counts with defined by source parameter values
-        :rtype: ndarray
         """
         return (
             psf_convolutors[energy_bin_id].extended_source_image(extended_src_model_map)
@@ -1291,14 +1264,10 @@ class HAL(PluginPrototype):
 
         :param data_analysis_bin: Observation analysis bin with observed counts and
         background
-        :type data_analysis_bin: DataAnalysisBin
         :param energy_bin_id: Analysis bin defined from maptree and response function
-        :type energy_bin_id: str
         :param n_point_sources: Number of point sources within the model
-        :param n_ext_sources:  Number of extended sources within the model
         :return: Returns the expected counts using the current parameters for the sources
         in the model
-        :rtype: ndarray | float
         """
 
         # Compute the expectation from the model
@@ -1374,21 +1343,14 @@ class HAL(PluginPrototype):
         """Project the model map from flat sky to HEALPiX projection
 
         :param energy_bin_id: Analysis bin defined from maptree and response function
-        :type energy_bin_id: str
         :param model_map: Model map with expected counts for sources within model
-        :type model_map: NDArray[np.float64]
         :param flat_sky_projection: Flat sky projection of the data analysis bin
-        :type flat_sky_projection: FlatSkyProjection
         :param data_analysis_bin: Observation analysis with observed counts
         and background
-        :type data_analysis_bin: DataAnalysisBin
         :param flat_sky_to_healpix_transform: Dictionary with the flat sky to
         HEALPiX transform
         for each analysis bin
-        :type flat_sky_to_healpix_transform: dict[str, FlatSkyToHealpixTransform]
         :return: Returns the expected counts model map in HEALPiX projection
-        :rtype: ndarray
-
         """
 
         # First divide for the pixel area because we need to interpolate brightness
