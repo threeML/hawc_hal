@@ -1,4 +1,4 @@
-from __future__ import division
+# from __future__ import division
 
 import collections
 import contextlib
@@ -147,12 +147,16 @@ class HAL(PluginPrototype):
         # python3 new way of doing things
         super().__init__(name, self._nuisance_parameters)
 
-        self._likelihood_model: Optional[astromodels.Model | None] = None
+        self._likelihood_model: Optional[astromodels.Model] = None
 
         # These lists will contain the maps for the point sources
-        self._convolved_point_sources = ConvolvedSourcesContainer()
+        self._convolved_point_sources: list[
+            ConvolvedPointSource
+        ] = ConvolvedSourcesContainer()  # type: ignore
         # and this one for extended sources
-        self._convolved_ext_sources = ConvolvedSourcesContainer()
+        self._convolved_ext_sources: list[
+            ConvolvedExtendedSource2D | ConvolvedExtendedSource3D
+        ] = ConvolvedSourcesContainer()  # type: ignore
 
         # All energy/nHit bins are loaded in memory
         self._all_planes: list[str] = list(self._maptree.analysis_bins_labels)
@@ -1165,9 +1169,9 @@ class HAL(PluginPrototype):
 
     def _calculate_point_source_expectation(
         self,
+        n_point_sources: int,
         energy_bin_id: str,
         data_analysis_bin: DataAnalysisBin,
-        convolved_pnt_source: ConvolvedPointSource,
         lock: Lock,
         psf_integration_method: str = "exact",
     ) -> ndarray:
@@ -1185,22 +1189,35 @@ class HAL(PluginPrototype):
         # ? multithreading for point sources causes racing conditions,
         # ? not sure what is going on and this requires more of an in-depth look
         # ? For now, a lock is put in place to prevent such conditions
-        with lock:
-            expectation_per_transit = convolved_pnt_source.get_source_map(
-                energy_bin_id, tag=None, psf_integration_method=psf_integration_method
+        pnt_source_model_map = None
+        for pts_id in range(n_point_sources):
+            this_conv_src = self._convolved_point_sources[pts_id]
+
+            with lock:
+                # Need to ensure that one thread at a time can access this
+                expectation_per_transit = this_conv_src.get_source_map(
+                    energy_bin_id,
+                    tag=None,
+                    psf_integration_method=psf_integration_method,
+                )
+
+            expectation_from_this_source = (
+                expectation_per_transit * data_analysis_bin.n_transits
             )
 
-        expectation_from_this_source = (
-            expectation_per_transit * data_analysis_bin.n_transits
-        )
+            if pnt_source_model_map is None:
+                pnt_source_model_map = expectation_from_this_source
+            else:
+                pnt_source_model_map += expectation_from_this_source
 
-        return expectation_from_this_source
+        if pnt_source_model_map is not None:
+            return pnt_source_model_map
+        raise ValueError("Point source model map not computed properly")
 
     def _extended_source_expectation(
         self,
         energy_bin_id: str,
         n_ext_sources: int,
-        convolved_source_container: ConvolvedSourcesContainer,
         data_analysis_bin: DataAnalysisBin,
     ) -> ndarray:
         """Calculate the expected counts from extended sources within model
@@ -1214,9 +1231,7 @@ class HAL(PluginPrototype):
         """
         extended_source_map = None
         for ext_id in range(n_ext_sources):
-            this_cnv_source: ConvolvedExtendedSource2D | ConvolvedExtendedSource3D = (
-                convolved_source_container[ext_id]
-            )
+            this_cnv_source = self._convolved_ext_sources[ext_id]
 
             this_ext_source = this_cnv_source.get_source_map(energy_bin_id)
 
@@ -1230,7 +1245,7 @@ class HAL(PluginPrototype):
                 extended_source_map * data_analysis_bin.n_transits
             )
 
-        raise ValueError("Extended source not properly computed")
+        raise ValueError("Extended source not computed properly")
 
     def _get_expectation(
         self,
@@ -1255,30 +1270,21 @@ class HAL(PluginPrototype):
 
         # first process the point sources
         if n_point_sources > 0:
-            # ? Can this for loop be parellelized?
-            for pts_id in range(n_point_sources):
-                this_conv_src = self._convolved_point_sources[pts_id]
-                expectation_from_this_source = self._calculate_point_source_expectation(
-                    energy_bin_id,
-                    data_analysis_bin,
-                    this_conv_src,
-                    self.lock,
-                    self._psf_integration_method,
-                )
+            point_sources_expectation = self._calculate_point_source_expectation(
+                n_point_sources,
+                energy_bin_id,
+                data_analysis_bin,
+                self.lock,
+                self._psf_integration_method,
+            )
 
-                if this_model_map is None:
-                    this_model_map = expectation_from_this_source
-                else:
-                    this_model_map += expectation_from_this_source
+            this_model_map = point_sources_expectation
 
         # Now process extended sources
         if n_ext_sources > 0:
-            # this_ext_model_map = None
-
             extended_sources_expectation = self._extended_source_expectation(
                 energy_bin_id,
                 n_ext_sources,
-                self._convolved_ext_sources,
                 data_analysis_bin,
             )
 
