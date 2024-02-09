@@ -1,31 +1,30 @@
 from __future__ import division
-from builtins import object
-from past.utils import old_div
-import numpy as np
+
 import collections
+
+import numpy as np
+import reproject
+from past.utils import old_div
+
 from hawc_hal import flat_sky_projection
 from hawc_hal.sphere_dist import sphere_dist
-import reproject
+
+#     Return an array of shape (n, nrows, ncols) where
+#     n * nrows * ncols = arr.size
+
+#     If arr is a 2D array, the returned array should look like n subblocks with
+#     each subblock preserving the "physical" layout of arr.
+#     """
+#     h, w = arr.shape
+#     return (
+#         arr.reshape(h // nrows, nrows, -1, ncols)
+#         .swapaxes(1, 2)
+#         .reshape(-1, nrows, ncols)
+#     )
 
 
-def _divide_in_blocks(arr, nrows, ncols):
-    """
-    Return an array of shape (n, nrows, ncols) where
-    n * nrows * ncols = arr.size
-
-    If arr is a 2D array, the returned array should look like n subblocks with
-    each subblock preserving the "physical" layout of arr.
-    """
-    h, w = arr.shape
-    return (arr.reshape(h // nrows, nrows, -1, ncols)
-            .swapaxes(1, 2)
-            .reshape(-1, nrows, ncols))
-
-
-class PSFInterpolator(object):
-
+class PSFInterpolator:
     def __init__(self, psf_wrapper, flat_sky_proj):
-
         self._psf = psf_wrapper
 
         self._flat_sky_p = flat_sky_proj
@@ -34,37 +33,46 @@ class PSFInterpolator(object):
         self._point_source_images = collections.OrderedDict()
 
     def _get_point_source_image_aitoff(self, ra, dec, psf_integration_method):
-
         # Get the density for the required (RA, Dec) points by interpolating the density profile
 
         # First we obtain an image with a flat sky projection centered exactly on the point source
         ancillary_image_pixel_size = 0.05
-        pixel_side = 2 * int(np.ceil(old_div(self._psf.truncation_radius, ancillary_image_pixel_size)))
-        ancillary_flat_sky_proj = flat_sky_projection.FlatSkyProjection(ra, dec, ancillary_image_pixel_size,
-                                                                        pixel_side, pixel_side)
+        pixel_side = 2 * int(
+            np.ceil(old_div(self._psf.truncation_radius, ancillary_image_pixel_size))
+        )
+        ancillary_flat_sky_proj = flat_sky_projection.FlatSkyProjection(
+            ra, dec, ancillary_image_pixel_size, pixel_side, pixel_side
+        )
 
         # Now we compute the angular distance of all pixels in the ancillary image with respect to the center
-        angular_distances = sphere_dist(ra, dec, ancillary_flat_sky_proj.ras, ancillary_flat_sky_proj.decs)
+        angular_distances = sphere_dist(
+            ra, dec, ancillary_flat_sky_proj.ras, ancillary_flat_sky_proj.decs
+        )
 
         # Compute the brightness (i.e., the differential PSF)
-        ancillary_brightness = self._psf.brightness(angular_distances).reshape((pixel_side, pixel_side)) * \
-                               self._flat_sky_p.project_plane_pixel_area
+        ancillary_brightness = (
+            self._psf.brightness(angular_distances).reshape((pixel_side, pixel_side))
+            * self._flat_sky_p.project_plane_pixel_area
+        )
 
         # Now reproject this brightness on the new image
-        if psf_integration_method == 'exact':
-
+        # Parallel is set to False otherwise this sets a pool of processes
+        #  which will occur at every reprojection which is not ideal for
+        # position sampling
+        if psf_integration_method == "exact":
             reprojection_method = reproject.reproject_exact
-            additional_keywords = {'parallel': False}
+            additional_keywords = {"parallel": False}
 
         else:
-
             reprojection_method = reproject.reproject_interp
             additional_keywords = {}
 
-        brightness, _ = reprojection_method((ancillary_brightness, ancillary_flat_sky_proj.wcs),
-                                            self._flat_sky_p.wcs, shape_out=(self._flat_sky_p.npix_height,
-                                                                             self._flat_sky_p.npix_width),
-                                            **additional_keywords)
+        brightness, _ = reprojection_method(
+            (ancillary_brightness, ancillary_flat_sky_proj.wcs),
+            self._flat_sky_p.wcs,
+            shape_out=(self._flat_sky_p.npix_height, self._flat_sky_p.npix_width),
+            **additional_keywords,
+        )
 
         brightness[np.isnan(brightness)] = 0.0
 
@@ -120,19 +128,18 @@ class PSFInterpolator(object):
 
         return point_source_img_ait
 
-    def point_source_image(self, ra_src, dec_src, psf_integration_method='exact'):
-
+    def point_source_image(self, ra_src, dec_src, psf_integration_method="exact"):
         # Make a unique key for this request
         key = (ra_src, dec_src, psf_integration_method)
 
         # If we already computed this image, return it, otherwise compute it from scratch
         if key in self._point_source_images:
-
             point_source_img_ait = self._point_source_images[key]
 
         else:
-
-            point_source_img_ait = self._get_point_source_image_aitoff(ra_src, dec_src, psf_integration_method)
+            point_source_img_ait = self._get_point_source_image_aitoff(
+                ra_src, dec_src, psf_integration_method
+            )
 
             # Store for future use
 
@@ -140,7 +147,6 @@ class PSFInterpolator(object):
 
             # Limit the size of the cache. If we have exceeded 20 images, we drop the oldest 10
             if len(self._point_source_images) > 20:
-
                 while len(self._point_source_images) > 10:
                     # FIFO removal (the oldest calls are removed first)
                     self._point_source_images.popitem(last=False)

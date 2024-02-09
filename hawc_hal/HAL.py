@@ -5,7 +5,7 @@ import contextlib
 import copy
 from builtins import range, str
 from functools import partial
-from threading import RLock
+from threading import Lock
 from typing import Optional
 
 import astromodels
@@ -95,7 +95,7 @@ class HAL(PluginPrototype):
         # Store ROI
         self._roi = roi
         self._n_workers = n_workers
-        self.lock = RLock()
+        self.lock = Lock()
 
         # optionally specify n_transits
         if set_transits is not None:
@@ -1163,13 +1163,12 @@ class HAL(PluginPrototype):
 
         return self._clone[0]
 
-    @staticmethod
     def _calculate_point_source_expectation(
-        pts_id: int,
+        self,
         energy_bin_id: str,
         data_analysis_bin: DataAnalysisBin,
-        convolved_source_container: ConvolvedSourcesContainer,
-        lock: RLock,
+        convolved_pnt_source: ConvolvedPointSource,
+        lock: Lock,
         psf_integration_method: str = "exact",
     ) -> ndarray:
         """Compute the expected counts for a point source
@@ -1177,19 +1176,17 @@ class HAL(PluginPrototype):
         :param pts_id: Assigned id of the point source
         :param energy_bin_id: Analysis bin defined from maptree and response function
         :param data_analysis_bin:  Data analysis bin with observed counts and background
-        :param convolved_source_container: Container with convolved point sources
         :param lock: Lock to use for thread safety with point sources
         :param psf_integration_method: Method to use for PSF integration. Options are:
         'exact' and 'fast'
         :return: Expected counts map for a point source
         """
-        this_conv_src: ConvolvedPointSource = convolved_source_container[pts_id]
 
         # ? multithreading for point sources causes racing conditions,
         # ? not sure what is going on and this requires more of an in-depth look
         # ? For now, a lock is put in place to prevent such conditions
         with lock:
-            expectation_per_transit = this_conv_src.get_source_map(
+            expectation_per_transit = convolved_pnt_source.get_source_map(
                 energy_bin_id, tag=None, psf_integration_method=psf_integration_method
             )
 
@@ -1204,12 +1201,15 @@ class HAL(PluginPrototype):
         energy_bin_id: str,
         n_ext_sources: int,
         convolved_source_container: ConvolvedSourcesContainer,
+        data_analysis_bin: DataAnalysisBin,
     ) -> ndarray:
         """Calculate the expected counts from extended sources within model
 
         :param energy_bin_id: Analysis bin defined from maptree and response function
         :param n_ext_sources: Number of extended sources in the model instance
         :param convolved_source_container: Container for the extended sources
+        :param data_analysis_bin: Observation data analysis bin with counts
+        and background
         :return: Expected counts from the extended sources for convolution with the PSF
         """
         extended_source_map = None
@@ -1226,31 +1226,11 @@ class HAL(PluginPrototype):
                 extended_source_map += this_ext_source
 
         if extended_source_map is not None:
-            return extended_source_map
+            return self._psf_convolutors[energy_bin_id].extended_source_image(
+                extended_source_map * data_analysis_bin.n_transits
+            )
 
-        raise ValueError("No extended sources found in the model")
-
-    @staticmethod
-    def _get_model_map_from_ext_source(
-        energy_bin_id: str,
-        psf_convolutors: dict[str, PSFConvolutor],
-        data_analysis_bin: DataAnalysisBin,
-        extended_src_model_map: NDArray[np.float64],
-    ) -> ndarray:
-        """Calculate model map for an extended source by convolving with the PSF
-
-        :param energy_bin_id: Analysis bin defined from maptree and response function
-        :param psf_convolutors: Dictionary with the PSF convolutors for each analysis bin
-        :param data_analysis_bin:  Observation analysis bin instance with observed counts
-        and background
-        :param extended_src_model_map: Map with expected counts per transit for
-        extended sources within model
-        :return: Returns the expected counts with defined by source parameter values
-        """
-        return (
-            psf_convolutors[energy_bin_id].extended_source_image(extended_src_model_map)
-            * data_analysis_bin.n_transits
-        )
+        raise ValueError("Extended source not properly computed")
 
     def _get_expectation(
         self,
@@ -1277,11 +1257,11 @@ class HAL(PluginPrototype):
         if n_point_sources > 0:
             # ? Can this for loop be parellelized?
             for pts_id in range(n_point_sources):
+                this_conv_src = self._convolved_point_sources[pts_id]
                 expectation_from_this_source = self._calculate_point_source_expectation(
-                    pts_id,
                     energy_bin_id,
                     data_analysis_bin,
-                    self._convolved_point_sources,
+                    this_conv_src,
                     self.lock,
                     self._psf_integration_method,
                 )
@@ -1295,24 +1275,17 @@ class HAL(PluginPrototype):
         if n_ext_sources > 0:
             # this_ext_model_map = None
 
-            tot_ext_sources_expectation_per_transit = self._extended_source_expectation(
+            extended_sources_expectation = self._extended_source_expectation(
                 energy_bin_id,
                 n_ext_sources,
                 self._convolved_ext_sources,
-            )
-
-            # Now convolve with the PSF
-            extended_source_expectation = self._get_model_map_from_ext_source(
-                energy_bin_id,
-                self._psf_convolutors,
                 data_analysis_bin,
-                tot_ext_sources_expectation_per_transit,
             )
 
-            if this_model_map is None:
-                this_model_map = extended_source_expectation
+            if this_model_map is not None:
+                this_model_map += extended_sources_expectation
             else:
-                this_model_map += extended_source_expectation
+                this_model_map = extended_sources_expectation
 
         if this_model_map is not None:
             # Now transform from the flat sky projection to HEALPiX
@@ -1355,7 +1328,8 @@ class HAL(PluginPrototype):
 
         # First divide for the pixel area because we need to interpolate brightness
 
-        model_map = np.divide(model_map, flat_sky_projection.project_plane_pixel_area)
+        # model_map = np.divide(model_map, flat_sky_projection.project_plane_pixel_area)
+        model_map /= flat_sky_projection.project_plane_pixel_area
 
         model_map_hpx = flat_sky_to_healpix_transform[energy_bin_id](
             model_map, fill_value=0.0
