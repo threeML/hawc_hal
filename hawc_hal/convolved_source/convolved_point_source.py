@@ -85,8 +85,7 @@ class ConvolvedPointSource:
             ] = collections.OrderedDict()
             for bin_id in self._response_energy_bins:
                 self._psf_interpolators[bin_id] = PSFInterpolator(
-                    self._response_energy_bins[bin_id].psf,
-                    self._flat_sky_projection,
+                    self._response_energy_bins[bin_id].psf, self._flat_sky_projection
                 )
 
     def get_source_map(

@@ -4,27 +4,35 @@ import collections
 
 import numpy as np
 import reproject
+from numpy.typing import NDArray
 from past.utils import old_div
 
 from hawc_hal import flat_sky_projection
+from hawc_hal.flat_sky_projection import FlatSkyProjection
+from hawc_hal.psf_fast import PSFWrapper
 from hawc_hal.sphere_dist import sphere_dist
 
-#     Return an array of shape (n, nrows, ncols) where
-#     n * nrows * ncols = arr.size
+ndarray = NDArray[np.float64]
 
-#     If arr is a 2D array, the returned array should look like n subblocks with
-#     each subblock preserving the "physical" layout of arr.
-#     """
-#     h, w = arr.shape
-#     return (
-#         arr.reshape(h // nrows, nrows, -1, ncols)
-#         .swapaxes(1, 2)
-#         .reshape(-1, nrows, ncols)
-#     )
+
+def _divide_in_blocks(arr: ndarray, nrows: int, ncols: int) -> ndarray:
+    """
+    Return an array of shape (n, nrows, ncols) where
+    n * nrows * ncols = arr.size
+
+    If arr is a 2D array, the returned array should look like n subblocks with
+    each subblock preserving the "physical" layout of arr.
+    """
+    h, w = arr.shape
+    return (
+        arr.reshape(h // nrows, nrows, -1, ncols)
+        .swapaxes(1, 2)
+        .reshape(-1, nrows, ncols)
+    )
 
 
 class PSFInterpolator:
-    def __init__(self, psf_wrapper, flat_sky_proj):
+    def __init__(self, psf_wrapper: PSFWrapper, flat_sky_proj: FlatSkyProjection):
         self._psf = psf_wrapper
 
         self._flat_sky_p = flat_sky_proj
@@ -32,7 +40,19 @@ class PSFInterpolator:
         # This will contain cached source images
         self._point_source_images = collections.OrderedDict()
 
-    def _get_point_source_image_aitoff(self, ra, dec, psf_integration_method):
+    def _get_point_source_image_aitoff(
+        self, ra: float, dec: float, psf_integration_method: str
+    ) -> ndarray:
+        """Compute the aitoff projection of the point source image
+
+        :param ra: right ascencion coordinate (degrees)
+        :param dec: declination coordinate (degrees)
+        :param psf_integration_method: specify the projection method for the point image:
+            * ``exact`` which uses the 'exact' projection from ``reproject`` package
+            * ``fast`` which uses the 'interp' projection from ``reproject`` package
+
+        :return: brightness image of point source
+        """
         # Get the density for the required (RA, Dec) points by interpolating the density profile
 
         # First we obtain an image with a flat sky projection centered exactly on the point source
@@ -50,7 +70,7 @@ class PSFInterpolator:
         )
 
         # Compute the brightness (i.e., the differential PSF)
-        ancillary_brightness = (
+        ancillary_brightness: ndarray = (
             self._psf.brightness(angular_distances).reshape((pixel_side, pixel_side))
             * self._flat_sky_p.project_plane_pixel_area
         )
@@ -77,7 +97,7 @@ class PSFInterpolator:
         brightness[np.isnan(brightness)] = 0.0
 
         # Now "integrate", i.e., multiply by pixel area
-        point_source_img_ait = brightness
+        point_source_img_ait: ndarray = brightness
 
         # # First let's compute the core of the PSF, i.e., the central area with a radius of 0.5 deg,
         # # using a small pixel size
@@ -128,7 +148,19 @@ class PSFInterpolator:
 
         return point_source_img_ait
 
-    def point_source_image(self, ra_src, dec_src, psf_integration_method="exact"):
+    def point_source_image(
+        self, ra_src: float, dec_src: float, psf_integration_method: str = "exact"
+    ) -> ndarray:
+        """Retrieve the aitoff projection of a point source brightness image
+
+        :param ra_src: right ascencion coordinate (degrees)
+        :param dec_src: declination coordinate (degrees)
+        :param psf_integration_method: point source image projection method, defaults to "exact"
+            * ``exact`` which uses the 'exact' projection from ``reproject`` package
+            * ``fast`` which uses the 'interp' projection from ``reproject`` package
+
+        :return: brightness image for point source
+        """
         # Make a unique key for this request
         key = (ra_src, dec_src, psf_integration_method)
 
