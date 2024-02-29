@@ -6,7 +6,7 @@ import copy
 from builtins import range, str
 from functools import partial
 from threading import Lock
-from typing import Optional
+from typing import Optional, OrderedDict
 
 import astromodels
 import healpy as hp
@@ -96,6 +96,9 @@ class HAL(PluginPrototype):
         self._roi = roi
         self._n_workers = n_workers
         self.lock = Lock()
+        self._pnt_source_cache: OrderedDict[
+            tuple[str, int, tuple[float, ...]], ndarray
+        ] = collections.OrderedDict()
 
         # optionally specify n_transits
         if set_transits is not None:
@@ -150,13 +153,9 @@ class HAL(PluginPrototype):
         self._likelihood_model: Optional[astromodels.Model] = None
 
         # These lists will contain the maps for the point sources
-        self._convolved_point_sources: list[
-            ConvolvedPointSource
-        ] = ConvolvedSourcesContainer()  # type: ignore
+        self._convolved_point_sources = ConvolvedSourcesContainer()  # type: ignore
         # and this one for extended sources
-        self._convolved_ext_sources: list[
-            ConvolvedExtendedSource2D | ConvolvedExtendedSource3D
-        ] = ConvolvedSourcesContainer()  # type: ignore
+        self._convolved_ext_sources = ConvolvedSourcesContainer()  # type: ignore
 
         # All energy/nHit bins are loaded in memory
         self._all_planes: list[str] = list(self._maptree.analysis_bins_labels)
@@ -1045,38 +1044,39 @@ class HAL(PluginPrototype):
 
         # Now compare with observation
         bkg_renorm = list(self._nuisance_parameters.values())[0].value
-        multithread_log_like_results = self._multithreading_log_like(
-            n_point_sources, n_ext_sources, bkg_renorm, n_jobs=self._n_workers
-        )
-        total_log_like = sum(result[1] for result in multithread_log_like_results)
-        if individual_bins is True:
-            log_like_per_bin = dict(multithread_log_like_results)
+        # ! it seems the overhead from running multithreads outweighs the benefit
+        # ! and the projection for point sources is not thread safe, so there needs to be
+        # ! a threading lock in place to prevent race conditions
+        # ! this basically defeats the purpose of having a multithreading setup
+        # multithread_log_like_results = self._multithreading_log_like(
+        #     n_point_sources, n_ext_sources, bkg_renorm, n_jobs=self._n_workers
+        # )
+        # total_log_like = sum(result[1] for result in multithread_log_like_results)
+        # if individual_bins is True:
+        #     log_like_per_bin = dict(multithread_log_like_results)
 
-        # for bin_id in self._active_planes:
-        #     this_data_analysis_bin: DataAnalysisBin = self._maptree[bin_id]
+        for bin_id in self._active_planes:
+            this_data_analysis_bin: DataAnalysisBin = self._maptree[bin_id]
 
-        #     this_model_map_hpx = self._get_expectation(
-        #         this_data_analysis_bin,
-        #         bin_id,
-        #         n_point_sources,
-        #         n_ext_sources,
-        #     )
+            this_model_map_hpx = self._get_expectation(
+                this_data_analysis_bin, bin_id, n_point_sources, n_ext_sources
+            )
 
-        #     obs = this_data_analysis_bin.observation_map.as_partial()
-        #     bkg = this_data_analysis_bin.background_map.as_partial() * bkg_renorm
+            obs = this_data_analysis_bin.observation_map.as_partial()
+            bkg = this_data_analysis_bin.background_map.as_partial() * bkg_renorm
 
-        #     this_pseudo_log_like = log_likelihood(obs, bkg, this_model_map_hpx)
+            this_pseudo_log_like = log_likelihood(obs, bkg, this_model_map_hpx)
 
-        #     this_log_like = (
-        #         this_pseudo_log_like
-        #         - self._log_factorials[bin_id]
-        #         - self._saturated_model_like_per_maptree[bin_id]
-        #     )
+            this_log_like = (
+                this_pseudo_log_like
+                - self._log_factorials[bin_id]
+                - self._saturated_model_like_per_maptree[bin_id]
+            )
 
-        #     total_log_like += this_log_like
+            total_log_like += this_log_like
 
-        #     if individual_bins is True:
-        #         log_like_per_bin[bin_id] = this_log_like
+            if individual_bins is True:
+                log_like_per_bin[bin_id] = this_log_like
 
         if individual_bins is True:
             for k in log_like_per_bin:
@@ -1191,18 +1191,13 @@ class HAL(PluginPrototype):
         # ? For now, a lock is put in place to prevent such conditions
         pnt_source_model_map = None
         for pts_id in range(n_point_sources):
-            this_conv_src = self._convolved_point_sources[pts_id]
+            this_conv_src: ConvolvedPointSource = self._convolved_point_sources[pts_id]  # type: ignore
 
-            with lock:
-                # Need to ensure that one thread at a time can access this
-                expectation_per_transit = this_conv_src.get_source_map(
-                    energy_bin_id,
-                    tag=None,
-                    psf_integration_method=psf_integration_method,
-                )
+            # with lock:
+            # Need to ensure that one thread at a time can access this
 
-            expectation_from_this_source = (
-                expectation_per_transit * data_analysis_bin.n_transits
+            expectation_from_this_source = self._point_convolved_image(
+                this_conv_src, energy_bin_id, data_analysis_bin, psf_integration_method
             )
 
             if pnt_source_model_map is None:
@@ -1214,11 +1209,31 @@ class HAL(PluginPrototype):
             return pnt_source_model_map
         raise ValueError("Point source model map not computed properly")
 
-    def _extended_source_expectation(
+    def _point_convolved_image(
         self,
+        convolved_point_source: ConvolvedPointSource,
         energy_bin_id: str,
-        n_ext_sources: int,
         data_analysis_bin: DataAnalysisBin,
+        psf_integration_method: str,
+    ) -> ndarray:
+        # Retrieve the current values from the source's free parameters
+        free_parameters = convolved_point_source._source.free_parameters
+        # Rounding a little bit, otherwise there's too many cache misses
+
+        # let's check whether the source's position is allowed to vary, if so let's
+        # set the psf integration method to `fast`, else set it to `exact`
+        if any("position" in param_key for param_key in free_parameters.keys()):
+            psf_integration_method = "fast"
+        else:
+            psf_integration_method = "exact"
+        expectation_per_transit = convolved_point_source.get_source_map(
+            energy_bin_id, tag=None, psf_integration_method=psf_integration_method
+        )
+
+        return expectation_per_transit * data_analysis_bin.n_transits
+
+    def _extended_source_expectation(
+        self, energy_bin_id: str, n_ext_sources: int, data_analysis_bin: DataAnalysisBin
     ) -> ndarray:
         """Calculate the expected counts from extended sources within model
 
@@ -1231,7 +1246,9 @@ class HAL(PluginPrototype):
         """
         extended_source_map = None
         for ext_id in range(n_ext_sources):
-            this_cnv_source = self._convolved_ext_sources[ext_id]
+            this_cnv_source: ConvolvedExtendedSource2D | ConvolvedExtendedSource3D = (
+                self._convolved_ext_sources[ext_id]  # type: ignore
+            )
 
             this_ext_source = this_cnv_source.get_source_map(energy_bin_id)
 
@@ -1240,12 +1257,9 @@ class HAL(PluginPrototype):
             else:
                 extended_source_map += this_ext_source
 
-        if extended_source_map is not None:
-            return self._psf_convolutors[energy_bin_id].extended_source_image(
-                extended_source_map * data_analysis_bin.n_transits
-            )
-
-        raise ValueError("Extended source not computed properly")
+        return self._psf_convolutors[energy_bin_id].extended_source_image(
+            extended_source_map * data_analysis_bin.n_transits
+        )
 
     def _get_expectation(
         self,
@@ -1283,9 +1297,7 @@ class HAL(PluginPrototype):
         # Now process extended sources
         if n_ext_sources > 0:
             extended_sources_expectation = self._extended_source_expectation(
-                energy_bin_id,
-                n_ext_sources,
-                data_analysis_bin,
+                energy_bin_id, n_ext_sources, data_analysis_bin
             )
 
             if this_model_map is not None:
