@@ -22,17 +22,12 @@ from threeML.plugin_prototype import PluginPrototype
 from threeML.utils.statistics.gammaln import logfactorial
 from tqdm.auto import tqdm
 
-from hawc_hal.convolved_source import (
-    ConvolvedExtendedSource2D,
-    ConvolvedExtendedSource3D,
-    ConvolvedPointSource,
-    ConvolvedSourcesContainer,
-)
-from hawc_hal.healpix_handling import (
-    FlatSkyToHealpixTransform,
-    SparseHealpix,
-    get_gnomonic_projection,
-)
+from hawc_hal.convolved_source import (ConvolvedExtendedSource2D,
+                                       ConvolvedExtendedSource3D,
+                                       ConvolvedPointSource,
+                                       ConvolvedSourcesContainer)
+from hawc_hal.healpix_handling import (FlatSkyToHealpixTransform,
+                                       SparseHealpix, get_gnomonic_projection)
 from hawc_hal.log_likelihood import log_likelihood
 from hawc_hal.maptree import map_tree_factory
 from hawc_hal.maptree.data_analysis_bin import DataAnalysisBin
@@ -53,6 +48,9 @@ class HAL(PluginPrototype):
     :param response: Response of HAWC (either ROOT or hd5 format)
     :param roi: a ROI instance describing the Region Of Interest
     :param flat_sky_pixels_size: size of the pixel for the flat sky projection (Hammer Aitoff)
+    :param n_workers: number of workers to use for the parallelization of reading
+    :param set_transits: specifies the number of transits to use for the given maptree.
+    ROOT files, default=1
     """
 
     def __init__(
@@ -283,9 +281,7 @@ class HAL(PluginPrototype):
             for this_bin in range(bin_id_min, bin_id_max + 1):
                 this_bin = str(this_bin)
                 if this_bin not in self._all_planes:
-                    raise ValueError(
-                        f"Bin {this_bin} is not contained in this maptree."
-                    )
+                    raise ValueError(f"Bin {this_bin} is not contained in this maptree.")
 
                 self._active_planes.append(this_bin)
 
@@ -301,9 +297,7 @@ class HAL(PluginPrototype):
             for this_bin in bin_list:
                 # if not this_bin in self._all_planes:
                 if this_bin not in self._all_planes:
-                    raise ValueError(
-                        f"Bin {this_bin} is not contained in this maptree."
-                    )
+                    raise ValueError(f"Bin {this_bin} is not contained in this maptree.")
 
                 self._active_planes.append(this_bin)
 
@@ -433,10 +427,7 @@ class HAL(PluginPrototype):
             this_nside = data_analysis_bin.observation_map.nside
 
             radial_bin_pixels = hp.query_disc(
-                this_nside,
-                center,
-                radius_radians,
-                inclusive=False,
+                this_nside, center, radius_radians, inclusive=False
             )
 
             # calculate the areas per bin by the product
@@ -445,9 +436,7 @@ class HAL(PluginPrototype):
 
             # NOTE: select active pixels according to each radial bin
             bin_active_pixel_indexes = np.intersect1d(
-                self._active_pixels[energy_id],
-                radial_bin_pixels,
-                return_indices=True,
+                self._active_pixels[energy_id], radial_bin_pixels, return_indices=True
             )[1]
 
             # obtain the excess, background, and expected excess at
@@ -523,10 +512,7 @@ class HAL(PluginPrototype):
         # The area of each ring is then given by the difference between two
         # subsequent circe areas.
         area = np.array(
-            [
-                self.get_excess_background(ra, dec, r + offset * delta_r)[0]
-                for r in radii
-            ]
+            [self.get_excess_background(ra, dec, r + offset * delta_r)[0] for r in radii]
         )
 
         temp = area[1:] - area[:-1]
@@ -534,10 +520,7 @@ class HAL(PluginPrototype):
 
         # signals
         signal = np.array(
-            [
-                self.get_excess_background(ra, dec, r + offset * delta_r)[1]
-                for r in radii
-            ]
+            [self.get_excess_background(ra, dec, r + offset * delta_r)[1] for r in radii]
         )
 
         temp = signal[1:] - signal[:-1]
@@ -545,10 +528,7 @@ class HAL(PluginPrototype):
 
         # backgrounds
         bkg = np.array(
-            [
-                self.get_excess_background(ra, dec, r + offset * delta_r)[2]
-                for r in radii
-            ]
+            [self.get_excess_background(ra, dec, r + offset * delta_r)[2] for r in radii]
         )
 
         temp = bkg[1:] - bkg[:-1]
@@ -559,10 +539,7 @@ class HAL(PluginPrototype):
         # model
         # convert 'top hat' excess into 'ring' excesses.
         model = np.array(
-            [
-                self.get_excess_background(ra, dec, r + offset * delta_r)[3]
-                for r in radii
-            ]
+            [self.get_excess_background(ra, dec, r + offset * delta_r)[3] for r in radii]
         )
 
         temp = model[1:] - model[:-1]
@@ -696,9 +673,7 @@ class HAL(PluginPrototype):
 
         plt.plot(radii, excess_model, color="red", label="Model")
 
-        plt.legend(
-            bbox_to_anchor=(1.0, 1.0), loc="upper right", numpoints=1, fontsize=16
-        )
+        plt.legend(bbox_to_anchor=(1.0, 1.0), loc="upper right", numpoints=1, fontsize=16)
         plt.axhline(0, color="deepskyblue", linestyle="--")
 
         x_limits = [0, max_radius]
@@ -805,9 +780,7 @@ class HAL(PluginPrototype):
 
         yerr = [yerr_high, yerr_low]
 
-        return self._plot_spectrum(
-            net_counts, yerr, model_only, residuals, residuals_err
-        )
+        return self._plot_spectrum(net_counts, yerr, model_only, residuals, residuals_err)
 
     def _plot_spectrum(self, net_counts, yerr, model_only, residuals, residuals_err):
         fig, subs = plt.subplots(
@@ -1080,9 +1053,7 @@ class HAL(PluginPrototype):
             )
 
             # Now multiply by the pixel area of the new map to go back to flux
-            this_model_map_hpx *= hp.nside2pixarea(
-                data_analysis_bin.nside, degrees=True
-            )
+            this_model_map_hpx *= hp.nside2pixarea(data_analysis_bin.nside, degrees=True)
 
         else:
             # No sources
@@ -1207,9 +1178,7 @@ class HAL(PluginPrototype):
             subs[i][0].set_title("model, bin {}".format(data_analysis_bin.name))
 
             # Plot data map
-            images[1] = subs[i][1].imshow(
-                proj_data, origin="lower", vmin=vmin, vmax=vmax
-            )
+            images[1] = subs[i][1].imshow(proj_data, origin="lower", vmin=vmin, vmax=vmax)
             subs[i][1].set_title("excess, bin {}".format(data_analysis_bin.name))
 
             # Plot background map.
@@ -1329,9 +1298,7 @@ class HAL(PluginPrototype):
             raise ValueError(f"{plane_id} not a plane in the current model")
 
         model_map = SparseHealpix(
-            self._get_expectation(
-                self._maptree[plane_id], plane_id, n_pt_src, n_ext_src
-            ),
+            self._get_expectation(self._maptree[plane_id], plane_id, n_pt_src, n_ext_src),
             self._active_pixels[plane_id],
             self._maptree[plane_id].observation_map.nside,
         )
@@ -1404,17 +1371,13 @@ class HAL(PluginPrototype):
         if return_map:
             return new_map_tree
 
-    def write_model_map(
-        self, file_name, poisson_fluctuate=False, test_return_map=False
-    ):
+    def write_model_map(self, file_name, poisson_fluctuate=False, test_return_map=False):
         """
         This function writes the model map to a file.
         The interface is based off of HAWCLike for consistency
         """
         if test_return_map:
-            log.warning(
-                "test_return_map=True should only be used for testing purposes!"
-            )
+            log.warning("test_return_map=True should only be used for testing purposes!")
         return self._write_a_map(file_name, "model", poisson_fluctuate, test_return_map)
 
     def write_residual_map(self, file_name, test_return_map=False):
@@ -1423,7 +1386,5 @@ class HAL(PluginPrototype):
         The interface is based off of HAWCLike for consistency
         """
         if test_return_map:
-            log.warning(
-                "test_return_map=True should only be used for testing purposes!"
-            )
+            log.warning("test_return_map=True should only be used for testing purposes!")
         return self._write_a_map(file_name, "residual", False, test_return_map)
