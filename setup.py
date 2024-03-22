@@ -54,7 +54,7 @@ setup(
         "numba",
         "reproject",
         "tqdm",
-        "uproot==5.1.2",
+        "uproot",
         "awkward",
         "mplhep",
         "hist",

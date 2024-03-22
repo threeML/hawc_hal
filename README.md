@@ -93,7 +93,8 @@ response = ... # This can be either a ROOT or hdf5 file
 hawc = HAL("HAWC",
            maptree,
            response,
-           roi)
+           roi,
+           n_workers=3) # enables ability of loading ROOT's files faster with multiprocessing
 
 # Use from bin 1 to bin 9
 hawc.set_active_measurements(1, 9)

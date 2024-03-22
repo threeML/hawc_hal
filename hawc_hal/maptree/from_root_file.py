@@ -1,4 +1,4 @@
-from __future__ import absolute_import,annotations
+from __future__ import absolute_import, annotations
 
 import collections
 import multiprocessing
@@ -61,9 +61,7 @@ class MaptreeMetaData:
             if self._legacy_convention
             else self.analysis_bin_names[0]
         )
-        return self.maptree_ttree_directory[f"nHit{bin_id}/data/count"].member(
-            "fEntries"
-        )
+        return self.maptree_ttree_directory[f"nHit{bin_id}/data/count"].member("fEntries")
 
     @property
     def _bkg_npixels(self) -> int:
@@ -73,9 +71,7 @@ class MaptreeMetaData:
             if self._legacy_convention
             else self.analysis_bin_names[0]
         )
-        return self.maptree_ttree_directory[f"nHit{bin_id}/bkg/count"].member(
-            "fEntries"
-        )
+        return self.maptree_ttree_directory[f"nHit{bin_id}/bkg/count"].member("fEntries")
 
     @property
     def nside_cnt(self) -> int:
@@ -121,9 +117,9 @@ def get_array_from_file(
 
     if roi is not None:
         # NOTE: load only the pixels within the ROI
-        return bin_id, map_infile[
-            f"nHit{current_bin_id}/data/count"
-        ].array().to_numpy()[hpx_map > 0.0]
+        return bin_id, map_infile[f"nHit{current_bin_id}/data/count"].array().to_numpy()[
+            hpx_map > 0.0
+        ]
 
     return bin_id, map_infile[f"nHit{current_bin_id}/data/count"].array().to_numpy()
 
@@ -210,7 +206,15 @@ def from_root_file(
     # cannot perform operations on histrograms
 
     # Read the maptree
-    with uproot.open(str(map_tree_file)) as map_infile:
+    with multiprocessing.Pool(processes=n_workers) as pool, uproot.open(
+        map_tree_file.as_posix(),
+        handler=uproot.MemmapSource,
+        num_fallback_workers=n_workers,
+    ) as map_infile:
+        # the handler for MemmapSource loads the file as it's needed
+        # suggested as the best for large local files
+        # otherwise use MultithreadedFileSource for remote files
+        # which requires setting the option for use_threads to True
         log.info("Reading Maptree!")
 
         maptree_metadata = MaptreeMetaData(map_infile)
@@ -246,11 +250,8 @@ def from_root_file(
         # NOTE: The number of workers is suggested to be kept equal one less
         # than the number of available cores in the system.
 
-        with multiprocessing.Pool(processes=n_workers) as executor:
-            result_data = list(executor.starmap(get_array_from_file, signal_data_info))
-            result_bkg = list(
-                executor.starmap(get_bkg_array_from_file, signal_data_info)
-            )
+        result_data = list(pool.starmap(get_array_from_file, signal_data_info))
+        result_bkg = list(pool.starmap(get_bkg_array_from_file, signal_data_info))
 
         # Processes are not guaranteed to preserve order of analysis bin names
         # Organize them into a dictionary for proper readout
