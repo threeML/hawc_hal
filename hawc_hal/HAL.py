@@ -360,26 +360,30 @@ class HAL(PluginPrototype):
         self._convolved_point_sources.reset()
         self._convolved_ext_sources.reset()
 
+        self._setup_psf_convolutors()
+
         # For each point source in the model, build the convolution class
+        pnt_sources = self._likelihood_model.point_sources.values()
 
-        for source in list(self._likelihood_model.point_sources.values()):
-            this_convolved_point_source = ConvolvedPointSource(
-                source, self._response, self._flat_sky_projection
-            )
+        if pnt_sources:
 
-            self._convolved_point_sources.append(this_convolved_point_source)
+            for source in list(pnt_sources):
+                this_convolved_point_source = ConvolvedPointSource(
+                    source, self._response, self._flat_sky_projection, self._active_planes
+                )
 
-        # Samewise for extended sources
+                self._convolved_point_sources.append(this_convolved_point_source)
+
+
+        # Likewise for extended sources
         ext_sources = list(self._likelihood_model.extended_sources.values())
 
         # NOTE: ext_sources evaluate to False if empty
         if ext_sources:
-            # We will need to convolve
-
-            self._setup_psf_convolutors()
 
             for source in ext_sources:
                 if source.spatial_shape.n_dim == 2:
+
                     this_convolved_ext_source = ConvolvedExtendedSource2D(
                         source, self._response, self._flat_sky_projection
                     )
@@ -888,6 +892,7 @@ class HAL(PluginPrototype):
             this_model_map_hpx = self._get_expectation(
                 data_analysis_bin, bin_id, n_point_sources, n_ext_sources
             )
+
             # Now compare with observation
             bkg_renorm = list(self._nuisance_parameters.values())[0].value
 
@@ -1002,69 +1007,63 @@ class HAL(PluginPrototype):
         self, data_analysis_bin, energy_bin_id, n_point_sources, n_ext_sources
     ):
         # Compute the expectation from the model
-
         this_model_map = None
 
-        for pts_id in range(n_point_sources):
-            this_conv_pnt_src: ConvolvedPointSource = self._convolved_point_sources[
-                pts_id
-            ]
+        #If there are sources in the map
+        if n_point_sources > 0 or n_ext_sources > 0:
 
-            expectation_per_transit = this_conv_pnt_src.get_source_map(
-                energy_bin_id,
-                tag=None,
-                psf_integration_method=self._psf_integration_method,
-            )
+            this_unconv_model_map = None
+            this_conv_ps_model_map = None
+            this_conv_ex_model_map = None
 
-            expectation_from_this_source = (
-                expectation_per_transit * data_analysis_bin.n_transits
-            )
+            #Process point sources
+            if n_point_sources > 0:
 
-            if this_model_map is None:
-                # First addition
+                for src_id in range(n_point_sources):
 
-                this_model_map = expectation_from_this_source
+                    this_conv_src: ConvolvedPointSource = self._convolved_point_sources[ src_id ]
 
-            else:
-                this_model_map += expectation_from_this_source
+                    expectation_per_transit = this_conv_src.get_source_map( energy_bin_id )
 
-        # Now process extended sources
-        if n_ext_sources > 0:
-            this_ext_model_map = None
+                    if this_conv_ps_model_map is None:
+                        # First addition
+                        this_conv_ps_model_map = expectation_per_transit
+                    else:
+                        this_conv_ps_model_map += expectation_per_transit
 
-            for ext_id in range(n_ext_sources):
-                this_conv_src: Union[
-                    ConvolvedExtendedSource2D, ConvolvedExtendedSource3D
-                ] = self._convolved_ext_sources[ext_id]
+            #Process extended sources
+            if n_ext_sources > 0:
 
-                expectation_per_transit = this_conv_src.get_source_map(energy_bin_id)
+                for ext_id in range(n_ext_sources):
+                    this_conv_src: Union[
+                        ConvolvedExtendedSource2D, ConvolvedExtendedSource3D
+                    ] = self._convolved_ext_sources[ ext_id ]
 
-                if this_ext_model_map is None:
-                    # First addition
+                    expectation_per_transit = this_conv_src.get_source_map( energy_bin_id )
 
-                    this_ext_model_map = expectation_per_transit
+                    if this_unconv_model_map is None:
+                        # First addition
+                        this_unconv_model_map = expectation_per_transit
+                    else:
+                        this_unconv_model_map += expectation_per_transit
 
-                else:
-                    this_ext_model_map += expectation_per_transit
+                # Now convolve with the PSF
+                this_conv_ex_model_map = self._psf_convolutors[ energy_bin_id ].extended_source_image( this_unconv_model_map )
 
-            # Now convolve with the PSF
-            if this_model_map is None:
-                # Only extended sources
 
-                this_model_map = (
-                    self._psf_convolutors[energy_bin_id].extended_source_image(
-                        this_ext_model_map
-                    )
-                    * data_analysis_bin.n_transits
-                )
 
-            else:
-                this_model_map += (
-                    self._psf_convolutors[energy_bin_id].extended_source_image(
-                        this_ext_model_map
-                    )
-                    * data_analysis_bin.n_transits
-                )
+            if n_point_sources > 0 and n_ext_sources > 0:
+
+                this_model_map = ( this_conv_ps_model_map + this_conv_ex_model_map ) * data_analysis_bin.n_transits
+
+            elif n_point_sources > 0:
+
+                this_model_map = this_conv_ps_model_map * data_analysis_bin.n_transits
+
+            elif n_ext_sources > 0:
+
+                this_model_map = this_conv_ex_model_map * data_analysis_bin.n_transits
+
 
         # Now transform from the flat sky projection to HEALPiX
 
@@ -1090,7 +1089,6 @@ class HAL(PluginPrototype):
             this_model_map_hpx = 0.0
 
         return this_model_map_hpx
-
     @staticmethod
     def _represent_healpix_map(
         fig, hpx_map, longitude, latitude, xsize, resolution, smoothing_kernel_sigma
