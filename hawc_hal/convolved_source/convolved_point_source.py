@@ -271,7 +271,7 @@ class ConvolvedPointSource(object):
 
 
                 self._this_model_image_norm_conv_shifted[ energy_bin_id ] =  shift( this_model_image_norm_conv_weighted, 
-                    self._deltaidx[::-1], order=1, mode='constant', cval=0.0 )
+                    self._deltaidx[::-1], order=2, mode='constant', cval=0.0 )
 
                 this_model_image_norm_conv = self._this_model_image_norm_conv_shifted[ energy_bin_id ]
 
@@ -314,7 +314,7 @@ class ConvolvedPointSource(object):
 
                 # Shift the image with sub-pixel precision
                 this_model_image_norm_conv =  shift( this_model_image_norm_conv_weighted, 
-                    self._deltaidx[::-1], order=1, mode='constant', cval=0.0 )
+                    self._deltaidx[::-1], order=2, mode='constant', cval=0.0 )
 
             # If we need to recompute the flux, let's do it
             if self._recompute:
