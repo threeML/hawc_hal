@@ -5,7 +5,7 @@ import os
 import collections
 import numpy as np
 
-from hawc_hal.psf_fast import PSFConvolutor
+from hawc_hal.psf_fast import PSFInterpolator
 from hawc_hal import HAL
 
 from astromodels import use_astromodels_memoization
@@ -74,7 +74,7 @@ class ConvolvedPointSource(object):
         for response_bin in self._dec_bins_to_consider:
             psf_convolutor = collections.OrderedDict()
             for energy_bin_id in self._active_planes:
-                psf_convolutor[ energy_bin_id ] = PSFConvolutor( response_bin[ energy_bin_id ].psf, self._flat_sky_projection )
+                psf_convolutor[ energy_bin_id ] = PSFInterpolator( response_bin[ energy_bin_id ].psf, self._flat_sky_projection )
             self._psf_convolutors.append( psf_convolutor )
 
         # This stores the convoluted sources
@@ -231,18 +231,18 @@ class ConvolvedPointSource(object):
                                        self._flat_sky_projection.wcs.world_to_pixel_values( [self._pix_ctr_coords] )[0] )
 
                     # Create an empty array, find the active pixel and set the active pixel = 1.
-                    self._this_model_image_square = np.zeros( (self._flat_sky_projection.npix_height, 
-                                                               self._flat_sky_projection.npix_width) )
+#                    self._this_model_image_square = np.zeros( (self._flat_sky_projection.npix_height, 
+#                                                               self._flat_sky_projection.npix_width) )
 
-                    self._this_model_image_square[ self._idx[1], self._idx[0] ] = 1.
+#                    self._this_model_image_square[ self._idx[1], self._idx[0] ] = 1.
 
-                    assert np.sum(self._this_model_image_square) == 1., "Yikes! This should have spat out 1. in ConvolvedPointSource"
+#                    assert np.sum(self._this_model_image_square) == 1., "Yikes! This should have spat out 1. in ConvolvedPointSource"
 
                 # Calculate the PSF in each dec bin for the energy bin, we only need to do this once
                 for i in range( len( self._dec_bins_to_consider ) ):
 
                     self._this_model_image_norm_conv[ i ][ energy_bin_id ] = self._psf_convolutors[ i ][ 
-                            energy_bin_id ].extended_source_image( self._this_model_image_square )
+                            energy_bin_id ].point_source_image( self._pix_ctr_coords[0], self._pix_ctr_coords[1], "fast")
 
                     # The convoluter returns negative pixel values in some cases, this needs to be fixed really, we just botch it here
                     # We don't just truncate at 0. but shift the image, just in case there is gradient information in there that the
@@ -271,7 +271,7 @@ class ConvolvedPointSource(object):
 
 
                 self._this_model_image_norm_conv_shifted[ energy_bin_id ] =  shift( this_model_image_norm_conv_weighted, 
-                    self._deltaidx[::-1], order=2, mode='constant', cval=0.0 )
+                    self._deltaidx[::-1], order=1, mode='grid-constant', cval=0.0, prefilter=True )
 
                 this_model_image_norm_conv = self._this_model_image_norm_conv_shifted[ energy_bin_id ]
 
@@ -314,7 +314,7 @@ class ConvolvedPointSource(object):
 
                 # Shift the image with sub-pixel precision
                 this_model_image_norm_conv =  shift( this_model_image_norm_conv_weighted, 
-                    self._deltaidx[::-1], order=2, mode='constant', cval=0.0 )
+                    self._deltaidx[::-1], order=1, mode='grid-constant', cval=0.0, prefilter=True )
 
             # If we need to recompute the flux, let's do it
             if self._recompute:
