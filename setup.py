@@ -46,7 +46,7 @@ setup(
         "threeml",
         "astromodels",
         "pandas",
-        "healpy",
+        "pytest",
         "six",
         "astropy",
         "scipy",
