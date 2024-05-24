@@ -406,7 +406,15 @@ class HAWCResponse:
                 f"Response {response_file_name} does not exist or is not readable"
             )
 
-        with uproot.open(response_file_name) as response_file_directory:
+        with multiprocessing.Pool(processes=n_workers) as pool, uproot.open(
+            response_file_name,
+            handler=uproot.MemmapSource,
+            num_fallback_workers=n_workers,
+        ) as response_file_directory:
+            # the handler for MemmapSource loads the file as it's needed
+            # suggested as the best for large local files
+            # otherwise use MultithreadedFileSource for remote files
+            # which requires setting the option for use_threads to True
             resp_metadata = ResponseMetaData(response_file_directory)
 
             # NOTE:Get the Response function basic information
@@ -426,12 +434,9 @@ class HAWCResponse:
                 for bin_id in analysis_bins_arr
             ]
 
-            with multiprocessing.Pool(processes=n_workers) as executor:
-                results = list(executor.starmap(resp_metadata.get_energy_hist, args))
-                results_bkg = list(
-                    executor.starmap(resp_metadata.get_energy_bkg_hist, args)
-                )
-                psf_param = list(executor.starmap(resp_metadata.get_psf_params, args))
+            results = list(pool.starmap(resp_metadata.get_energy_hist, args))
+            results_bkg = list(pool.starmap(resp_metadata.get_energy_bkg_hist, args))
+            psf_param = list(pool.starmap(resp_metadata.get_psf_params, args))
 
         energy_hists = cls.create_dict_from_results(results)
         energy_bkgs = cls.create_dict_from_results(results_bkg)
