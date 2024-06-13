@@ -926,20 +926,13 @@ class HAL(PluginPrototype):
                 data_analysis_bin = self._maptree[bin_id]
                 if bin_id not in self._active_planes:
                     expectations[bin_id] = None
-
                 else:
-                    expectations[bin_id] = (
-                        self._get_expectation(
-                            data_analysis_bin, bin_id, n_point_sources, n_ext_sources
-                        )
-                        + data_analysis_bin.background_map.as_partial()
-                    )
+                    expectations[bin_id] = ( self._get_expectation( data_analysis_bin, bin_id, n_point_sources, n_ext_sources )
+                                             + data_analysis_bin.background_map.as_partial() )
 
             if parallel_client.is_parallel_computation_active():
                 # Do not clone, as the parallel environment already makes clones
-
                 clone = self
-
             else:
                 clone = copy.deepcopy(self)
 
@@ -951,13 +944,10 @@ class HAL(PluginPrototype):
 
             if bin_id not in self._active_planes:
                 continue
-
             else:
                 # Active plane. Generate new data
                 expectation = self._clone[1][bin_id]
-                new_data = np.random.poisson(
-                    expectation, size=(1, expectation.shape[0])
-                ).flatten()
+                new_data = np.random.poisson( expectation, size=(1, expectation.shape[0]) ).flatten()
 
                 # Substitute data
                 data_analysis_bin.observation_map.set_new_values(new_data)
@@ -967,18 +957,14 @@ class HAL(PluginPrototype):
         # Adjust the name of the nuisance parameter
         old_name = list(self._clone[0]._nuisance_parameters.keys())[0]
         new_name = old_name.replace(self.name, name)
-        self._clone[0]._nuisance_parameters[new_name] = self._clone[
-            0
-        ]._nuisance_parameters.pop(old_name)
+        self._clone[0]._nuisance_parameters[new_name] = self._clone[0]._nuisance_parameters.pop(old_name)
 
         # Recompute biases
         self._clone[0]._compute_likelihood_biases()
 
         return self._clone[0]
 
-    def _get_expectation(
-        self, data_analysis_bin, energy_bin_id, n_point_sources, n_ext_sources
-    ):
+    def _get_expectation( self, data_analysis_bin, energy_bin_id, n_point_sources, n_ext_sources ):
         # Compute the expectation from the model
         this_model_map = None
 
@@ -1042,14 +1028,9 @@ class HAL(PluginPrototype):
 
         if this_model_map is not None:
             # First divide for the pixel area because we need to interpolate brightness
-            # this_model_map = old_div(this_model_map, self._flat_sky_projection.project_plane_pixel_area)
-            this_model_map = (
-                this_model_map / self._flat_sky_projection.project_plane_pixel_area
-            )
+            this_model_map = ( this_model_map / self._flat_sky_projection.project_plane_pixel_area )
 
-            this_model_map_hpx = self._flat_sky_to_healpix_transform[energy_bin_id](
-                this_model_map, fill_value=0.0
-            )
+            this_model_map_hpx = self._flat_sky_to_healpix_transform[energy_bin_id]( this_model_map, fill_value=0.0 )
 
             # Now multiply by the pixel area of the new map to go back to flux
             this_model_map_hpx *= hp.nside2pixarea(data_analysis_bin.nside, degrees=True)
@@ -1061,12 +1042,9 @@ class HAL(PluginPrototype):
 
         return this_model_map_hpx
     @staticmethod
-    def _represent_healpix_map(
-        fig, hpx_map, longitude, latitude, xsize, resolution, smoothing_kernel_sigma
-    ):
-        proj = get_gnomonic_projection(
-            fig, hpx_map, rot=(longitude, latitude, 0.0), xsize=xsize, reso=resolution
-        )
+    def _represent_healpix_map( fig, hpx_map, longitude, latitude, xsize, resolution, smoothing_kernel_sigma ):
+
+        proj = get_gnomonic_projection( fig, hpx_map, rot=(longitude, latitude, 0.0), xsize=xsize, reso=resolution )
 
         if smoothing_kernel_sigma is not None:
             # Get the sigma in pixels

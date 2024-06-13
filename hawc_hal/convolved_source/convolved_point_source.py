@@ -204,7 +204,6 @@ class ConvolvedPointSource(object):
                 aux_variable.add_callback(callback)
 
 
-
     def get_source_map(self, energy_bin_id, tag=None ):
 
         # We do not use the memoization in astromodels because we are doing caching by ourselves,
@@ -229,14 +228,6 @@ class ConvolvedPointSource(object):
 
                     self._deltaidx = ( self._flat_sky_projection.wcs.world_to_pixel_values( [[ ra_current, dec_current ]] )[0] -
                                        self._flat_sky_projection.wcs.world_to_pixel_values( [self._pix_ctr_coords] )[0] )
-
-                    # Create an empty array, find the active pixel and set the active pixel = 1.
-#                    self._this_model_image_square = np.zeros( (self._flat_sky_projection.npix_height, 
-#                                                               self._flat_sky_projection.npix_width) )
-
-#                    self._this_model_image_square[ self._idx[1], self._idx[0] ] = 1.
-
-#                    assert np.sum(self._this_model_image_square) == 1., "Yikes! This should have spat out 1. in ConvolvedPointSource"
 
                 # Calculate the PSF in each dec bin for the energy bin, we only need to do this once
                 for i in range( len( self._dec_bins_to_consider ) ):
@@ -271,7 +262,7 @@ class ConvolvedPointSource(object):
 
 
                 self._this_model_image_norm_conv_shifted[ energy_bin_id ] =  shift( this_model_image_norm_conv_weighted, 
-                    self._deltaidx[::-1], order=1, mode='grid-constant', cval=0.0, prefilter=True )
+                    self._deltaidx[::-1], order=2, mode='grid-constant', cval=0.0, prefilter=True )
 
                 this_model_image_norm_conv = self._this_model_image_norm_conv_shifted[ energy_bin_id ]
 
@@ -314,13 +305,12 @@ class ConvolvedPointSource(object):
 
                 # Shift the image with sub-pixel precision
                 this_model_image_norm_conv =  shift( this_model_image_norm_conv_weighted, 
-                    self._deltaidx[::-1], order=1, mode='grid-constant', cval=0.0, prefilter=True )
+                    self._deltaidx[::-1], order=2, mode='grid-constant', cval=0.0, prefilter=True )
 
             # If we need to recompute the flux, let's do it
             if self._recompute:
 
                 #Check that dec is still between decbin centres, if not need to calculate dec bins again
-
                 if ( dec_current != self._last_processed_position[ energy_bin_id ][1] ):
 
                     self._energy_centers_keV = self._update_energy_centers( dec_current )
@@ -335,7 +325,6 @@ class ConvolvedPointSource(object):
 
             # Loop over the Dec bins that cover this source and compute the expected flux, interpolating between
             # two dec bins for each point
-
             dec_bin1, dec_bin2 = self._dec_bins_to_consider[ 
                 self._decbin_to_idx[ self._dec_bins_idx[ energy_bin_id ][0] ] ], self._dec_bins_to_consider[ 
                 self._decbin_to_idx[ self._dec_bins_idx[ energy_bin_id ][1] ] ]
