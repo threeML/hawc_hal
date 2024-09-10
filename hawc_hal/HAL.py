@@ -774,7 +774,6 @@ class HAL(PluginPrototype):
 
             this_wh_model = this_model_tot + this_bkg_tot
             total_model[i] = this_wh_model
-
             if this_data_tot >= 50.0:
                 # Gaussian limit
                 # Under the null hypothesis the data are distributed as a Gaussian with mu = model
@@ -804,6 +803,16 @@ class HAL(PluginPrototype):
         ]
 
         yerr = [yerr_high, yerr_low]
+
+        df = pd.DataFrame(columns=["Counts", "Err", "Bkg", "Model", "Net_Signal", "Residuals"], index=self._active_planes)
+        df.index.name = "Bin"
+        df["Counts"] = total_counts
+        df["Err"] = yerr_low
+        df["Bkg"] = total_counts-net_counts
+        df["Model"] = model_only
+        df["Net_Signal"] = net_counts
+        df["Residuals"] = residuals
+        print(df)
 
         return self._plot_spectrum(
             net_counts, yerr, model_only, residuals, residuals_err
@@ -1315,7 +1324,11 @@ class HAL(PluginPrototype):
 
         n_points = 0
 
-        for bin_id in self._maptree:
+        for bin_id in self._active_planes:
+            log.debug('Bin %s: %d pixels' %(bin_id,
+                                 self._maptree[bin_id].observation_map.as_partial().shape[0])
+                      )
+
             n_points += self._maptree[bin_id].observation_map.as_partial().shape[0]
 
         return n_points
