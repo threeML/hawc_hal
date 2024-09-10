@@ -45,8 +45,8 @@ path = "hawc_hal/tests/data"
 
 [tool.ruff]
 exclude = ["codecov.yml", "data/*", "ci/*", "notebooks"]
-docstring-code-format = true
-docstring-code-line-length = 60
+# docstring-code-format = true
+# docstring-code-line-length = 60
 line-length = 88
 indent-width = 4
 
