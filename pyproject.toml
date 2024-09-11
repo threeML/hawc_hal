@@ -4,15 +4,21 @@ build-backend = "poetry.core.masonry.api"
 
 [tool.poetry]
 name = "hawc_hal"
-version = "1.0"
+version = "1.1"
 authors = ["Giacomo Vianello <giacomov@stanford.edu>"]
 maintainers = [
-  "Ramiro Torres-Escobedo <rtorrese@proton.me>",
   "Xiaojie Wang <xwang32@mtu.edu>",
+  "Ramiro Torres-Escobedo <rtorrese@proton.me>",
 ]
 description = "HAWC Accelerated Likelihood; Read and handle HAWC data"
-license = "BSD-3.0"
+license = "BSD-3-Clause"
 packages = [{ include = "hawc_hal" }, { include = "scripts" }]
+
+[tool.poetry.urls]
+homepage = "https://threeml.readthedocs.io/en/stable/index.html"
+repository = "https://github.com/threeML/hawc_hal"
+documentation = "https://threeml.readthedocs.io/en/stable/notebooks/hal_example.html"
+"Bug Tracker" = "https://github.com/threeML/hawc_hal/issues"
 
 [tool.poetry.dependencies]
 python = "^3.8"
@@ -33,20 +39,16 @@ uproot = "*"
 awkward = "*"
 mplhep = "*"
 hist = "*"
+ruff = "*"
+pyright = "*"
 
 
 [tool.poetry.scripts]
 hdf5tofits = "scripts.hal_hdf5_to_fits:main"
 halfitpointsrc = "scripts.hal_fit_point_source:main"
 
-[tool.poetry.package.include]
-format = "sdist"
-path = "hawc_hal/tests/data"
-
 [tool.ruff]
-exclude = ["codecov.yml", "data/*", "ci/*", "notebooks"]
-# docstring-code-format = true
-# docstring-code-line-length = 60
+exclude = ["codecov.yml", "data/*", "ci/*", "notebooks", "tests"]
 line-length = 88
 indent-width = 4
 
