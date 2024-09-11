@@ -48,9 +48,43 @@ hdf5tofits = "scripts.hal_hdf5_to_fits:main"
 halfitpointsrc = "scripts.hal_fit_point_source:main"
 
 [tool.ruff]
-exclude = ["codecov.yml", "data/*", "ci/*", "notebooks", "tests"]
+include = [
+  "pyproject.toml",
+  "hawc_hal/**/*.py",
+  "scripts/**/*.py",
+  "notebooks/**/*.ipynb",
+]
+exclude = [
+  "codecov.yml",
+  "data/*",
+  "ci/*",
+  "notebooks",
+  "tests",
+  ".eggs",
+  ".git",
+  ".git-rewrite",
+  ".ipynb_checkpoints",
+  ".mypy_cache",
+  ".nox",
+  ".pants.d",
+  ".pyenv",
+  ".pytest_cache",
+  ".pytype",
+  ".ruff_cache",
+  ".venv",
+  ".vscode",
+  "__pypackages__",
+  "_build",
+  "buck-out",
+  "build",
+  "dist",
+  "node_modules",
+  "site-packages",
+  "venv",
+]
 line-length = 88
 indent-width = 4
+docstring-code-format = false
 
 
 [tool.ruff.format]
