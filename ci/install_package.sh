@@ -19,8 +19,7 @@ if [[ "$OSTYPE" == darwin* ]]; then
     #conda update -c conda-forge -c threeml threeml astromodels
     conda install -c conda-forge libgcc lapack
 fi
-# pip install --no-binary :all: root_numpy
-pip install "speclite>=0.19"
+pip install --no-binary :all: root_numpy
 pip install .
 
 set +x
