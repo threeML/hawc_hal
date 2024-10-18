@@ -58,6 +58,7 @@ setup(
         "awkward",
         "mplhep",
         "hist",
+        "speclite>=0.19"
     ],
     entry_points={
         "console_scripts": [
