@@ -49,4 +49,7 @@ dependencies:
   - numba
   - root<=6.30
   - reproject
+pip:
   - speclite>=0.19
+  - ruff
+  - pyright
