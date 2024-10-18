@@ -49,3 +49,4 @@ dependencies:
   - numba
   - root<=6.30
   - reproject
+  - speclite>=0.14
