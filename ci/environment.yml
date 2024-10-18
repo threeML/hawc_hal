@@ -47,4 +47,5 @@ dependencies:
   - threeml>=2.2.1
   - future
   - numba
+  - root<=6.30
   - reproject
