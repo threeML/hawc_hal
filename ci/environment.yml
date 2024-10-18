@@ -52,4 +52,3 @@ dependencies:
 pip:
   - speclite>=0.19
   - ruff
-  - pyright
