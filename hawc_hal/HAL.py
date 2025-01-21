@@ -413,12 +413,15 @@ class HAL(PluginPrototype):
         the `get_radial_profile` method
         """
 
+        from math import radians
+
         if self._active_planes is None:
             raise ValueError(
                 "No active planes have been set. Please use set_active_measurements()"
             )
 
-        radius_radians = np.deg2rad(radius)
+        # healpy likes to work with radians
+        radius_radians: float = radians(radius)
 
         total_counts = np.zeros(len(self._active_planes), dtype=float)
         background = np.zeros_like(total_counts)
@@ -441,14 +444,14 @@ class HAL(PluginPrototype):
         )
 
         # select the pixels that are only within the radial bin
-        pixels_within_rad_bin = np.isin(
+        pixels_within_rad_bin = np.in1d(
             self._active_pixels[self._active_planes[0]], radial_bin_pixels
         )
 
         # calculate the areas per bin by the product
         # of pixel area by the number of pixels at each radial bin
         this_area = hp.nside2pixarea(this_nside) * radial_bin_pixels.shape[0]
-        area = np.full(this_area, len(self._active_planes))
+        area = np.full(len(self._active_planes), this_area)
 
         for i, energy_id in enumerate(self._active_planes):
             data_analysis_bin: DataAnalysisBin = self._maptree[energy_id]
@@ -506,8 +509,8 @@ class HAL(PluginPrototype):
         good_planes = [plane_id in active_planes for plane_id in self._active_planes]
         plane_ids = set(active_planes) & set(self._active_planes)
 
-        offset = 0.5
-        delta_r = 1.0 * max_radius / n_radial_bins
+        offset = 0.50
+        delta_r = (1.0 * max_radius) / n_radial_bins
         radii = np.array([delta_r * (r + offset) for r in range(n_radial_bins)])
 
         # Get area of all pixels in a given circle
@@ -593,9 +596,8 @@ class HAL(PluginPrototype):
         total_bkg = self._get_excess_background(ra, dec, max_radius)[2][good_planes]
         total_model = self._get_excess_background(ra, dec, max_radius)[3][good_planes]
 
-        # w = np.divide(total_model, total_bkg)
-        w = total_model / total_bkg
-        weight = np.array([w / np.sum(w) for _ in radii])
+        w = np.divide(total_model, total_bkg)
+        weight = np.array([w / w.sum() for _ in radii])
 
         # restrict profiles to the user-specified analysis bins
         area = area[:, good_planes]
@@ -615,7 +617,7 @@ class HAL(PluginPrototype):
             excess_data,
             excess_error,
             sorted(plane_ids),  # pyright:ignore
-            w[0, :],
+            weight[0, :],
         )
 
     def plot_radial_profile(
@@ -627,7 +629,7 @@ class HAL(PluginPrototype):
         n_radial_bins: int = 30,
         model_to_subtract: astromodels.Model | None = None,
         subtract_model_from_model: bool = False,
-    ) -> tuple[Figure, pd.DataFrame]:
+    ) -> tuple[Figure, pd.DataFrame, pd.DataFrame]:
         """Plot radial prfiles for a source in units of excess counts per steradian
 
         :param ra: RA of origin of radial profile (J2000)
@@ -655,15 +657,19 @@ class HAL(PluginPrototype):
 
         # add a dataframe for easy retrieval for calculations of surface
         # brighntess, if necessary.
-        df = pd.DataFrame(columns=["Excess", "Error", "Model"], index=radii)
+        df = pd.DataFrame(
+            {"Excess": excess_data, "Error": excess_error, "Model": excess_model},
+            index=radii,
+            dtype=float,
+        )
         df.index.name = "Radii"
-        df["Excess"] = excess_data
-        df["Error"] = excess_error
-        df["Model"] = excess_model
 
-        fig, ax = plt.subplots(figsize=(10, 8))
+        dfw = pd.DataFrame({"Bins": plane_ids, "Weights": weights})
 
-        plt.errorbar(
+        fig = plt.figure(figsize=(10, 8))
+        ax = fig.add_subplot()
+
+        ax.errorbar(
             radii,
             excess_data,
             yerr=excess_error,
@@ -673,51 +679,34 @@ class HAL(PluginPrototype):
             fmt=".",
         )
 
-        plt.plot(radii, excess_model, color="red", label="Model")
+        ax.plot(radii, excess_model, color="red", label="Model")
 
-        plt.legend(
+        ax.legend(
             bbox_to_anchor=(1.0, 1.0), loc="upper right", numpoints=1, fontsize=16
         )
-        plt.axhline(0, color="deepskyblue", linestyle="--")
+        ax.axhline(0, color="deepskyblue", linestyle="--")
 
-        x_limits = [0, max_radius]
-        plt.xlim(x_limits)
-        plt.xticks(fontsize=18)
-        plt.yticks(fontsize=18)
-
-        plt.ylabel(r"Apparent Radial Excess [sr$^{-1}$]", fontsize=18)
-        plt.xlabel(
-            f"Distance from source at ({ra:0.2f} $^{{\circ}}$, {dec:0.2f} $^{{\circ}}$)",
-            fontsize=18,
-        )
+        ax.set_xlim(left=0, right=max_radius)
+        ax.tick_params(axis="both", labelsize=18)
 
         if len(plane_ids) == 1:
             title = f"Radial Profile, bin {plane_ids[0]}"
 
         else:
             title = "Radial Profile"
-            # tmptitle = f"Radial Profile, bins \n{plane_ids}"
-            # width = 80
-            # title = "\n".join(
-            # tmptitle[i : i + width] for i in range(0, len(tmptitle), width)
-            # )
-            # title = tmptitle
 
-        plt.title(title)
-
+        plt.ylabel(r"Apparent Radial Excess [sr$^{-1}$]", fontsize=18)
+        plt.xlabel(
+            f"Distance from source at ({ra:0.2f} $^{{\circ}}$, {dec:0.2f} $^{{\circ}}$)",
+            fontsize=18,
+        )
+        ax.set_title(title)
         ax.grid(True)
 
         with contextlib.suppress(Exception):
             plt.tight_layout()
-        # try:
-        #
-        # plt.tight_layout()
-        #
-        # except Exception:
-        #
-        # pass
 
-        return fig, df
+        return fig, df, dfw
 
     def display_spectrum(self):
         """
