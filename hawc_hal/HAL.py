@@ -12,7 +12,7 @@ import healpy as hp
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-from astromodels import Parameter
+from astromodels import Model, Parameter
 from astropy.convolution import Gaussian2DKernel
 from astropy.convolution import convolve_fft as convolve
 from matplotlib.figure import Figure
@@ -122,7 +122,7 @@ class HAL(PluginPrototype):
         # python3 new way of doing things
         super().__init__(name, self._nuisance_parameters)
 
-        self._likelihood_model = None
+        self._likelihood_model: Model | None = None
 
         # These lists will contain the maps for the point sources
         self._convolved_point_sources = ConvolvedSourcesContainer()
@@ -209,10 +209,9 @@ class HAL(PluginPrototype):
 
     @psf_integration_method.setter
     def psf_integration_method(self, mode):
-        assert mode.lower() in [
-            "exact",
-            "fast",
-        ], "PSF integration method must be either 'exact' or 'fast'"
+        assert mode.lower() in ["exact", "fast"], (
+            "PSF integration method must be either 'exact' or 'fast'"
+        )
 
         self._psf_integration_method = mode.lower()
 
@@ -290,9 +289,7 @@ class HAL(PluginPrototype):
             for this_bin in range(bin_id_min, bin_id_max + 1):
                 this_bin = str(this_bin)
                 if this_bin not in self._all_planes:
-                    raise ValueError(
-                        f"Bin {this_bin} is not contained in this maptree."
-                    )
+                    raise ValueError(f"Bin {this_bin} is not contained in this maptree.")
 
                 self._active_planes.append(this_bin)
 
@@ -308,9 +305,7 @@ class HAL(PluginPrototype):
             for this_bin in bin_list:
                 # if not this_bin in self._all_planes:
                 if this_bin not in self._all_planes:
-                    raise ValueError(
-                        f"Bin {this_bin} is not contained in this maptree."
-                    )
+                    raise ValueError(f"Bin {this_bin} is not contained in this maptree.")
 
                 self._active_planes.append(this_bin)
 
@@ -398,6 +393,40 @@ class HAL(PluginPrototype):
 
                 self._convolved_ext_sources.append(this_convolved_ext_source)
 
+    def _prepare_data_for_radial_profile(self) -> None:
+        """Organize the data for radial profiles. This requires getting the observation,
+        background, and model maps for the the current region of interest. We use this in the
+        `get_excess_background` method to retrieve the values for each map that coincide
+        with every radial bin.
+
+        :raises ValueError: Check that the likelihood model and active planes have been set.
+        """
+        self._data_for_radial_profile: collections.OrderedDict[
+            str, collections.OrderedDict[str, ndarray]
+        ] = collections.OrderedDict()
+
+        if self._likelihood_model is None:
+            raise ValueError("No likelihood model has been set.")
+
+        if self._active_planes is None:
+            raise ValueError("Active planes have not been set")
+
+        n_point_sources = self._likelihood_model.get_number_of_point_sources()
+        n_ext_sources = self._likelihood_model.get_number_of_extended_sources()
+        for i, energy_id in enumerate(self._active_planes):
+            data_analysis_bin: DataAnalysisBin = self._maptree[energy_id]
+
+            # obtain the excess, background, and expected excess at
+            # each radial bin
+            data: ndarray = data_analysis_bin.observation_map.as_partial()
+            bkg: ndarray = data_analysis_bin.background_map.as_partial()
+            mdl: ndarray = self._get_model_map(
+                energy_id, n_point_sources, n_ext_sources
+            ).as_partial()
+            self._data_for_radial_profile[energy_id] = collections.OrderedDict(
+                {"data": data, "bkg": bkg, "mdl": mdl}
+            )
+
     def _get_excess_background(
         self, ra: float, dec: float, radius: float
     ) -> tuple[ndarray, ...]:
@@ -454,22 +483,24 @@ class HAL(PluginPrototype):
         area = np.full(len(self._active_planes), this_area)
 
         for i, energy_id in enumerate(self._active_planes):
-            data_analysis_bin: DataAnalysisBin = self._maptree[energy_id]
-
+            # data_analysis_bin: DataAnalysisBin = self._maptree[energy_id]
             # obtain the excess, background, and expected excess at
             # each radial bin
-            data: ndarray = data_analysis_bin.observation_map.as_partial()
-            bkg: ndarray = data_analysis_bin.background_map.as_partial()
-            mdl: ndarray = self._get_model_map(
-                energy_id, n_point_sources, n_ext_sources
-            ).as_partial()
+            # data: ndarray = data_analysis_bin.observation_map.as_partial()
+            # bkg: ndarray = data_analysis_bin.background_map.as_partial()
+            # mdl: ndarray = self._get_model_map(
+            #     energy_id, n_point_sources, n_ext_sources
+            # ).as_partial()
+            data: ndarray = self._data_for_radial_profile[energy_id]["data"]
+            bkg: ndarray = self._data_for_radial_profile[energy_id]["bkg"]
+            mdl: ndarray = self._data_for_radial_profile[energy_id]["mdl"]
 
             # select the information only from the pixels that are within the radial
             # bin from origin of radial profile
 
-            this_data_tot = data[pixels_within_rad_bin].sum()
-            this_bkg_tot = bkg[pixels_within_rad_bin].sum()
-            this_model_tot = mdl[pixels_within_rad_bin].sum()
+            this_data_tot: float = data[pixels_within_rad_bin].sum()
+            this_bkg_tot: float = bkg[pixels_within_rad_bin].sum()
+            this_model_tot: float = mdl[pixels_within_rad_bin].sum()
 
             background[i] = this_bkg_tot
             observation[i] = this_data_tot
@@ -505,22 +536,22 @@ class HAL(PluginPrototype):
         if active_planes is None:
             active_planes = self._active_planes
 
+        # call this here to get the data in order
+        self._prepare_data_for_radial_profile()
+
         # Make sure we use bins with data
         good_planes = [plane_id in active_planes for plane_id in self._active_planes]
         plane_ids = set(active_planes) & set(self._active_planes)
 
         offset = 0.50
         delta_r = (1.0 * max_radius) / n_radial_bins
-        radii = np.array([delta_r * (r + offset) for r in range(n_radial_bins)])
+        radii: ndarray = np.array([delta_r * (r + offset) for r in range(n_radial_bins)])
 
         # Get area of all pixels in a given circle
         # The area of each ring is then given by the difference between two
         # subsequent circe areas.
         area = np.array(
-            [
-                self._get_excess_background(ra, dec, r + offset * delta_r)[0]
-                for r in radii
-            ]
+            [self._get_excess_background(ra, dec, r + offset * delta_r)[0] for r in radii]
         )
 
         temp = area[1:] - area[:-1]
@@ -528,10 +559,7 @@ class HAL(PluginPrototype):
 
         # signals
         signal = np.array(
-            [
-                self._get_excess_background(ra, dec, r + offset * delta_r)[1]
-                for r in radii
-            ]
+            [self._get_excess_background(ra, dec, r + offset * delta_r)[1] for r in radii]
         )
 
         temp = signal[1:] - signal[:-1]
@@ -539,10 +567,7 @@ class HAL(PluginPrototype):
 
         # backgrounds
         bkg = np.array(
-            [
-                self._get_excess_background(ra, dec, r + offset * delta_r)[2]
-                for r in radii
-            ]
+            [self._get_excess_background(ra, dec, r + offset * delta_r)[2] for r in radii]
         )
 
         temp = bkg[1:] - bkg[:-1]
@@ -553,10 +578,7 @@ class HAL(PluginPrototype):
         # model
         # convert 'top hat' excess into 'ring' excesses.
         model = np.array(
-            [
-                self._get_excess_background(ra, dec, r + offset * delta_r)[3]
-                for r in radii
-            ]
+            [self._get_excess_background(ra, dec, r + offset * delta_r)[3] for r in radii]
         )
 
         temp = model[1:] - model[:-1]
@@ -681,9 +703,7 @@ class HAL(PluginPrototype):
 
         ax.plot(radii, excess_model, color="red", label="Model")
 
-        ax.legend(
-            bbox_to_anchor=(1.0, 1.0), loc="upper right", numpoints=1, fontsize=16
-        )
+        ax.legend(bbox_to_anchor=(1.0, 1.0), loc="upper right", numpoints=1, fontsize=16)
         ax.axhline(0, color="deepskyblue", linestyle="--")
 
         ax.set_xlim(left=0, right=max_radius)
@@ -773,9 +793,7 @@ class HAL(PluginPrototype):
 
         yerr = [yerr_high, yerr_low]
 
-        return self._plot_spectrum(
-            net_counts, yerr, model_only, residuals, residuals_err
-        )
+        return self._plot_spectrum(net_counts, yerr, model_only, residuals, residuals_err)
 
     def _plot_spectrum(self, net_counts, yerr, model_only, residuals, residuals_err):
         fig, subs = plt.subplots(
@@ -1050,9 +1068,7 @@ class HAL(PluginPrototype):
             )
 
             # Now multiply by the pixel area of the new map to go back to flux
-            this_model_map_hpx *= hp.nside2pixarea(
-                data_analysis_bin.nside, degrees=True
-            )
+            this_model_map_hpx *= hp.nside2pixarea(data_analysis_bin.nside, degrees=True)
 
         else:
             # No sources
@@ -1177,9 +1193,7 @@ class HAL(PluginPrototype):
             subs[i][0].set_title("model, bin {}".format(data_analysis_bin.name))
 
             # Plot data map
-            images[1] = subs[i][1].imshow(
-                proj_data, origin="lower", vmin=vmin, vmax=vmax
-            )
+            images[1] = subs[i][1].imshow(proj_data, origin="lower", vmin=vmin, vmax=vmax)
             subs[i][1].set_title("excess, bin {}".format(data_analysis_bin.name))
 
             # Plot background map.
@@ -1299,9 +1313,7 @@ class HAL(PluginPrototype):
             raise ValueError(f"{plane_id} not a plane in the current model")
 
         model_map = SparseHealpix(
-            self._get_expectation(
-                self._maptree[plane_id], plane_id, n_pt_src, n_ext_src
-            ),
+            self._get_expectation(self._maptree[plane_id], plane_id, n_pt_src, n_ext_src),
             self._active_pixels[plane_id],
             self._maptree[plane_id].observation_map.nside,
         )
@@ -1374,17 +1386,13 @@ class HAL(PluginPrototype):
         if return_map:
             return new_map_tree
 
-    def write_model_map(
-        self, file_name, poisson_fluctuate=False, test_return_map=False
-    ):
+    def write_model_map(self, file_name, poisson_fluctuate=False, test_return_map=False):
         """
         This function writes the model map to a file.
         The interface is based off of HAWCLike for consistency
         """
         if test_return_map:
-            log.warning(
-                "test_return_map=True should only be used for testing purposes!"
-            )
+            log.warning("test_return_map=True should only be used for testing purposes!")
         return self._write_a_map(file_name, "model", poisson_fluctuate, test_return_map)
 
     def write_residual_map(self, file_name, test_return_map=False):
@@ -1393,7 +1401,5 @@ class HAL(PluginPrototype):
         The interface is based off of HAWCLike for consistency
         """
         if test_return_map:
-            log.warning(
-                "test_return_map=True should only be used for testing purposes!"
-            )
+            log.warning("test_return_map=True should only be used for testing purposes!")
         return self._write_a_map(file_name, "residual", False, test_return_map)
