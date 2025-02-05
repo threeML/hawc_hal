@@ -459,9 +459,6 @@ class HAL(PluginPrototype):
         signal = np.zeros_like(total_counts)
         area = np.zeros_like(total_counts)
 
-        n_point_sources = self._likelihood_model.get_number_of_point_sources()  # type: ignore
-        n_ext_sources = self._likelihood_model.get_number_of_extended_sources()  # type: ignore
-
         longitude = ra_to_longitude(ra)
         latitude = dec
         center = hp.ang2vec(longitude, latitude, lonlat=True)
