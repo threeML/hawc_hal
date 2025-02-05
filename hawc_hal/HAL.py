@@ -483,21 +483,12 @@ class HAL(PluginPrototype):
         area = np.full(len(self._active_planes), this_area)
 
         for i, energy_id in enumerate(self._active_planes):
-            # data_analysis_bin: DataAnalysisBin = self._maptree[energy_id]
-            # obtain the excess, background, and expected excess at
-            # each radial bin
-            # data: ndarray = data_analysis_bin.observation_map.as_partial()
-            # bkg: ndarray = data_analysis_bin.background_map.as_partial()
-            # mdl: ndarray = self._get_model_map(
-            #     energy_id, n_point_sources, n_ext_sources
-            # ).as_partial()
             data: ndarray = self._data_for_radial_profile[energy_id]["data"]
             bkg: ndarray = self._data_for_radial_profile[energy_id]["bkg"]
             mdl: ndarray = self._data_for_radial_profile[energy_id]["mdl"]
 
             # select the information only from the pixels that are within the radial
             # bin from origin of radial profile
-
             this_data_tot: float = data[pixels_within_rad_bin].sum()
             this_bkg_tot: float = bkg[pixels_within_rad_bin].sum()
             this_model_tot: float = mdl[pixels_within_rad_bin].sum()
