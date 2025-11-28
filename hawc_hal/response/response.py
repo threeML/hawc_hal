@@ -25,7 +25,7 @@ log.propagate = False
 _instances = {}
 
 ndarray = NDArray[np.float64]
-nstrarray = NDArray[np.string_]
+nstrarray = NDArray[np.bytes_]
 
 
 def hawc_response_factory(response_file_name: str, n_workers: int = 1):
@@ -406,11 +406,14 @@ class HAWCResponse:
                 f"Response {response_file_name} does not exist or is not readable"
             )
 
-        with multiprocessing.Pool(processes=n_workers) as pool, uproot.open(
-            response_file_name,
-            handler=uproot.MemmapSource,
-            num_fallback_workers=n_workers,
-        ) as response_file_directory:
+        with (
+            multiprocessing.Pool(processes=n_workers) as pool,
+            uproot.open(
+                response_file_name,
+                handler=uproot.MemmapSource,
+                num_fallback_workers=n_workers,
+            ) as response_file_directory,
+        ):
             # the handler for MemmapSource loads the file as it's needed
             # suggested as the best for large local files
             # otherwise use MultithreadedFileSource for remote files
@@ -589,9 +592,9 @@ class HAWCResponse:
                 psf_dfs.append(this_psf_df)
                 # assert bin_id == response_bin.name, \
                 # 'Bin name inconsistency: {} != {}'.format(bin_id, response_bin.name)
-                assert (
-                    bin_id == response_bin.name
-                ), f"Bin name inconsistency: {bin_id} != {response_bin.name}"
+                assert bin_id == response_bin.name, (
+                    f"Bin name inconsistency: {bin_id} != {response_bin.name}"
+                )
                 multi_index_keys.append((dec_center, response_bin.name))
                 all_metas.append(pd.Series(this_meta))
 
