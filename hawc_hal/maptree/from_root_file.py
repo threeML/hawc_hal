@@ -206,11 +206,14 @@ def from_root_file(
     # cannot perform operations on histrograms
 
     # Read the maptree
-    with multiprocessing.Pool(processes=n_workers) as pool, uproot.open(
-        map_tree_file.as_posix(),
-        handler=uproot.MemmapSource,
-        num_fallback_workers=n_workers,
-    ) as map_infile:
+    with (
+        multiprocessing.Pool(processes=n_workers) as pool,
+        uproot.open(
+            map_tree_file.as_posix(),
+            handler=uproot.MemmapSource,
+            num_fallback_workers=n_workers,
+        ) as map_infile,
+    ):
         # the handler for MemmapSource loads the file as it's needed
         # suggested as the best for large local files
         # otherwise use MultithreadedFileSource for remote files
@@ -227,9 +230,9 @@ def from_root_file(
         nside_bkg: int = maptree_metadata.nside_bkg
         # binning_scheme_name: str = maptree_metadata.binning_scheme
 
-        assert (
-            nside_cnt == nside_bkg
-        ), "Nside value needs to be the same for counts and bkg. maps"
+        assert nside_cnt == nside_bkg, (
+            "Nside value needs to be the same for counts and bkg. maps"
+        )
 
         healpix_map_active = np.zeros(hp.nside2npix(nside_cnt))
 
@@ -266,7 +269,6 @@ def from_root_file(
 
     # use value of maptree unless otherwise specified by user
     n_transits = max_duration if transits is None else transits
-    scale_factor: float = n_transits / max_duration
 
     assert scheme == 0, "NESTED HEALPix is not currently supported."
 
@@ -276,9 +278,6 @@ def from_root_file(
         for name in data_bins_labels:
             counts = data_dir_array[name]
             bkg = bkg_dir_array[name]
-
-            counts *= scale_factor
-            bkg *= scale_factor
 
             counts_hpx = SparseHealpix(counts, active_pixels, nside_cnt)
             bkg_hpx = SparseHealpix(bkg, active_pixels, nside_bkg)
@@ -298,9 +297,6 @@ def from_root_file(
         for name in data_bins_labels:
             counts = data_dir_array[name]
             bkg = bkg_dir_array[name]
-
-            counts *= scale_factor
-            bkg *= scale_factor
 
             this_data_analysis_bin = DataAnalysisBin(
                 name,
