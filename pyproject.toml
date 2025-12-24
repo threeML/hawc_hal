@@ -1,0 +1,93 @@
+[build-system]
+requires = ["hatchling>=1.10.0"]
+build-backend = "hatchling.build"
+
+[project]
+name = "hawc_hal"
+version = "1.1"
+authors = [{ name = "Giacomo Vianello", email = "giacomov@stanford.edu" }]
+maintainers = [
+  { name = "Xiaojie Wang", email = "xwang32@mtu.edu" },
+  { name = "Ramiro Torres-Escobedo", email = "rtorrese@proton.me" },
+]
+description = "HAWC Accelerated Likelihood; Read and handle HAWC data"
+license = { text = "BSD-3-Clause" }
+requires-python = ">=3.8"
+dependencies = [
+  "numpy>=1.14",
+  "healpy",
+  "threeml",
+  "astromodels",
+  "pandas",
+  "pytest",
+  "six",
+  "astropy",
+  "scipy",
+  "matplotlib",
+  "numba",
+  "reproject",
+  "tqdm",
+  "uproot",
+  "awkward",
+  "mplhep",
+  "hist",
+  "ruff",
+  "pyright",
+]
+
+[project.urls]
+homepage = "https://threeml.readthedocs.io/en/stable/index.html"
+repository = "https://github.com/threeML/hawc_hal"
+documentation = "https://threeml.readthedocs.io/en/stable/notebooks/hal_example.html"
+"Bug Tracker" = "https://github.com/threeML/hawc_hal/issues"
+
+[project.scripts]
+hdf5tofits = "scripts.hal_hdf5_to_fits:main"
+halfitpointsrc = "scripts.hal_fit_point_source:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["hawc_hal", "scripts"]
+
+[tool.ruff]
+include = [
+  "pyproject.toml",
+  "hawc_hal/**/*.py",
+  "scripts/**/*.py",
+  "notebooks/**/*.ipynb",
+]
+exclude = [
+  "codecov.yml",
+  "data/*",
+  "ci/*",
+  "notebooks",
+  "tests",
+  ".eggs",
+  ".git",
+  ".git-rewrite",
+  ".ipynb_checkpoints",
+  ".mypy_cache",
+  ".nox",
+  ".pants.d",
+  ".pyenv",
+  ".pytest_cache",
+  ".pytype",
+  ".ruff_cache",
+  ".venv",
+  ".vscode",
+  "__pypackages__",
+  "_build",
+  "buck-out",
+  "build",
+  "dist",
+  "node_modules",
+  "site-packages",
+  "venv",
+]
+line-length = 88
+indent-width = 4
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+skip-magic-trailing-comma = false
+line-ending = "auto"
