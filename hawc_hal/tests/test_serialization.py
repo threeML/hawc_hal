@@ -29,8 +29,8 @@ def test_serialization():
 
         assert set(store.keys) == set(('/test_obj','/test_df'))
 
-    assert np.alltrue(my_obj == copy_obj)
-    assert np.alltrue(my_ob2 == copy_obj2)
+    assert np.all(my_obj == copy_obj)
+    assert np.all(my_ob2 == copy_obj2)
 
     for k in meta:
 
