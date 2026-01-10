@@ -615,64 +615,50 @@ class HAL(PluginPrototype):
         self,
         ra: float,
         dec: float,
-        active_planes: list = None,
+        active_planes: list | None = None,
         max_radius: float = 3.0,
         n_radial_bins: int = 30,
-        model_to_subtract: astromodels.Model = None,
+        model_to_subtract: astromodels.Model | None = None,
         subtract_model_from_model: bool = False,
     ):
-        """Plots radial profiles of data-background & model
+        """Plots radial profiles in units of counts/steradian
 
-        Args:
-            ra (float): RA of origin of radial profile
-            dec (float): Declination of origin of radial profile.
-            active_planes (np.ndarray, optional): List of analysis bins over
-            which to average.
-            Defaults to None.
-            max_radius (float, optional): Radius up to which the radial profile
-            is evaluate; also used as the radius for the disk to calculate the
-            gamma/hadron weights. Defaults to 3.0.
-            n_radial_bins (int, optional): number of radial bins used for ring
-            calculation. Defaults to 30.
-            model_to_subtract (astromodels.model, optional): Another model that
-            is to be subtracted from the data excess. Defaults to None.
-            subtract_model_from_model (bool, optional): If True and
-            model_to_subtract is not None, subtract from model too.
-            Defaults to False.
-
-        Returns:
-            tuple(matplotlib.pyplot.Figure, pd.DataFrame): plot of data-background
-            & model radial profile for source and a dataframe with all
-            values for easy retrieval
+        :param ra: RA (J2000) of origin of radial profile.
+        :param dec: Dec (J2000) of origin of radial profile.
+        :param active_planes: List of analysis bins over which to average over.
+        :param max_radius: Maximum radius upt ot which evaluate the radial profile.
+        :param n_radial_bins: Number of radial bins used for ring calculation.
+        :param model_to_subtract: Another model instance that is to be subtracted from the
+        excess signal.
+        :param subtract_model_from_model: Subtract also from the model the new model
+        instance
+        :return: Figure instance of radial plot and a pandas dataframe with information of
+        radial profile.
         """
 
-        (
-            radii,
-            excess_model,
-            excess_data,
-            excess_error,
-            plane_ids,
-        ) = self.get_radial_profile(
-            ra,
-            dec,
-            active_planes,
-            max_radius,
-            n_radial_bins,
-            model_to_subtract,
-            subtract_model_from_model,
+        (radii, excess_model, excess_data, excess_error, plane_ids) = (
+            self.get_radial_profile(
+                ra,
+                dec,
+                active_planes,
+                max_radius,
+                n_radial_bins,
+                model_to_subtract,
+                subtract_model_from_model,
+            )
         )
 
         # add a dataframe for easy retrieval for calculations of surface
         # brighntess, if necessary.
-        df = pd.DataFrame(columns=["Excess", "Bkg", "Model"], index=radii)
+        df = pd.DataFrame(columns=["Excess", "Error", "Model"], index=radii)
         df.index.name = "Radii"
         df["Excess"] = excess_data
         df["Bkg"] = excess_error
         df["Model"] = excess_model
 
-        fig, ax = plt.subplots(figsize=(10, 8))
+        fig, ax = plt.subplots(figsize=(7, 5))
 
-        plt.errorbar(
+        ax.errorbar(
             radii,
             excess_data,
             yerr=excess_error,
@@ -682,29 +668,14 @@ class HAL(PluginPrototype):
             fmt=".",
         )
 
-        plt.plot(radii, excess_model, color="red", label="Model")
-
-        plt.legend(
-            bbox_to_anchor=(1.0, 1.0), loc="upper right", numpoints=1, fontsize=16
-        )
-        plt.axhline(0, color="deepskyblue", linestyle="--")
-
-        x_limits = [0, max_radius]
-        plt.xlim(x_limits)
-        plt.xticks(fontsize=18)
-        plt.yticks(fontsize=18)
-
-        plt.ylabel(r"Apparent Radial Excess [sr$^{-1}$]", fontsize=18)
-        plt.xlabel(
-            f"Distance from source at ({ra:0.2f} $^{{\circ}}$, {dec:0.2f} $^{{\circ}}$)",
-            fontsize=18,
-        )
+        ax.plot(radii, excess_model, color="red", label="Model")
 
         if len(plane_ids) == 1:
             title = f"Radial Profile, bin {plane_ids[0]}"
 
         else:
             title = "Radial Profile"
+            # TODO: figure a nicer way to format this
             # tmptitle = f"Radial Profile, bins \n{plane_ids}"
             # width = 80
             # title = "\n".join(
@@ -712,19 +683,20 @@ class HAL(PluginPrototype):
             # )
             # title = tmptitle
 
-        plt.title(title)
-
+        ax.set_ylabel(r"Apparent Radial Excess [sr$^{-1}$]", fontsize=14)
+        ax.set_xlabel(
+            f"Distance from source at ({ra:0.2f} $^{{\circ}}$, {dec:0.2f} $^{{\circ}}$)",
+            fontsize=14,
+        )
+        ax.legend(bbox_to_anchor=(1.0, 1.0), loc="upper right", numpoints=1, fontsize=12)
+        ax.axhline(0, color="deepskyblue", linestyle="--")
+        ax.set_xlim(left=0, right=max_radius)
+        ax.tick_params(axis="both", labelsize=14)
+        ax.set_title(title)
         ax.grid(True)
 
         with contextlib.suppress(Exception):
             plt.tight_layout()
-        # try:
-        #
-        # plt.tight_layout()
-        #
-        # except Exception:
-        #
-        # pass
 
         return fig, df
 
