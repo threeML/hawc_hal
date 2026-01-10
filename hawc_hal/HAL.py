@@ -394,25 +394,18 @@ class HAL(PluginPrototype):
 
                 self._convolved_ext_sources.append(this_convolved_ext_source)
 
-    def get_excess_background(self, ra: float, dec: float, radius: float):
-        """Calculates excess (data-bkg), background, and model counts at
-        different radial distances from origin of radial profile.
+    def get_excess_background(
+        self, ra: float, dec: float, radius: float
+    ) -> tuple[NDArray[np.float64], ...]:
+        """Calculate excess (data-bkg), background, and model counts at different radial
+        distances from a source.
 
-
-        Parameters
-        ----------
-        ra : float
-            RA of origin of radial profile
-        dec : float
-           Dec of origin of radial profile
-        radius : float
-           distance from origin of radial profile
-
-        Returns
-        -------
-           returns a tuple of numpy arrays with info of areas (steradian) and
-           signal excess, background, and model in units of counts to be used
-           in the get_radial_profile method.
+        :param ra: RA coordinate (J2000)
+        :param dec: Dec coordinate (J2000)
+        :param radius: Distance from origin
+        :return: returns a tuple of numpy arrays with info of areas (steradian), signal
+        excess, background, and expected excess (model) in units of counts to be used in
+        the `get_radial_profile_method`
         """
 
         radius_radians = np.deg2rad(radius)
@@ -422,7 +415,8 @@ class HAL(PluginPrototype):
         observation = np.zeros_like(total_counts)
         model = np.zeros_like(total_counts)
         signal = np.zeros_like(total_counts)
-        area = np.zeros_like(total_counts)
+
+        this_nside = self._maptree[self._active_planes[0]].observation_map.nside
 
         n_point_sources = self._likelihood_model.get_number_of_point_sources()
         n_ext_sources = self._likelihood_model.get_number_of_extended_sources()
@@ -430,23 +424,23 @@ class HAL(PluginPrototype):
         longitude = ra_to_longitude(ra)
         latitude = dec
         center = hp.ang2vec(longitude, latitude, lonlat=True)
+        radial_bin_pixels = hp.query_disc(
+            this_nside, center, radius_radians, inclusive=False
+        )
+
+        # NOTE: calculate the areas per bin by the product
+        # of pixel area by the number of pixels at each radial bin
+        area = np.full(
+            total_counts.shape,
+            fill_value=hp.nside2pixarea(this_nside) * radial_bin_pixels.shape[0],
+        )
+        # NOTE: select active pixels according to each radial bin
+        this_radial_bin_active_pixels = np.isin(
+            self._active_pixels[self._active_planes[0]], radial_bin_pixels
+        )
 
         for i, energy_id in enumerate(self._active_planes):
             data_analysis_bin = self._maptree[energy_id]
-            this_nside = data_analysis_bin.observation_map.nside
-
-            radial_bin_pixels = hp.query_disc(
-                this_nside, center, radius_radians, inclusive=False
-            )
-
-            # calculate the areas per bin by the product
-            # of pixel area by the number of pixels at each radial bin
-            area[i] = hp.nside2pixarea(this_nside) * radial_bin_pixels.shape[0]
-
-            # NOTE: select active pixels according to each radial bin
-            bin_active_pixel_indexes = np.intersect1d(
-                self._active_pixels[energy_id], radial_bin_pixels, return_indices=True
-            )[1]
 
             # obtain the excess, background, and expected excess at
             # each radial bin
@@ -458,13 +452,9 @@ class HAL(PluginPrototype):
 
             # select counts only from the pixels within specifid distance from
             # origin of radial profile
-            bin_data = np.array([data[i] for i in bin_active_pixel_indexes])
-            bin_bkg = np.array([bkg[i] for i in bin_active_pixel_indexes])
-            bin_model = np.array([mdl[i] for i in bin_active_pixel_indexes])
-
-            this_data_tot = np.sum(bin_data)
-            this_bkg_tot = np.sum(bin_bkg)
-            this_model_tot = np.sum(bin_model)
+            this_data_tot = data[this_radial_bin_active_pixels].sum()
+            this_bkg_tot = bkg[this_radial_bin_active_pixels].sum()
+            this_model_tot = mdl[this_radial_bin_active_pixels].sum()
 
             background[i] = this_bkg_tot
             observation[i] = this_data_tot
