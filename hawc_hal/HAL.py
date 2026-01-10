@@ -14,6 +14,7 @@ import pandas as pd
 from astromodels import Parameter
 from astropy.convolution import Gaussian2DKernel
 from astropy.convolution import convolve_fft as convolve
+from numpy.typing import NDArray
 from past.utils import old_div
 from scipy.stats import poisson
 from threeML.io.logging import setup_logger
@@ -205,10 +206,9 @@ class HAL(PluginPrototype):
 
     @psf_integration_method.setter
     def psf_integration_method(self, mode):
-        assert mode.lower() in [
-            "exact",
-            "fast",
-        ], "PSF integration method must be either 'exact' or 'fast'"
+        assert mode.lower() in ["exact", "fast"], (
+            "PSF integration method must be either 'exact' or 'fast'"
+        )
 
         self._psf_integration_method = mode.lower()
 
@@ -286,9 +286,7 @@ class HAL(PluginPrototype):
             for this_bin in range(bin_id_min, bin_id_max + 1):
                 this_bin = str(this_bin)
                 if this_bin not in self._all_planes:
-                    raise ValueError(
-                        f"Bin {this_bin} is not contained in this maptree."
-                    )
+                    raise ValueError(f"Bin {this_bin} is not contained in this maptree.")
 
                 self._active_planes.append(this_bin)
 
@@ -304,9 +302,7 @@ class HAL(PluginPrototype):
             for this_bin in bin_list:
                 # if not this_bin in self._all_planes:
                 if this_bin not in self._all_planes:
-                    raise ValueError(
-                        f"Bin {this_bin} is not contained in this maptree."
-                    )
+                    raise ValueError(f"Bin {this_bin} is not contained in this maptree.")
 
                 self._active_planes.append(this_bin)
 
@@ -750,9 +746,7 @@ class HAL(PluginPrototype):
 
         yerr = [yerr_high, yerr_low]
 
-        return self._plot_spectrum(
-            net_counts, yerr, model_only, residuals, residuals_err
-        )
+        return self._plot_spectrum(net_counts, yerr, model_only, residuals, residuals_err)
 
     def _plot_spectrum(self, net_counts, yerr, model_only, residuals, residuals_err):
         fig, subs = plt.subplots(
@@ -1027,9 +1021,7 @@ class HAL(PluginPrototype):
             )
 
             # Now multiply by the pixel area of the new map to go back to flux
-            this_model_map_hpx *= hp.nside2pixarea(
-                data_analysis_bin.nside, degrees=True
-            )
+            this_model_map_hpx *= hp.nside2pixarea(data_analysis_bin.nside, degrees=True)
 
         else:
             # No sources
@@ -1154,9 +1146,7 @@ class HAL(PluginPrototype):
             subs[i][0].set_title("model, bin {}".format(data_analysis_bin.name))
 
             # Plot data map
-            images[1] = subs[i][1].imshow(
-                proj_data, origin="lower", vmin=vmin, vmax=vmax
-            )
+            images[1] = subs[i][1].imshow(proj_data, origin="lower", vmin=vmin, vmax=vmax)
             subs[i][1].set_title("excess, bin {}".format(data_analysis_bin.name))
 
             # Plot background map.
@@ -1276,9 +1266,7 @@ class HAL(PluginPrototype):
             raise ValueError(f"{plane_id} not a plane in the current model")
 
         model_map = SparseHealpix(
-            self._get_expectation(
-                self._maptree[plane_id], plane_id, n_pt_src, n_ext_src
-            ),
+            self._get_expectation(self._maptree[plane_id], plane_id, n_pt_src, n_ext_src),
             self._active_pixels[plane_id],
             self._maptree[plane_id].observation_map.nside,
         )
@@ -1351,17 +1339,13 @@ class HAL(PluginPrototype):
         if return_map:
             return new_map_tree
 
-    def write_model_map(
-        self, file_name, poisson_fluctuate=False, test_return_map=False
-    ):
+    def write_model_map(self, file_name, poisson_fluctuate=False, test_return_map=False):
         """
         This function writes the model map to a file.
         The interface is based off of HAWCLike for consistency
         """
         if test_return_map:
-            log.warning(
-                "test_return_map=True should only be used for testing purposes!"
-            )
+            log.warning("test_return_map=True should only be used for testing purposes!")
         return self._write_a_map(file_name, "model", poisson_fluctuate, test_return_map)
 
     def write_residual_map(self, file_name, test_return_map=False):
@@ -1370,7 +1354,5 @@ class HAL(PluginPrototype):
         The interface is based off of HAWCLike for consistency
         """
         if test_return_map:
-            log.warning(
-                "test_return_map=True should only be used for testing purposes!"
-            )
+            log.warning("test_return_map=True should only be used for testing purposes!")
         return self._write_a_map(file_name, "residual", False, test_return_map)
