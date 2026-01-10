@@ -467,33 +467,24 @@ class HAL(PluginPrototype):
         self,
         ra: float,
         dec: float,
-        active_planes: list = None,
+        active_planes: list | None = None,
         max_radius: float = 3.0,
         n_radial_bins: int = 30,
-        model_to_subtract: astromodels.Model = None,
+        model_to_subtract: astromodels.Model | None = None,
         subtract_model_from_model: bool = False,
-    ):
-        """Calculates radial profiles for a source in units of excess counts
-           per steradian
+    ) -> tuple[*tuple[NDArray[np.float64], ...], list[str]]:
+        """Calculate the radial profile for a source in units of excess counts per
+        steradian
 
-        Args:
-            ra (float): RA of origin of radial profile
-            dec (float): Declincation of origin of radial profile
-            active_planes (np.ndarray, optional): List of active planes over
-            which to average. Defaults to None.
-            max_radius (float, optional): Radius up to which evaluate the
-            radial profile. Defaults to 3.0.
-            n_radial_bins (int, optional): Number of radial bins to use for
-            the profile. Defaults to 30.
-            model_to_subtract (astromodels.model, optional): Another model to
-            subtract from the data excess. Defaults to None.
-            subtract_model_from_model (bool, optional): If True, and
-            model_to_subtract is not None,
-            subtract model from model too. Defaults to False.
-
-        Returns:
-            tuple(np.ndarray): returns list of radial distances, excess expected
-            counts, excess counts, counts uncertainty, and list of sorted active_planes
+        :param ra: RA (J2000) of origin of radial profile
+        :param dec: Dec (J2000) of origin of radial profile
+        :param active_planes: List of active planes over which to average.
+        :param max_radius: Radius up to which to evaluate the radial profile.
+        :param n_radial_bins: Number of radial bins to use for the profile.
+        :param model_to_subtract: Another model instance to subtract the data.
+        :param subtract_model_from_model: Allows to subtract from the model as well
+        :return: returns list of radial distances, expected excess, excess counts, error,
+        and list of sorted planes.
         """
         # default is to use all active bins
         if active_planes is None:
@@ -511,10 +502,7 @@ class HAL(PluginPrototype):
         # The area of each ring is then given by the difference between two
         # subsequent circe areas.
         area = np.array(
-            [
-                self.get_excess_background(ra, dec, r + offset * delta_r)[0]
-                for r in radii
-            ]
+            [self.get_excess_background(ra, dec, r + offset * delta_r)[0] for r in radii]
         )
 
         temp = area[1:] - area[:-1]
@@ -522,10 +510,7 @@ class HAL(PluginPrototype):
 
         # signals
         signal = np.array(
-            [
-                self.get_excess_background(ra, dec, r + offset * delta_r)[1]
-                for r in radii
-            ]
+            [self.get_excess_background(ra, dec, r + offset * delta_r)[1] for r in radii]
         )
 
         temp = signal[1:] - signal[:-1]
@@ -533,10 +518,7 @@ class HAL(PluginPrototype):
 
         # backgrounds
         bkg = np.array(
-            [
-                self.get_excess_background(ra, dec, r + offset * delta_r)[2]
-                for r in radii
-            ]
+            [self.get_excess_background(ra, dec, r + offset * delta_r)[2] for r in radii]
         )
 
         temp = bkg[1:] - bkg[:-1]
@@ -547,10 +529,7 @@ class HAL(PluginPrototype):
         # model
         # convert 'top hat' excess into 'ring' excesses.
         model = np.array(
-            [
-                self.get_excess_background(ra, dec, r + offset * delta_r)[3]
-                for r in radii
-            ]
+            [self.get_excess_background(ra, dec, r + offset * delta_r)[3] for r in radii]
         )
 
         temp = model[1:] - model[:-1]
@@ -584,7 +563,7 @@ class HAL(PluginPrototype):
         # them to the data later. Weight is normalized (sum of weights over
         # the bins = 1).
 
-        np.array(self.get_excess_background(ra, dec, max_radius)[1])[good_planes]
+        # np.array(self.get_excess_background(ra, dec, max_radius)[1])[good_planes]
 
         total_bkg = np.array(self.get_excess_background(ra, dec, max_radius)[2])[
             good_planes
