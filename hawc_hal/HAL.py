@@ -605,9 +605,15 @@ class HAL(PluginPrototype):
         bkg = bkg[:, good_planes]
 
         # average over the analysis bins
-        excess_data = np.average(signal / area, weights=weight, axis=1)
-        excess_error = np.sqrt(np.sum(counts * weight * weight / (area * area), axis=1))
-        excess_model = np.average(model / area, weights=weight, axis=1)
+        excess_data: NDArray[np.float64] = w.sum() * np.average(
+            signal / area, weights=weight, axis=1
+        )
+        excess_error: NDArray[np.float64] = w.sum() * np.sqrt(
+            np.sum(counts * weight * weight / (area * area), axis=1)
+        )
+        excess_model: NDArray[np.float64] = w.sum() * np.average(
+            model / area, weights=weight, axis=1
+        )
 
         return radii, excess_model, excess_data, excess_error, sorted(plane_ids)
 
