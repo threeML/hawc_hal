@@ -1,43 +1,49 @@
-from __future__ import division
-from __future__ import absolute_import
-from builtins import range
-from builtins import object
-from past.utils import old_div
+from __future__ import absolute_import, division
+
+from builtins import object, range
+
 import numpy as np
-from numpy.fft import rfftn, irfftn
-#from scipy.signal import fftconvolve
+from numpy.fft import irfftn, rfftn
+from past.utils import old_div
+
+# from scipy.signal import fftconvolve
 from scipy.fftpack import helper
 
-
 from .psf_interpolator import PSFInterpolator
-from .psf_wrapper import PSFWrapper
 
 
 class PSFConvolutor(object):
-
     def __init__(self, psf_wrapper, flat_sky_proj):
-
         self._psf = psf_wrapper  # type: PSFWrapper
         self._flat_sky_proj = flat_sky_proj
 
         # Compute an image of the PSF on the current defined flat sky projection
         interpolator = PSFInterpolator(psf_wrapper, flat_sky_proj)
-        psf_stamp = interpolator.point_source_image(flat_sky_proj.ra_center, flat_sky_proj.dec_center)
+        psf_stamp = interpolator.point_source_image(
+            flat_sky_proj.ra_center, flat_sky_proj.dec_center
+        )
 
         # Crop the kernel at the appropriate radius for this PSF (making sure is divisible by 2)
-        kernel_radius_px = int(np.ceil(old_div(self._psf.kernel_radius, flat_sky_proj.pixel_size)))
+        kernel_radius_px = int(
+            np.ceil(old_div(self._psf.kernel_radius, flat_sky_proj.pixel_size))
+        )
         pixels_to_keep = kernel_radius_px * 2
 
-        assert pixels_to_keep <= psf_stamp.shape[0] and \
-               pixels_to_keep <= psf_stamp.shape[1], \
+        assert (
+            pixels_to_keep <= psf_stamp.shape[0] and pixels_to_keep <= psf_stamp.shape[1]
+        ), (
             "The kernel is too large with respect to the model image. Enlarge your model radius."
+        )
 
         xoff = (psf_stamp.shape[0] - pixels_to_keep) // 2
         yoff = (psf_stamp.shape[1] - pixels_to_keep) // 2
 
         self._kernel = psf_stamp[yoff:-yoff, xoff:-xoff]
 
-        assert np.isclose(self._kernel.sum(), 1.0, rtol=1e-2), "Failed to generate proper kernel normalization: got _kernel.sum() = %f; expected 1.0+-0.01." % self._kernel.sum()
+        assert np.isclose(self._kernel.sum(), 1.0, rtol=1e-2), (
+            "Failed to generate proper kernel normalization: got _kernel.sum() = %f; expected 1.0+-0.01."
+            % self._kernel.sum()
+        )
 
         # Renormalize to exactly 1
         self._kernel = old_div(self._kernel, self._kernel.sum())
@@ -65,12 +71,15 @@ class PSFConvolutor(object):
     #     return conv
 
     def extended_source_image(self, ideal_image):
-
         # Convolve
 
-        assert np.alltrue(ideal_image.shape == self._expected_shape), "Shape of image to be convolved is not correct."
+        assert np.all(ideal_image.shape == self._expected_shape), (
+            "Shape of image to be convolved is not correct."
+        )
 
-        ret = irfftn(rfftn(ideal_image, self._fshape) * self._psf_fft, self._fshape)[self._fslice].copy()
+        ret = irfftn(rfftn(ideal_image, self._fshape) * self._psf_fft, self._fshape)[
+            self._fslice
+        ].copy()
 
         conv = _centered(ret, self._expected_shape)
 

@@ -43,7 +43,7 @@ class MaptreeMetaData:
         return self._legacy_convention
 
     @property
-    def analysis_bin_names(self) -> NDArray[np.string_]:
+    def analysis_bin_names(self) -> NDArray[np.bytes_]:
         """Get the analysis bin names contained within the maptree"""
         if self.maptree_ttree_directory.get("BinInfo/name", None) is not None:
             return self.maptree_ttree_directory["BinInfo/name"].array().to_numpy()
