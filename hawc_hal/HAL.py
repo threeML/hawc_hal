@@ -14,6 +14,7 @@ import pandas as pd
 from astromodels import Parameter
 from astropy.convolution import Gaussian2DKernel
 from astropy.convolution import convolve_fft as convolve
+from numpy.typing import NDArray
 from past.utils import old_div
 from scipy.stats import poisson
 from threeML.io.logging import setup_logger
@@ -22,12 +23,17 @@ from threeML.plugin_prototype import PluginPrototype
 from threeML.utils.statistics.gammaln import logfactorial
 from tqdm.auto import tqdm
 
-from hawc_hal.convolved_source import (ConvolvedExtendedSource2D,
-                                       ConvolvedExtendedSource3D,
-                                       ConvolvedPointSource,
-                                       ConvolvedSourcesContainer)
-from hawc_hal.healpix_handling import (FlatSkyToHealpixTransform,
-                                       SparseHealpix, get_gnomonic_projection)
+from hawc_hal.convolved_source import (
+    ConvolvedExtendedSource2D,
+    ConvolvedExtendedSource3D,
+    ConvolvedPointSource,
+    ConvolvedSourcesContainer,
+)
+from hawc_hal.healpix_handling import (
+    FlatSkyToHealpixTransform,
+    SparseHealpix,
+    get_gnomonic_projection,
+)
 from hawc_hal.log_likelihood import log_likelihood
 from hawc_hal.maptree import map_tree_factory
 from hawc_hal.maptree.data_analysis_bin import DataAnalysisBin
@@ -200,10 +206,9 @@ class HAL(PluginPrototype):
 
     @psf_integration_method.setter
     def psf_integration_method(self, mode):
-        assert mode.lower() in [
-            "exact",
-            "fast",
-        ], "PSF integration method must be either 'exact' or 'fast'"
+        assert mode.lower() in ["exact", "fast"], (
+            "PSF integration method must be either 'exact' or 'fast'"
+        )
 
         self._psf_integration_method = mode.lower()
 
@@ -269,9 +274,9 @@ class HAL(PluginPrototype):
 
         # Check for legal input
         if bin_id_min is not None:
-            assert (
-                bin_id_max is not None
-            ), "If you provide a minimum bin, you also need to provide a maximum bin."
+            assert bin_id_max is not None, (
+                "If you provide a minimum bin, you also need to provide a maximum bin."
+            )
 
             # Make sure they are integers
             bin_id_min = int(bin_id_min)
@@ -286,9 +291,9 @@ class HAL(PluginPrototype):
                 self._active_planes.append(this_bin)
 
         else:
-            assert (
-                bin_id_max is None
-            ), "If you provie a maximum bin, you also need to provide a minimum bin."
+            assert bin_id_max is None, (
+                "If you provie a maximum bin, you also need to provide a minimum bin."
+            )
 
             assert bin_list is not None
 
@@ -385,25 +390,18 @@ class HAL(PluginPrototype):
 
                 self._convolved_ext_sources.append(this_convolved_ext_source)
 
-    def get_excess_background(self, ra: float, dec: float, radius: float):
-        """Calculates excess (data-bkg), background, and model counts at
-        different radial distances from origin of radial profile.
+    def get_excess_background(
+        self, ra: float, dec: float, radius: float
+    ) -> tuple[NDArray[np.float64], ...]:
+        """Calculate excess (data-bkg), background, and model counts at different radial
+        distances from a source.
 
-
-        Parameters
-        ----------
-        ra : float
-            RA of origin of radial profile
-        dec : float
-           Dec of origin of radial profile
-        radius : float
-           distance from origin of radial profile
-
-        Returns
-        -------
-           returns a tuple of numpy arrays with info of areas (steradian) and
-           signal excess, background, and model in units of counts to be used
-           in the get_radial_profile method.
+        :param ra: RA coordinate (J2000)
+        :param dec: Dec coordinate (J2000)
+        :param radius: Distance from origin
+        :return: returns a tuple of numpy arrays with info of areas (steradian), signal
+        excess, background, and expected excess (model) in units of counts to be used in
+        the `get_radial_profile_method`
         """
 
         radius_radians = np.deg2rad(radius)
@@ -413,7 +411,8 @@ class HAL(PluginPrototype):
         observation = np.zeros_like(total_counts)
         model = np.zeros_like(total_counts)
         signal = np.zeros_like(total_counts)
-        area = np.zeros_like(total_counts)
+
+        this_nside = self._maptree[self._active_planes[0]].observation_map.nside
 
         n_point_sources = self._likelihood_model.get_number_of_point_sources()
         n_ext_sources = self._likelihood_model.get_number_of_extended_sources()
@@ -421,23 +420,23 @@ class HAL(PluginPrototype):
         longitude = ra_to_longitude(ra)
         latitude = dec
         center = hp.ang2vec(longitude, latitude, lonlat=True)
+        radial_bin_pixels = hp.query_disc(
+            this_nside, center, radius_radians, inclusive=False
+        )
+
+        # NOTE: calculate the areas per bin by the product
+        # of pixel area by the number of pixels at each radial bin
+        area = np.full(
+            total_counts.shape,
+            fill_value=hp.nside2pixarea(this_nside) * radial_bin_pixels.shape[0],
+        )
+        # NOTE: select active pixels according to each radial bin
+        this_radial_bin_active_pixels = np.isin(
+            self._active_pixels[self._active_planes[0]], radial_bin_pixels
+        )
 
         for i, energy_id in enumerate(self._active_planes):
             data_analysis_bin = self._maptree[energy_id]
-            this_nside = data_analysis_bin.observation_map.nside
-
-            radial_bin_pixels = hp.query_disc(
-                this_nside, center, radius_radians, inclusive=False
-            )
-
-            # calculate the areas per bin by the product
-            # of pixel area by the number of pixels at each radial bin
-            area[i] = hp.nside2pixarea(this_nside) * radial_bin_pixels.shape[0]
-
-            # NOTE: select active pixels according to each radial bin
-            bin_active_pixel_indexes = np.intersect1d(
-                self._active_pixels[energy_id], radial_bin_pixels, return_indices=True
-            )[1]
 
             # obtain the excess, background, and expected excess at
             # each radial bin
@@ -449,13 +448,9 @@ class HAL(PluginPrototype):
 
             # select counts only from the pixels within specifid distance from
             # origin of radial profile
-            bin_data = np.array([data[i] for i in bin_active_pixel_indexes])
-            bin_bkg = np.array([bkg[i] for i in bin_active_pixel_indexes])
-            bin_model = np.array([mdl[i] for i in bin_active_pixel_indexes])
-
-            this_data_tot = np.sum(bin_data)
-            this_bkg_tot = np.sum(bin_bkg)
-            this_model_tot = np.sum(bin_model)
+            this_data_tot = data[this_radial_bin_active_pixels].sum()
+            this_bkg_tot = bkg[this_radial_bin_active_pixels].sum()
+            this_model_tot = mdl[this_radial_bin_active_pixels].sum()
 
             background[i] = this_bkg_tot
             observation[i] = this_data_tot
@@ -468,33 +463,24 @@ class HAL(PluginPrototype):
         self,
         ra: float,
         dec: float,
-        active_planes: list = None,
+        active_planes: list | None = None,
         max_radius: float = 3.0,
         n_radial_bins: int = 30,
-        model_to_subtract: astromodels.Model = None,
+        model_to_subtract: astromodels.Model | None = None,
         subtract_model_from_model: bool = False,
-    ):
-        """Calculates radial profiles for a source in units of excess counts
-           per steradian
+    ) -> tuple[*tuple[NDArray[np.float64], ...], list[str]]:
+        """Calculate the radial profile for a source in units of excess counts per
+        steradian
 
-        Args:
-            ra (float): RA of origin of radial profile
-            dec (float): Declincation of origin of radial profile
-            active_planes (np.ndarray, optional): List of active planes over
-            which to average. Defaults to None.
-            max_radius (float, optional): Radius up to which evaluate the
-            radial profile. Defaults to 3.0.
-            n_radial_bins (int, optional): Number of radial bins to use for
-            the profile. Defaults to 30.
-            model_to_subtract (astromodels.model, optional): Another model to
-            subtract from the data excess. Defaults to None.
-            subtract_model_from_model (bool, optional): If True, and
-            model_to_subtract is not None,
-            subtract model from model too. Defaults to False.
-
-        Returns:
-            tuple(np.ndarray): returns list of radial distances, excess expected
-            counts, excess counts, counts uncertainty, and list of sorted active_planes
+        :param ra: RA (J2000) of origin of radial profile
+        :param dec: Dec (J2000) of origin of radial profile
+        :param active_planes: List of active planes over which to average.
+        :param max_radius: Radius up to which to evaluate the radial profile.
+        :param n_radial_bins: Number of radial bins to use for the profile.
+        :param model_to_subtract: Another model instance to subtract the data.
+        :param subtract_model_from_model: Allows to subtract from the model as well
+        :return: returns list of radial distances, expected excess, excess counts, error,
+        and list of sorted planes.
         """
         # default is to use all active bins
         if active_planes is None:
@@ -573,7 +559,7 @@ class HAL(PluginPrototype):
         # them to the data later. Weight is normalized (sum of weights over
         # the bins = 1).
 
-        np.array(self.get_excess_background(ra, dec, max_radius)[1])[good_planes]
+        # np.array(self.get_excess_background(ra, dec, max_radius)[1])[good_planes]
 
         total_bkg = np.array(self.get_excess_background(ra, dec, max_radius)[2])[
             good_planes
@@ -594,9 +580,15 @@ class HAL(PluginPrototype):
         bkg = bkg[:, good_planes]
 
         # average over the analysis bins
-        excess_data = np.average(signal / area, weights=weight, axis=1)
-        excess_error = np.sqrt(np.sum(counts * weight * weight / (area * area), axis=1))
-        excess_model = np.average(model / area, weights=weight, axis=1)
+        excess_data: NDArray[np.float64] = w.sum() * np.average(
+            signal / area, weights=weight, axis=1
+        )
+        excess_error: NDArray[np.float64] = w.sum() * np.sqrt(
+            np.sum(counts * weight * weight / (area * area), axis=1)
+        )
+        excess_model: NDArray[np.float64] = w.sum() * np.average(
+            model / area, weights=weight, axis=1
+        )
 
         return radii, excess_model, excess_data, excess_error, sorted(plane_ids)
 
@@ -604,64 +596,50 @@ class HAL(PluginPrototype):
         self,
         ra: float,
         dec: float,
-        active_planes: list = None,
+        active_planes: list | None = None,
         max_radius: float = 3.0,
         n_radial_bins: int = 30,
-        model_to_subtract: astromodels.Model = None,
+        model_to_subtract: astromodels.Model | None = None,
         subtract_model_from_model: bool = False,
     ):
-        """Plots radial profiles of data-background & model
+        """Plots radial profiles in units of counts/steradian
 
-        Args:
-            ra (float): RA of origin of radial profile
-            dec (float): Declination of origin of radial profile.
-            active_planes (np.ndarray, optional): List of analysis bins over
-            which to average.
-            Defaults to None.
-            max_radius (float, optional): Radius up to which the radial profile
-            is evaluate; also used as the radius for the disk to calculate the
-            gamma/hadron weights. Defaults to 3.0.
-            n_radial_bins (int, optional): number of radial bins used for ring
-            calculation. Defaults to 30.
-            model_to_subtract (astromodels.model, optional): Another model that
-            is to be subtracted from the data excess. Defaults to None.
-            subtract_model_from_model (bool, optional): If True and
-            model_to_subtract is not None, subtract from model too.
-            Defaults to False.
-
-        Returns:
-            tuple(matplotlib.pyplot.Figure, pd.DataFrame): plot of data-background
-            & model radial profile for source and a dataframe with all
-            values for easy retrieval
+        :param ra: RA (J2000) of origin of radial profile.
+        :param dec: Dec (J2000) of origin of radial profile.
+        :param active_planes: List of analysis bins over which to average over.
+        :param max_radius: Maximum radius upt ot which evaluate the radial profile.
+        :param n_radial_bins: Number of radial bins used for ring calculation.
+        :param model_to_subtract: Another model instance that is to be subtracted from the
+        excess signal.
+        :param subtract_model_from_model: Subtract also from the model the new model
+        instance
+        :return: Figure instance of radial plot and a pandas dataframe with information of
+        radial profile.
         """
 
-        (
-            radii,
-            excess_model,
-            excess_data,
-            excess_error,
-            plane_ids,
-        ) = self.get_radial_profile(
-            ra,
-            dec,
-            active_planes,
-            max_radius,
-            n_radial_bins,
-            model_to_subtract,
-            subtract_model_from_model,
+        (radii, excess_model, excess_data, excess_error, plane_ids) = (
+            self.get_radial_profile(
+                ra,
+                dec,
+                active_planes,
+                max_radius,
+                n_radial_bins,
+                model_to_subtract,
+                subtract_model_from_model,
+            )
         )
 
         # add a dataframe for easy retrieval for calculations of surface
         # brighntess, if necessary.
-        df = pd.DataFrame(columns=["Excess", "Bkg", "Model"], index=radii)
+        df = pd.DataFrame(columns=["Excess", "Error", "Model"], index=radii)
         df.index.name = "Radii"
         df["Excess"] = excess_data
         df["Bkg"] = excess_error
         df["Model"] = excess_model
 
-        fig, ax = plt.subplots(figsize=(10, 8))
+        fig, ax = plt.subplots(figsize=(7, 5))
 
-        plt.errorbar(
+        ax.errorbar(
             radii,
             excess_data,
             yerr=excess_error,
@@ -671,27 +649,14 @@ class HAL(PluginPrototype):
             fmt=".",
         )
 
-        plt.plot(radii, excess_model, color="red", label="Model")
-
-        plt.legend(bbox_to_anchor=(1.0, 1.0), loc="upper right", numpoints=1, fontsize=16)
-        plt.axhline(0, color="deepskyblue", linestyle="--")
-
-        x_limits = [0, max_radius]
-        plt.xlim(x_limits)
-        plt.xticks(fontsize=18)
-        plt.yticks(fontsize=18)
-
-        plt.ylabel(r"Apparent Radial Excess [sr$^{-1}$]", fontsize=18)
-        plt.xlabel(
-            f"Distance from source at ({ra:0.2f} $^{{\circ}}$, {dec:0.2f} $^{{\circ}}$)",
-            fontsize=18,
-        )
+        ax.plot(radii, excess_model, color="red", label="Model")
 
         if len(plane_ids) == 1:
             title = f"Radial Profile, bin {plane_ids[0]}"
 
         else:
             title = "Radial Profile"
+            # TODO: figure a nicer way to format this
             # tmptitle = f"Radial Profile, bins \n{plane_ids}"
             # width = 80
             # title = "\n".join(
@@ -699,19 +664,20 @@ class HAL(PluginPrototype):
             # )
             # title = tmptitle
 
-        plt.title(title)
-
+        ax.set_ylabel(r"Apparent Radial Excess [sr$^{-1}$]", fontsize=14)
+        ax.set_xlabel(
+            f"Distance from source at ({ra:0.2f} $^{{\circ}}$, {dec:0.2f} $^{{\circ}}$)",
+            fontsize=14,
+        )
+        ax.legend(bbox_to_anchor=(1.0, 1.0), loc="upper right", numpoints=1, fontsize=12)
+        ax.axhline(0, color="deepskyblue", linestyle="--")
+        ax.set_xlim(left=0, right=max_radius)
+        ax.tick_params(axis="both", labelsize=14)
+        ax.set_title(title)
         ax.grid(True)
 
         with contextlib.suppress(Exception):
             plt.tight_layout()
-        # try:
-        #
-        # plt.tight_layout()
-        #
-        # except Exception:
-        #
-        # pass
 
         return fig, df
 
@@ -848,7 +814,9 @@ class HAL(PluginPrototype):
             assert (
                 n_point_sources == self._convolved_point_sources.n_sources_in_cache
                 and n_ext_sources == self._convolved_ext_sources.n_sources_in_cache
-            ), "The number of sources has changed. Please re-assign the model to the plugin."
+            ), (
+                "The number of sources has changed. Please re-assign the model to the plugin."
+            )
 
         # This will hold the total log-likelihood
 
