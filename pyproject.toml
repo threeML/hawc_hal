@@ -14,7 +14,7 @@ description = "HAWC Accelerated Likelihood; Read and handle HAWC data"
 license = "BSD-3-Clause"
 packages = [{ include = "hawc_hal" }, { include = "scripts" }]
 
-[tool.project.urls]
+[tool.poetry.urls]
 homepage = "https://threeml.readthedocs.io/en/stable/index.html"
 repository = "https://github.com/threeML/hawc_hal"
 documentation = "https://threeml.readthedocs.io/en/stable/notebooks/hal_example.html"
@@ -84,11 +84,10 @@ exclude = [
 ]
 line-length = 88
 indent-width = 4
+docstring-code-format = false
 
 
 [tool.ruff.format]
-docstring-code-format = false
-
 # Like Black, use double quotes for strings.
 quote-style = "double"
 
