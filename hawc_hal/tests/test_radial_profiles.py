@@ -1,9 +1,7 @@
 from __future__ import print_function
 
 import matplotlib.pyplot as plt
-import pandas as pd
 import pytest
-from conftest import point_source_model
 from threeML import *
 from tqdm import tqdm
 
@@ -46,24 +44,17 @@ def test_plots(test_fit):
 
     ra = pts_model.pts.position.ra.value
     dec = pts_model.pts.position.dec.value
-    radius = 1.5
+    radius = 2.0
 
     bins = hawc._active_planes
 
-    fig, table = hawc.plot_radial_profile(
-        ra,
-        dec,
-        bins,
-        radius,
-        n_radial_bins=25,
-    )
+    fig, table = hawc.plot_radial_profile(ra, dec, bins, radius, n_radial_bins=15)
     fig.savefig("hal_src_radial_profile.png")
     table.to_hdf("hal_src_radial_table.hd5", key="radial")
 
     prog_bar = tqdm(total=len(hawc._active_planes), desc="Smoothing planes")
     for bin in hawc._active_planes:
-
-        fig, table = hawc.plot_radial_profile(ra, dec, f"{bin}", radius)
+        fig, table = hawc.plot_radial_profile(ra, dec, f"{bin}", radius, n_radial_bins=15)
         fig.savefig(f"hal_src_radial_profile_bin{bin}.png")
 
         table.to_hdf(f"hal_src_radial_table_{bin}.hd5", key="radial")

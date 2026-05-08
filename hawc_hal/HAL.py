@@ -4,6 +4,7 @@ import collections
 import contextlib
 import copy
 from builtins import range, str
+from functools import lru_cache
 from typing import Union
 
 import astromodels
@@ -391,7 +392,11 @@ class HAL(PluginPrototype):
                 self._convolved_ext_sources.append(this_convolved_ext_source)
 
     def get_excess_background(
-        self, ra: float, dec: float, radius: float
+        self,
+        ra: float,
+        dec: float,
+        radius: float,
+        exclusion_regions: list[tuple[float, float, float]] | None = None,
     ) -> tuple[NDArray[np.float64], ...]:
         """Calculate excess (data-bkg), background, and model counts at different radial
         distances from a source.
@@ -406,32 +411,41 @@ class HAL(PluginPrototype):
 
         radius_radians = np.deg2rad(radius)
 
-        total_counts = np.zeros(len(self._active_planes), dtype=float)
-        background = np.zeros_like(total_counts)
-        observation = np.zeros_like(total_counts)
-        model = np.zeros_like(total_counts)
-        signal = np.zeros_like(total_counts)
+        nplanes = len(self._active_planes)
+        background = np.zeros(nplanes, dtype=float)
+        observation = np.zeros(nplanes, dtype=float)
+        model = np.zeros(nplanes, dtype=float)
+        signal = np.zeros(nplanes, dtype=float)
 
         this_nside = self._maptree[self._active_planes[0]].observation_map.nside
 
-        n_point_sources = self._likelihood_model.get_number_of_point_sources()
-        n_ext_sources = self._likelihood_model.get_number_of_extended_sources()
+        n_point_sources: int = self._likelihood_model.get_number_of_point_sources()  # ty:ignore[unresolved-attribute]
+        n_ext_sources: int = self._likelihood_model.get_number_of_extended_sources()  # ty:ignore[unresolved-attribute]
 
-        longitude = ra_to_longitude(ra)
-        latitude = dec
-        center = hp.ang2vec(longitude, latitude, lonlat=True)
-        radial_bin_pixels = hp.query_disc(
-            this_nside, center, radius_radians, inclusive=False
-        )
+        # longitude = ra_to_longitude(ra)
+        # latitude = dec
+        # center = hp.ang2vec(longitude, latitude, lonlat=True)
+        # radial_bin_pixels = hp.query_disc(
+        #     this_nside, center, radius_radians, inclusive=False
+        # )
+        radial_bin_pixels = self._query_disc_pixels(this_nside, ra, dec, radius_radians)
 
+        # remove excluded pixels and correct for area accordingly
+        if exclusion_regions:
+            for exc_ra, exc_dec, exc_r in exclusion_regions:
+                exc_pix = self._query_disc_pixels(
+                    this_nside, exc_ra, exc_dec, np.deg2rad(exc_r)
+                )
+
+                radial_bin_pixels = np.setdiff1d(
+                    radial_bin_pixels, exc_pix, assume_unique=True
+                )
         # NOTE: calculate the areas per bin by the product
         # of pixel area by the number of pixels at each radial bin
-        area = np.full(
-            total_counts.shape,
-            fill_value=hp.nside2pixarea(this_nside) * radial_bin_pixels.shape[0],
-        )
+        pixel_area_sr = hp.nside2pixarea(this_nside)
+        area = np.full(nplanes, fill_value=pixel_area_sr * radial_bin_pixels.shape[0])
         # NOTE: select active pixels according to each radial bin
-        this_radial_bin_active_pixels = np.isin(
+        active_mask = np.isin(
             self._active_pixels[self._active_planes[0]], radial_bin_pixels
         )
 
@@ -448,9 +462,9 @@ class HAL(PluginPrototype):
 
             # select counts only from the pixels within specifid distance from
             # origin of radial profile
-            this_data_tot = data[this_radial_bin_active_pixels].sum()
-            this_bkg_tot = bkg[this_radial_bin_active_pixels].sum()
-            this_model_tot = mdl[this_radial_bin_active_pixels].sum()
+            this_data_tot = data[active_mask].sum()
+            this_bkg_tot = bkg[active_mask].sum()
+            this_model_tot = mdl[active_mask].sum()
 
             background[i] = this_bkg_tot
             observation[i] = this_data_tot
@@ -468,6 +482,7 @@ class HAL(PluginPrototype):
         n_radial_bins: int = 30,
         model_to_subtract: astromodels.Model | None = None,
         subtract_model_from_model: bool = False,
+        exclusion_regions: list[tuple[float, float, float]] | None = None,
     ) -> tuple[*tuple[NDArray[np.float64], ...], list[str]]:
         """Calculate the radial profile for a source in units of excess counts per
         steradian
@@ -487,49 +502,31 @@ class HAL(PluginPrototype):
             active_planes = self._active_planes
 
         # Make sure we use bins with data
-        good_planes = [plane_id in active_planes for plane_id in self._active_planes]
-        plane_ids = set(active_planes) & set(self._active_planes)
+        good_planes = [p in active_planes for p in self._active_planes]
+        plane_ids = sorted(set(active_planes) & set(self._active_planes))
 
         offset = 0.5
         delta_r = 1.0 * max_radius / n_radial_bins
         radii = np.array([delta_r * (r + offset) for r in range(n_radial_bins)])
+        query_r = radii + offset * delta_r
 
-        # Get area of all pixels in a given circle
-        # The area of each ring is then given by the difference between two
-        # subsequent circe areas.
-        area = np.array(
-            [self.get_excess_background(ra, dec, r + offset * delta_r)[0] for r in radii]
-        )
+        results = [
+            self.get_excess_background(ra, dec, r, exclusion_regions) for r in query_r
+        ]
 
-        temp = area[1:] - area[:-1]
-        area[1:] = temp
+        tophat_area = np.array([res[0] for res in results])
+        tophat_signal = np.array([res[1] for res in results])
+        tophat_bkg = np.array([res[2] for res in results])
+        tophat_model = np.array([res[3] for res in results])
 
-        # signals
-        signal = np.array(
-            [self.get_excess_background(ra, dec, r + offset * delta_r)[1] for r in radii]
-        )
+        def _to_rings(cumulative: NDArray) -> NDArray:
+            padded = np.vstack([np.zeros((1, cumulative.shape[1])), cumulative])
+            return np.diff(padded, axis=0)
 
-        temp = signal[1:] - signal[:-1]
-        signal[1:] = temp
-
-        # backgrounds
-        bkg = np.array(
-            [self.get_excess_background(ra, dec, r + offset * delta_r)[2] for r in radii]
-        )
-
-        temp = bkg[1:] - bkg[:-1]
-        bkg[1:] = temp
-
-        counts = signal + bkg
-
-        # model
-        # convert 'top hat' excess into 'ring' excesses.
-        model = np.array(
-            [self.get_excess_background(ra, dec, r + offset * delta_r)[3] for r in radii]
-        )
-
-        temp = model[1:] - model[:-1]
-        model[1:] = temp
+        area = _to_rings(tophat_area)
+        signal = _to_rings(tophat_signal)
+        bkg = _to_rings(tophat_bkg)
+        model = _to_rings(tophat_model)
 
         if model_to_subtract is not None:
             this_model = copy.deepcopy(self._likelihood_model)
@@ -537,60 +534,140 @@ class HAL(PluginPrototype):
 
             model_subtract = np.array(
                 [
-                    self.get_excess_background(ra, dec, r + offset * delta_r)[3]
-                    for r in radii
+                    self.get_excess_background(ra, dec, r, exclusion_regions)[3]
+                    for r in query_r
                 ]
             )
 
-            temp = model_subtract[1:] - model_subtract[:-1]
-            model_subtract[1:] = temp
-
-            signal -= model_subtract
+            sub_rings = _to_rings(model_subtract)
+            signal -= sub_rings
 
             if subtract_model_from_model:
-                model -= model_subtract
+                model -= sub_rings
 
             self.set_model(this_model)
-
-        # NOTE: weights are calculated as expected number of gamma-rays/number
-        # of background counts.here, use max_radius to evaluate the number of
-        # gamma-rays/bkg counts. The weights do not depend on the radius,
-        # but fill a matrix anyway so there's no confusion when multiplying
-        # them to the data later. Weight is normalized (sum of weights over
-        # the bins = 1).
-
-        # np.array(self.get_excess_background(ra, dec, max_radius)[1])[good_planes]
-
-        total_bkg = np.array(self.get_excess_background(ra, dec, max_radius)[2])[
-            good_planes
-        ]
-
-        total_model = np.array(self.get_excess_background(ra, dec, max_radius)[3])[
-            good_planes
-        ]
-
-        w = np.divide(total_model, total_bkg)
-        weight = np.array([w / np.sum(w) for _ in radii])
 
         # restrict profiles to the user-specified analysis bins
         area = area[:, good_planes]
         signal = signal[:, good_planes]
-        model = model[:, good_planes]
-        counts = counts[:, good_planes]
         bkg = bkg[:, good_planes]
+        model = model[:, good_planes]
 
-        # average over the analysis bins
-        excess_data: NDArray[np.float64] = w.sum() * np.average(
-            signal / area, weights=weight, axis=1
-        )
-        excess_error: NDArray[np.float64] = w.sum() * np.sqrt(
-            np.sum(counts * weight * weight / (area * area), axis=1)
-        )
-        excess_model: NDArray[np.float64] = w.sum() * np.average(
-            model / area, weights=weight, axis=1
-        )
+        # NOTE: weights are calculated as expected number of gamma-rays/number
+        # of background counts. Here, use max_radius to evaluate the number of
+        # gamma-rays/bkg counts. The weights do not depend on the radius,
+        # but fill a matrix anyway so there's no confusion when multiplying
+        # them to the data later. Weight is normalized (sum of weights over
+        # the bins = 1).
+        total_bkg = np.array(
+            self.get_excess_background(ra, dec, max_radius, exclusion_regions)[2]
+        )[good_planes]
 
-        return radii, excess_model, excess_data, excess_error, sorted(plane_ids)
+        total_model = np.array(
+            self.get_excess_background(ra, dec, max_radius, exclusion_regions)[3]
+        )[good_planes]
+
+        # After computing alpha (normalised weights)
+        n_radii = len(query_r)
+        excess_data = np.zeros(n_radii)
+        excess_error = np.zeros(n_radii)
+        excess_model = np.zeros(n_radii)
+
+        w = total_model / total_bkg
+        w = np.nan_to_num(w, nan=0.0, posinf=0.0)
+
+        if w.sum() == 0:
+            alpha = np.ones_like(w) / len(w)
+        else:
+            alpha = w / w.sum()
+
+        for r in range(n_radii):
+            x_data = signal[r, :] / area[r, :]
+            var_x = (signal[r, :] + bkg[r, :]) / (area[r, :] ** 2)
+            excess_data[r] = np.sum(alpha * x_data)
+            excess_error[r] = np.sqrt(np.sum(alpha**2 * var_x))
+
+            # Model: same weights, no error
+            x_model = model[r, :] / area[r, :]
+            excess_model[r] = np.sum(alpha * x_model)
+
+        return radii, excess_model, excess_data, excess_error, plane_ids
+
+    def get_radial_profile_sector(
+        self, ra: float, dec: float, phi_min: float, phi_max: float, **kwargs
+    ) -> tuple[*tuple[NDArray[np.float64], ...], list[str]]:
+        """Radial profile restricted to an azimuthal wedge [phi_min, phi_max].
+
+        Computes the same weighted excess counts per steradian as
+        `get_radial_profile` but only for pixels whose position angle
+        relative to the source falls within the requested sector.  This
+        allows morphology checks (e.g. comparing north vs south profiles)
+        or detection of source elongation.
+
+        The position angle φ is defined as degrees East of North (0–360),
+        following the standard astronomical convention:
+
+            φ = arctan2(Δeast, Δnorth)  mod 360°
+
+        where Δeast and Δnorth are the projections of the pixel offset
+        vector onto the local East and North tangent-plane directions,
+        computed via the unit vectors:
+
+            nortĥ = (−sin δ cos α,  −sin δ sin α,  cos δ)
+            êast  = (−sin α,          cos α,         0   )
+
+        with (α, δ) = (RA, Dec) of the source in radians.
+
+        :param ra: Source position (J2000, degrees).
+        :param dec: Source declination (J2000, degrees).
+        :param phi_min: Minimum angle boundary
+        :param phi_max: Maximum angle boundary
+        :return: Azimuth restricted profile with same tuple as `get_radial_profile`
+        """
+        this_nside = self._maptree[self._active_planes[0]].observation_map.nside
+        active_pix = self._active_pixels[self._active_planes[0]]
+        lon_rad = np.deg2rad(ra_to_longitude(ra))
+        lat_rad = np.deg2rad(dec)
+        north = np.array(
+            [
+                -np.sin(lat_rad) * np.cos(lon_rad),
+                -np.sin(lat_rad) * np.sin(lon_rad),
+                np.cos(lat_rad),
+            ]
+        )
+        east = np.array([-np.sin(lon_rad), np.cos(lon_rad), 0.0])
+
+        src_vec = hp.ang2vec(ra_to_longitude(ra), dec, lonlat=True)
+        pix_vecs = np.column_stack(hp.pix2vec(this_nside, active_pix))
+        delta = pix_vecs - src_vec
+
+        phi_angle = np.rad2deg(np.arctan2(delta @ east, delta @ north)) % 360.0
+        outside_pixels = active_pix[(phi_angle < phi_min) | (phi_angle >= phi_max)]
+
+        kwargs["excluded_pixels"] = outside_pixels
+        if "exclusion_regions" not in kwargs:
+            kwargs["exclusion_regions"] = None
+        return self.get_radial_profile(ra, dec, **kwargs)
+
+    @lru_cache(maxsize=256)
+    def _query_disc_pixels(
+        self,
+        nside: int,
+        ra: float,
+        dec: float,
+        radius_radians: float,
+        excluded_pixels: NDArray[np.int64] | None = None,
+    ) -> NDArray[np.intp]:
+        """Return cached HEALPix pixel indices inside *radius_radians* of (ra, dec).
+
+        Caching avoids redundant disc queries when the same geometry is
+        evaluated multiple times (e.g. during model subtraction).
+        """
+        center = hp.ang2vec(ra_to_longitude(ra), dec, lonlat=True)
+        pix = hp.query_disc(nside, center, radius_radians, inclusive=False)
+        if excluded_pixels is not None:
+            pix = np.setdiff1d(pix, excluded_pixels, assume_unique=True)
+        return pix
 
     def plot_radial_profile(
         self,
