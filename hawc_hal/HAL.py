@@ -391,12 +391,33 @@ class HAL(PluginPrototype):
 
                 self._convolved_ext_sources.append(this_convolved_ext_source)
 
+    @lru_cache(maxsize=256)
+    def _query_disc_pixels(
+        self,
+        nside: int,
+        ra: float,
+        dec: float,
+        radius_radians: float,
+        excluded_pixels: NDArray[np.int64] | None = None,
+    ) -> NDArray[np.intp]:
+        """Return cached HEALPix pixel indices inside *radius_radians* of (ra, dec).
+
+        Caching avoids redundant disc queries when the same geometry is
+        evaluated multiple times (e.g. during model subtraction).
+        """
+        center = hp.ang2vec(ra_to_longitude(ra), dec, lonlat=True)
+        pix = hp.query_disc(nside, center, radius_radians, inclusive=False)
+        if excluded_pixels is not None:
+            pix = np.setdiff1d(pix, np.array(excluded_pixels), assume_unique=True)
+        return pix
+
     def get_excess_background(
         self,
         ra: float,
         dec: float,
         radius: float,
         exclusion_regions: list[tuple[float, float, float]] | None = None,
+        excluded_pixels: NDArray[np.int64] | None = None,
     ) -> tuple[NDArray[np.float64], ...]:
         """Calculate excess (data-bkg), background, and model counts at different radial
         distances from a source.
@@ -422,16 +443,18 @@ class HAL(PluginPrototype):
         n_point_sources: int = self._likelihood_model.get_number_of_point_sources()  # ty:ignore[unresolved-attribute]
         n_ext_sources: int = self._likelihood_model.get_number_of_extended_sources()  # ty:ignore[unresolved-attribute]
 
-        # longitude = ra_to_longitude(ra)
-        # latitude = dec
-        # center = hp.ang2vec(longitude, latitude, lonlat=True)
-        # radial_bin_pixels = hp.query_disc(
-        #     this_nside, center, radius_radians, inclusive=False
-        # )
-        radial_bin_pixels = self._query_disc_pixels(this_nside, ra, dec, radius_radians)
+        excluded_pixels_key = (
+            tuple(int(p) for p in excluded_pixels)
+            if excluded_pixels is not None
+            else None
+        )
+
+        radial_bin_pixels = self._query_disc_pixels(
+            this_nside, ra, dec, radius_radians, excluded_pixels=excluded_pixels_key
+        )
 
         # remove excluded pixels and correct for area accordingly
-        if exclusion_regions:
+        if exclusion_regions is not None:
             for exc_ra, exc_dec, exc_r in exclusion_regions:
                 exc_pix = self._query_disc_pixels(
                     this_nside, exc_ra, exc_dec, np.deg2rad(exc_r)
@@ -483,6 +506,7 @@ class HAL(PluginPrototype):
         model_to_subtract: astromodels.Model | None = None,
         subtract_model_from_model: bool = False,
         exclusion_regions: list[tuple[float, float, float]] | None = None,
+        excluded_pixels: NDArray[np.int64] | None = None,
     ) -> tuple[*tuple[NDArray[np.float64], ...], list[str]]:
         """Calculate the radial profile for a source in units of excess counts per
         steradian
@@ -511,7 +535,8 @@ class HAL(PluginPrototype):
         query_r = radii + offset * delta_r
 
         results = [
-            self.get_excess_background(ra, dec, r, exclusion_regions) for r in query_r
+            self.get_excess_background(ra, dec, r, exclusion_regions, excluded_pixels)
+            for r in query_r
         ]
 
         tophat_area = np.array([res[0] for res in results])
@@ -534,7 +559,9 @@ class HAL(PluginPrototype):
 
             model_subtract = np.array(
                 [
-                    self.get_excess_background(ra, dec, r, exclusion_regions)[3]
+                    self.get_excess_background(
+                        ra, dec, r, exclusion_regions, excluded_pixels
+                    )[3]
                     for r in query_r
                 ]
             )
@@ -559,13 +586,17 @@ class HAL(PluginPrototype):
         # but fill a matrix anyway so there's no confusion when multiplying
         # them to the data later. Weight is normalized (sum of weights over
         # the bins = 1).
-        total_bkg = np.array(
-            self.get_excess_background(ra, dec, max_radius, exclusion_regions)[2]
-        )[good_planes]
+        tophat_max_radius_res = np.array(
+            [
+                res
+                for res in self.get_excess_background(
+                    ra, dec, max_radius, exclusion_regions, excluded_pixels
+                )
+            ]
+        )
 
-        total_model = np.array(
-            self.get_excess_background(ra, dec, max_radius, exclusion_regions)[3]
-        )[good_planes]
+        total_bkg = tophat_max_radius_res[2][good_planes]
+        total_model = tophat_max_radius_res[3][good_planes]
 
         # After computing alpha (normalised weights)
         n_radii = len(query_r)
@@ -645,29 +676,8 @@ class HAL(PluginPrototype):
         outside_pixels = active_pix[(phi_angle < phi_min) | (phi_angle >= phi_max)]
 
         kwargs["excluded_pixels"] = outside_pixels
-        if "exclusion_regions" not in kwargs:
-            kwargs["exclusion_regions"] = None
+        kwargs.setdefault("exclusion_regions", None)
         return self.get_radial_profile(ra, dec, **kwargs)
-
-    @lru_cache(maxsize=256)
-    def _query_disc_pixels(
-        self,
-        nside: int,
-        ra: float,
-        dec: float,
-        radius_radians: float,
-        excluded_pixels: NDArray[np.int64] | None = None,
-    ) -> NDArray[np.intp]:
-        """Return cached HEALPix pixel indices inside *radius_radians* of (ra, dec).
-
-        Caching avoids redundant disc queries when the same geometry is
-        evaluated multiple times (e.g. during model subtraction).
-        """
-        center = hp.ang2vec(ra_to_longitude(ra), dec, lonlat=True)
-        pix = hp.query_disc(nside, center, radius_radians, inclusive=False)
-        if excluded_pixels is not None:
-            pix = np.setdiff1d(pix, excluded_pixels, assume_unique=True)
-        return pix
 
     def plot_radial_profile(
         self,
@@ -678,6 +688,9 @@ class HAL(PluginPrototype):
         n_radial_bins: int = 30,
         model_to_subtract: astromodels.Model | None = None,
         subtract_model_from_model: bool = False,
+        phi_min: float | None = None,
+        phi_max: float | None = None,
+        exclusion_regions: list[tuple[float, float, float]] | None = None,
     ):
         """Plots radial profiles in units of counts/steradian
 
@@ -694,24 +707,45 @@ class HAL(PluginPrototype):
         radial profile.
         """
 
-        (radii, excess_model, excess_data, excess_error, plane_ids) = (
-            self.get_radial_profile(
-                ra,
-                dec,
-                active_planes,
-                max_radius,
-                n_radial_bins,
-                model_to_subtract,
-                subtract_model_from_model,
+        if phi_min is not None and phi_max is not None:
+            (radii, excess_model, excess_data, excess_error, plane_ids) = (
+                self.get_radial_profile_sector(
+                    ra,
+                    dec,
+                    phi_min=phi_min,
+                    phi_max=phi_max,
+                    active_planes=active_planes,
+                    max_radius=max_radius,
+                    n_radial_bins=n_radial_bins,
+                    model_to_subtract=model_to_subtract,
+                    subtract_model_from_model=subtract_model_from_model,
+                    exclusion_regions=exclusion_regions,
+                )
             )
-        )
+
+            title_suffix = rf"Sector $\phi$: {phi_min:.0f} to {phi_max:.0f}"
+
+        else:
+            (radii, excess_model, excess_data, excess_error, plane_ids) = (
+                self.get_radial_profile(
+                    ra,
+                    dec,
+                    active_planes,
+                    max_radius,
+                    n_radial_bins,
+                    model_to_subtract,
+                    subtract_model_from_model,
+                    exclusion_regions=exclusion_regions,
+                )
+            )
+            title_suffix = ""
 
         # add a dataframe for easy retrieval for calculations of surface
         # brighntess, if necessary.
         df = pd.DataFrame(columns=["Excess", "Error", "Model"], index=radii)
         df.index.name = "Radii"
         df["Excess"] = excess_data
-        df["Bkg"] = excess_error
+        df["Error"] = excess_error
         df["Model"] = excess_model
 
         fig, ax = plt.subplots(figsize=(7, 5))
@@ -729,23 +763,19 @@ class HAL(PluginPrototype):
         ax.plot(radii, excess_model, color="red", label="Model")
 
         if len(plane_ids) == 1:
-            title = f"Radial Profile, bin {plane_ids[0]}"
+            title = f"Radial Profile, bin {plane_ids[0]}: {title_suffix}"
 
         else:
-            title = "Radial Profile"
-            # TODO: figure a nicer way to format this
-            # tmptitle = f"Radial Profile, bins \n{plane_ids}"
-            # width = 80
-            # title = "\n".join(
-            # tmptitle[i : i + width] for i in range(0, len(tmptitle), width)
-            # )
-            # title = tmptitle
+            title = f"Radial Profile {title_suffix}"
 
         ax.set_ylabel(r"Apparent Radial Excess [sr$^{-1}$]", fontsize=14)
         ax.set_xlabel(
             f"Distance from source at ({ra:0.2f} $^{{\circ}}$, {dec:0.2f} $^{{\circ}}$)",
             fontsize=14,
         )
+        ax.spines["top"].set_visible(True)
+        ax.spines["right"].set_visible(True)
+        ax.tick_params(axis="both", direction="in", top=True, right=True)
         ax.legend(bbox_to_anchor=(1.0, 1.0), loc="upper right", numpoints=1, fontsize=12)
         ax.axhline(0, color="deepskyblue", linestyle="--")
         ax.set_xlim(left=0, right=max_radius)
