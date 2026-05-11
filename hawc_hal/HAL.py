@@ -425,9 +425,14 @@ class HAL(PluginPrototype):
         :param ra: RA coordinate (J2000)
         :param dec: Dec coordinate (J2000)
         :param radius: Distance from origin
+        :param exclusion_regions: Circular sky regions to exclude, each given as an
+            (ra, dec, radius) tuple in degrees. Intended for masking contaminating sources.
+        :param excluded_pixels: HEALPix pixel indices to remove before accumulating counts.
+            Used internally by `_get_radial_profile_sector` to restrict the profile to an
+            azimuthal wedge; not expressible as circular exclusion regions.
         :return: returns a tuple of numpy arrays with info of areas (steradian), signal
         excess, background, and expected excess (model) in units of counts to be used in
-        the `get_radial_profile_method`
+        the `_get_radial_profile` method
         """
 
         radius_radians = np.deg2rad(radius)
@@ -496,7 +501,7 @@ class HAL(PluginPrototype):
 
         return area, signal, background, model
 
-    def get_radial_profile(
+    def _get_radial_profile(
         self,
         ra: float,
         dec: float,
@@ -518,6 +523,11 @@ class HAL(PluginPrototype):
         :param n_radial_bins: Number of radial bins to use for the profile.
         :param model_to_subtract: Another model instance to subtract the data.
         :param subtract_model_from_model: Allows to subtract from the model as well
+        :param exclusion_regions: Circular sky regions to exclude, each given as an
+            (ra, dec, radius) tuple in degrees. Passed through to `_top_hat_excess`.
+        :param excluded_pixels: HEALPix pixel indices to exclude from every radial bin.
+            Set by `_get_radial_profile_sector` to enforce an azimuthal wedge mask;
+            not meant to be set directly by callers.
         :return: returns list of radial distances, expected excess, excess counts, error,
         and list of sorted planes.
         """
@@ -619,7 +629,7 @@ class HAL(PluginPrototype):
 
         return radii, excess_model, excess_data, excess_error, plane_ids
 
-    def get_radial_profile_sector(
+    def _get_radial_profile_sector(
         self, ra: float, dec: float, phi_min: float, phi_max: float, **kwargs
     ) -> tuple[*tuple[NDArray[np.float64], ...], list[str]]:
         """Radial profile restricted to an azimuthal wedge [phi_min, phi_max].
@@ -672,7 +682,7 @@ class HAL(PluginPrototype):
 
         kwargs["excluded_pixels"] = outside_pixels
         kwargs.setdefault("exclusion_regions", None)
-        return self.get_radial_profile(ra, dec, **kwargs)
+        return self._get_radial_profile(ra, dec, **kwargs)
 
     def plot_radial_profile(
         self,
@@ -714,7 +724,7 @@ class HAL(PluginPrototype):
 
         if phi_min is not None and phi_max is not None:
             (radii, excess_model, excess_data, excess_error, plane_ids) = (
-                self.get_radial_profile_sector(
+                self._get_radial_profile_sector(
                     ra,
                     dec,
                     phi_min=phi_min,
@@ -732,7 +742,7 @@ class HAL(PluginPrototype):
             )
         else:
             (radii, excess_model, excess_data, excess_error, plane_ids) = (
-                self.get_radial_profile(
+                self._get_radial_profile(
                     ra,
                     dec,
                     active_planes,
