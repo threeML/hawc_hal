@@ -1,51 +1,52 @@
 [build-system]
-requires = ["poetry-core>=1.0.0"]
-build-backend = "poetry.core.masonry.api"
+requires = ["hatchling"]
+build-backend = "hatchling.build"
 
-[tool.poetry]
+[project]
 name = "hawc_hal"
 version = "1.1"
-authors = ["Giacomo Vianello <giacomov@stanford.edu>"]
-maintainers = [
-  "Xiaojie Wang <xwang32@mtu.edu>",
-  "Ramiro Torres-Escobedo <rtorrese@proton.me>",
-]
 description = "HAWC Accelerated Likelihood; Read and handle HAWC data"
 license = "BSD-3-Clause"
-packages = [{ include = "hawc_hal" }, { include = "scripts" }]
+requires-python = ">=3.8"
+authors = [{ name = "Giacomo Vianello", email = "giacomov@stanford.edu" }]
+maintainers = [
+  { name = "Xiaojie Wang", email = "xwang32@mtu.edu" },
+  { name = "Ramiro Torres-Escobedo", email = "rtorrese@proton.me" },
+]
+dependencies = [
+  "numpy>=1.14",
+  "healpy",
+  "threeml",
+  "astromodels",
+  "pandas",
+  "six",
+  "astropy",
+  "scipy",
+  "matplotlib",
+  "numba",
+  "reproject",
+  "tqdm",
+  "uproot",
+  "awkward",
+  "mplhep",
+  "hist",
+]
 
-[tool.poetry.urls]
-homepage = "https://threeml.readthedocs.io/en/stable/index.html"
-repository = "https://github.com/threeML/hawc_hal"
-documentation = "https://threeml.readthedocs.io/en/stable/notebooks/hal_example.html"
+[project.urls]
+Homepage = "https://threeml.readthedocs.io/en/stable/index.html"
+Repository = "https://github.com/threeML/hawc_hal"
+Documentation = "https://threeml.readthedocs.io/en/stable/notebooks/hal_example.html"
 "Bug Tracker" = "https://github.com/threeML/hawc_hal/issues"
 
-[tool.poetry.dependencies]
-python = "^3.8"
-numpy = ">=1.14"
-healpy = "*"
-threeml = "*"
-astromodels = "*"
-pandas = "*"
-pytest = "*"
-six = "*"
-astropy = "*"
-scipy = "*"
-matplotlib = "*"
-numba = "*"
-reproject = "*"
-tqdm = "*"
-uproot = "*"
-awkward = "*"
-mplhep = "*"
-hist = "*"
-ruff = "*"
-pyright = "*"
-
-
-[tool.poetry.scripts]
+[project.scripts]
 hdf5tofits = "scripts.hal_hdf5_to_fits:main"
 halfitpointsrc = "scripts.hal_fit_point_source:main"
+
+[dependency-groups]
+dev = ["pytest", "ruff", "pyright"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["hawc_hal", "scripts"]
 
 [tool.ruff]
 include = [
@@ -88,14 +89,7 @@ docstring-code-format = false
 
 
 [tool.ruff.format]
-# Like Black, use double quotes for strings.
 quote-style = "double"
-
-# Like Black, indent with spaces, rather than tabs.
 indent-style = "space"
-
-# Like Black, respect magic trailing commas.
 skip-magic-trailing-comma = false
-
-# Like Black, automatically detect the appropriate line ending.
 line-ending = "auto"
