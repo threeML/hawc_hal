@@ -411,7 +411,7 @@ class HAL(PluginPrototype):
             pix = np.setdiff1d(pix, np.array(excluded_pixels), assume_unique=True)
         return pix
 
-    def get_excess_background(
+    def _top_hat_excess(
         self,
         ra: float,
         dec: float,
@@ -535,7 +535,7 @@ class HAL(PluginPrototype):
         query_r = radii + offset * delta_r
 
         results = [
-            self.get_excess_background(ra, dec, r, exclusion_regions, excluded_pixels)
+            self._top_hat_excess(ra, dec, r, exclusion_regions, excluded_pixels)
             for r in query_r
         ]
 
@@ -559,9 +559,9 @@ class HAL(PluginPrototype):
 
             model_subtract = np.array(
                 [
-                    self.get_excess_background(
-                        ra, dec, r, exclusion_regions, excluded_pixels
-                    )[3]
+                    self._top_hat_excess(ra, dec, r, exclusion_regions, excluded_pixels)[
+                        3
+                    ]
                     for r in query_r
                 ]
             )
@@ -586,17 +586,12 @@ class HAL(PluginPrototype):
         # but fill a matrix anyway so there's no confusion when multiplying
         # them to the data later. Weight is normalized (sum of weights over
         # the bins = 1).
-        tophat_max_radius_res = np.array(
-            [
-                res
-                for res in self.get_excess_background(
-                    ra, dec, max_radius, exclusion_regions, excluded_pixels
-                )
-            ]
+        _, _, total_bkg, total_model = self._top_hat_excess(
+            ra, dec, max_radius, exclusion_regions, excluded_pixels
         )
 
-        total_bkg = tophat_max_radius_res[2][good_planes]
-        total_model = tophat_max_radius_res[3][good_planes]
+        total_bkg = np.array(total_bkg)[good_planes]
+        total_model = np.array(total_model)[good_planes]
 
         # After computing alpha (normalised weights)
         n_radii = len(query_r)
@@ -692,19 +687,29 @@ class HAL(PluginPrototype):
         phi_max: float | None = None,
         exclusion_regions: list[tuple[float, float, float]] | None = None,
     ):
-        """Plots radial profiles in units of counts/steradian
+        """Plot the radial profile of a source in units of excess counts per steradian.
 
-        :param ra: RA (J2000) of origin of radial profile.
-        :param dec: Dec (J2000) of origin of radial profile.
-        :param active_planes: List of analysis bins over which to average over.
-        :param max_radius: Maximum radius upt ot which evaluate the radial profile.
-        :param n_radial_bins: Number of radial bins used for ring calculation.
-        :param model_to_subtract: Another model instance that is to be subtracted from the
-        excess signal.
-        :param subtract_model_from_model: Subtract also from the model the new model
-        instance
-        :return: Figure instance of radial plot and a pandas dataframe with information of
-        radial profile.
+        Returns a two-panel figure: the upper panel shows the weighted excess and model
+        as a function of angular distance, and the lower panel shows the normalised
+        residuals (data - model) / sigma for each radial bin.
+
+        :param ra: RA (J2000) of the profile origin, in degrees.
+        :param dec: Dec (J2000) of the profile origin, in degrees.
+        :param active_planes: Analysis bins to average over. Defaults to all active planes.
+        :param max_radius: Maximum angular radius to evaluate, in degrees.
+        :param n_radial_bins: Number of radial bins used for the ring calculation.
+        :param model_to_subtract: Optional model whose predicted counts are subtracted
+            from the excess signal before plotting.
+        :param subtract_model_from_model: If True, also subtract the extra model from the
+            plotted model curve.
+        :param phi_min: Minimum azimuthal angle (degrees East of North, 0-360) for a
+            sector profile. Must be set together with phi_max.
+        :param phi_max: Maximum azimuthal angle (degrees East of North, 0-360) for a
+            sector profile. Must be set together with phi_min.
+        :param exclusion_regions: List of (ra, dec, radius) tuples defining circular
+            sky regions to exclude from the profile calculation.
+        :return: Tuple of (Figure, DataFrame). The DataFrame has columns Excess, Error,
+            and Model indexed by radial distance.
         """
 
         if phi_min is not None and phi_max is not None:
@@ -722,9 +727,9 @@ class HAL(PluginPrototype):
                     exclusion_regions=exclusion_regions,
                 )
             )
-
-            title_suffix = rf"Sector $\phi$: {phi_min:.0f} to {phi_max:.0f}"
-
+            title_suffix = (
+                rf"Sector $\phi$: {phi_min:.0f}$^\circ$ to {phi_max:.0f}$^\circ$"
+            )
         else:
             (radii, excess_model, excess_data, excess_error, plane_ids) = (
                 self.get_radial_profile(
@@ -740,48 +745,73 @@ class HAL(PluginPrototype):
             )
             title_suffix = ""
 
-        # add a dataframe for easy retrieval for calculations of surface
-        # brighntess, if necessary.
-        df = pd.DataFrame(columns=["Excess", "Error", "Model"], index=radii)
-        df.index.name = "Radii"
-        df["Excess"] = excess_data
-        df["Error"] = excess_error
-        df["Model"] = excess_model
+        df = pd.DataFrame(
+            {"Excess": excess_data, "Error": excess_error, "Model": excess_model},
+            index=pd.Index(radii, name="Radii"),
+        )
 
-        fig, ax = plt.subplots(figsize=(7, 5))
+        pulls = np.where(
+            excess_error > 0, (excess_data - excess_model) / excess_error, 0.0
+        )
+
+        fig, (ax, ax_res) = plt.subplots(
+            2, 1, figsize=(8, 6), gridspec_kw={"height_ratios": [3, 1], "hspace": 0}
+        )
 
         ax.errorbar(
             radii,
             excess_data,
             yerr=excess_error,
-            capsize=0,
-            color="black",
-            label="Excess (data-bkg)",
             fmt=".",
+            capsize=2,
+            color="black",
+            elinewidth=0.8,
+            zorder=3,
+            label=r"Excess (data - bkg)",
         )
+        ax.plot(radii, excess_model, color="red", lw=1.5, label="Model")
+        ax.axhline(0, color="deepskyblue", linestyle="--", lw=1.0, zorder=2)
 
-        ax.plot(radii, excess_model, color="red", label="Model")
-
-        if len(plane_ids) == 1:
-            title = f"Radial Profile, bin {plane_ids[0]}: {title_suffix}"
-
-        else:
-            title = f"Radial Profile {title_suffix}"
-
-        ax.set_ylabel(r"Apparent Radial Excess [sr$^{-1}$]", fontsize=14)
-        ax.set_xlabel(
-            f"Distance from source at ({ra:0.2f} $^{{\circ}}$, {dec:0.2f} $^{{\circ}}$)",
-            fontsize=14,
-        )
+        ax.set_ylabel(r"Apparent Radial Excess [sr$^{-1}$]", fontsize=13)
+        ax.set_xlim(left=0, right=max_radius)
         ax.spines["top"].set_visible(True)
         ax.spines["right"].set_visible(True)
-        ax.tick_params(axis="both", direction="in", top=True, right=True)
-        ax.legend(bbox_to_anchor=(1.0, 1.0), loc="upper right", numpoints=1, fontsize=12)
-        ax.axhline(0, color="deepskyblue", linestyle="--")
-        ax.set_xlim(left=0, right=max_radius)
-        ax.tick_params(axis="both", labelsize=14)
-        ax.set_title(title)
+        ax.tick_params(axis="both", direction="in", top=True, right=True, labelsize=13)
+        ax.legend(bbox_to_anchor=(1.0, 1.0), loc="upper right", fontsize=12)
+        ax.set_xticklabels([])
         ax.grid(True)
+
+        if len(plane_ids) == 1:
+            title = f"Radial Profile, bin {plane_ids[0]}"
+        else:
+            title = "Radial Profile"
+        if title_suffix:
+            title = f"{title}: {title_suffix}"
+        ax.set_title(title)
+
+        ax_res.errorbar(
+            radii,
+            pulls,
+            yerr=np.ones_like(pulls),
+            fmt=".",
+            capsize=2,
+            color="black",
+            elinewidth=0.8,
+            zorder=3,
+        )
+        ax_res.axhline(0, color="red", linestyle="--", lw=1.0, zorder=2)
+        ax_res.set_ylabel(r"Pull [$\sigma$]", fontsize=13)
+        ax_res.set_xlabel(
+            rf"Distance from source at ({ra:.2f} $^\circ$, {dec:.2f} $^\circ$)",
+            fontsize=13,
+        )
+        ax_res.set_xlim(left=0, right=max_radius)
+        ax_res.spines["top"].set_visible(True)
+        ax_res.spines["right"].set_visible(True)
+        ax_res.tick_params(
+            axis="both", direction="in", top=True, right=True, labelsize=13
+        )
+        ax_res.grid(True)
 
         with contextlib.suppress(Exception):
             plt.tight_layout()
