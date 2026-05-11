@@ -131,7 +131,7 @@ class HAL(PluginPrototype):
         self._all_planes = list(self._maptree.analysis_bins_labels)
 
         # The active planes list always contains the list of *indexes* of the active planes
-        self._active_planes = None
+        self._active_planes: list[str] | None = None
 
         # Set up the transformations from the flat-sky projection to Healpix, as well as the list of active pixels
         # (one for each energy/nHit bin). We make a separate transformation because different energy bins might have
@@ -505,14 +505,14 @@ class HAL(PluginPrototype):
         self,
         ra: float,
         dec: float,
-        active_planes: list | None = None,
+        active_planes: list[str] | None = None,
         max_radius: float = 3.0,
         n_radial_bins: int = 30,
         model_to_subtract: astromodels.Model | None = None,
         subtract_model_from_model: bool = False,
         exclusion_regions: list[tuple[float, float, float]] | None = None,
         excluded_pixels: NDArray[np.int64] | None = None,
-    ) -> tuple[*tuple[NDArray[np.float64], ...], list[str]]:
+    ) -> tuple[*tuple[NDArray[np.float64], ...], list[set]]:
         """Calculate the radial profile for a source in units of excess counts per
         steradian
 
@@ -541,7 +541,9 @@ class HAL(PluginPrototype):
 
         offset = 0.5
         delta_r = 1.0 * max_radius / n_radial_bins
-        radii = np.array([delta_r * (r + offset) for r in range(n_radial_bins)])
+        radii = np.array(
+            [delta_r * (r + offset) for r in range(n_radial_bins)], dtype=float
+        )
         query_r = radii + offset * delta_r
 
         results = [
@@ -603,12 +605,6 @@ class HAL(PluginPrototype):
         total_bkg = np.array(total_bkg)[good_planes]
         total_model = np.array(total_model)[good_planes]
 
-        # After computing alpha (normalised weights)
-        n_radii = len(query_r)
-        excess_data = np.zeros(n_radii)
-        excess_error = np.zeros(n_radii)
-        excess_model = np.zeros(n_radii)
-
         w = total_model / total_bkg
         w = np.nan_to_num(w, nan=0.0, posinf=0.0)
 
@@ -617,15 +613,14 @@ class HAL(PluginPrototype):
         else:
             alpha = w / w.sum()
 
-        for r in range(n_radii):
-            x_data = signal[r, :] / area[r, :]
-            var_x = (signal[r, :] + bkg[r, :]) / (area[r, :] ** 2)
-            excess_data[r] = np.sum(alpha * x_data)
-            excess_error[r] = np.sqrt(np.sum(alpha**2 * var_x))
+        # shape: (n_radii, n_planes)
+        x_data = signal / area
+        x_model = model / area
+        var_x = (signal + bkg) / area**2
 
-            # Model: same weights, no error
-            x_model = model[r, :] / area[r, :]
-            excess_model[r] = np.sum(alpha * x_model)
+        excess_data = x_data @ alpha
+        excess_model = x_model @ alpha
+        excess_error = np.sqrt(var_x @ alpha**2)
 
         return radii, excess_model, excess_data, excess_error, plane_ids
 
