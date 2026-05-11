@@ -50,20 +50,16 @@ def test_plots(test_fit):
     bins = hawc._active_planes
 
     fig, table = hawc.plot_radial_profile(ra, dec, bins, radius, n_radial_bins=15)
-    fig.savefig("hal_src_radial_profile.png")
-    table.to_hdf("hal_src_radial_table.hd5", key="radial")
+    fig.savefig("radial_profile_all_bins.png")
+    table.to_hdf("radial_profile_all_bins.hd5", key="radial")
+    plt.close(fig)
 
     prog_bar = tqdm(total=len(hawc._active_planes), desc="Smoothing planes")
     for bin in hawc._active_planes:
         fig, table = hawc.plot_radial_profile(ra, dec, f"{bin}", radius, n_radial_bins=15)
-        fig.savefig(f"hal_src_radial_profile_bin{bin}.png")
-
-        table.to_hdf(f"hal_src_radial_table_{bin}.hd5", key="radial")
-        # NOTE: ensure figures are closed to maintain memory
-        # usage low
-
+        fig.savefig(f"radial_profile_bin{bin}.png")
+        table.to_hdf(f"radial_profile_bin{bin}.hd5", key="radial")
         plt.close(fig)
-
         prog_bar.update(1)
 
 
@@ -158,13 +154,16 @@ def test_sector_plot_radial_profile(sector_hawc):
     ra = model.pts.position.ra.value
     dec = model.pts.position.dec.value
 
-    fig, df = hawc.plot_radial_profile(
-        ra, dec, phi_min=0.0, phi_max=180.0, **_PROFILE_KWARGS
-    )
+    for phi_min, phi_max in [(0.0, 90.0), (90.0, 180.0), (180.0, 270.0), (270.0, 360.0)]:
+        fig, df = hawc.plot_radial_profile(
+            ra, dec, phi_min=phi_min, phi_max=phi_max, **_PROFILE_KWARGS
+        )
 
-    assert isinstance(fig, Figure)
-    assert isinstance(df, pd.DataFrame)
-    assert list(df.columns) == ["Excess", "Error", "Model"]
-    assert len(df) == _PROFILE_KWARGS["n_radial_bins"]
+        assert isinstance(fig, Figure)
+        assert isinstance(df, pd.DataFrame)
+        assert list(df.columns) == ["Excess", "Error", "Model"]
+        assert len(df) == _PROFILE_KWARGS["n_radial_bins"]
 
-    plt.close(fig)
+        fig.savefig(f"radial_profile_sector_phi{int(phi_min)}_to_{int(phi_max)}deg.png")
+        df.to_hdf(f"radial_profile_sector_phi{int(phi_min)}_to_{int(phi_max)}deg.hd5", key="radial")
+        plt.close(fig)
