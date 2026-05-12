@@ -83,7 +83,7 @@ def test_sector_profile_returns_correct_shape(sector_hawc):
     ra = model.pts.position.ra.value
     dec = model.pts.position.dec.value
 
-    radii, excess_model, excess_data, excess_error, plane_ids = (
+    radii, excess_model, excess_data, excess_error, plane_ids, alpha = (
         hawc._get_radial_profile_sector(ra, dec, phi_min=0.0, phi_max=180.0, **_PROFILE_KWARGS)
     )
 
@@ -117,8 +117,8 @@ def test_sector_profile_differs_from_full_profile(sector_hawc):
     ra = model.pts.position.ra.value
     dec = model.pts.position.dec.value
 
-    _, _, data_full, _, _ = hawc._get_radial_profile(ra, dec, **_PROFILE_KWARGS)
-    _, _, data_north, _, _ = hawc._get_radial_profile_sector(
+    _, _, data_full, _, _, _ = hawc._get_radial_profile(ra, dec, **_PROFILE_KWARGS)
+    _, _, data_north, _, _, _ = hawc._get_radial_profile_sector(
         ra, dec, phi_min=0.0, phi_max=180.0, **_PROFILE_KWARGS
     )
 
@@ -133,10 +133,10 @@ def test_complementary_sectors_differ(sector_hawc):
     ra = model.pts.position.ra.value
     dec = model.pts.position.dec.value
 
-    _, _, data_north, _, _ = hawc._get_radial_profile_sector(
+    _, _, data_north, _, _, _ = hawc._get_radial_profile_sector(
         ra, dec, phi_min=0.0, phi_max=180.0, **_PROFILE_KWARGS
     )
-    _, _, data_south, _, _ = hawc._get_radial_profile_sector(
+    _, _, data_south, _, _, _ = hawc._get_radial_profile_sector(
         ra, dec, phi_min=180.0, phi_max=360.0, **_PROFILE_KWARGS
     )
 

@@ -622,7 +622,7 @@ class HAL(PluginPrototype):
         excess_model = x_model @ alpha
         excess_error = np.sqrt(var_x @ alpha**2)
 
-        return radii, excess_model, excess_data, excess_error, plane_ids
+        return radii, excess_model, excess_data, excess_error, plane_ids, alpha
 
     def _get_radial_profile_sector(
         self, ra: float, dec: float, phi_min: float, phi_max: float, **kwargs
@@ -714,11 +714,13 @@ class HAL(PluginPrototype):
         :param exclusion_regions: List of (ra, dec, radius) tuples defining circular
             sky regions to exclude from the profile calculation.
         :return: Tuple of (Figure, DataFrame). The DataFrame has columns Excess, Error,
-            and Model indexed by radial distance.
+            and Model indexed by radial distance. The bin weights used to form the
+            weighted average are stored in ``df.attrs['weights']`` as a
+            ``pd.Series`` indexed by analysis bin label.
         """
 
         if phi_min is not None and phi_max is not None:
-            (radii, excess_model, excess_data, excess_error, plane_ids) = (
+            (radii, excess_model, excess_data, excess_error, plane_ids, alpha) = (
                 self._get_radial_profile_sector(
                     ra,
                     dec,
@@ -736,7 +738,7 @@ class HAL(PluginPrototype):
                 rf"Sector $\phi$: {phi_min:.0f}$^\circ$ to {phi_max:.0f}$^\circ$"
             )
         else:
-            (radii, excess_model, excess_data, excess_error, plane_ids) = (
+            (radii, excess_model, excess_data, excess_error, plane_ids, alpha) = (
                 self._get_radial_profile(
                     ra,
                     dec,
@@ -754,6 +756,7 @@ class HAL(PluginPrototype):
             {"Excess": excess_data, "Error": excess_error, "Model": excess_model},
             index=pd.Index(radii, name="Radii"),
         )
+        df.attrs["weights"] = pd.Series(alpha, index=plane_ids, name="weight")
 
         pulls = np.where(
             excess_error > 0, (excess_data - excess_model) / excess_error, 0.0
