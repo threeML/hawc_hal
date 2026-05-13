@@ -7,7 +7,7 @@ name = "hawc_hal"
 version = "1.1"
 description = "HAWC Accelerated Likelihood; Read and handle HAWC data"
 license = "BSD-3-Clause"
-requires-python = ">=3.8"
+requires-python = ">=3.11"
 authors = [{ name = "Giacomo Vianello", email = "giacomov@stanford.edu" }]
 maintainers = [
   { name = "Xiaojie Wang", email = "xwang32@mtu.edu" },
