@@ -592,12 +592,11 @@ class HAL(PluginPrototype):
         bkg = bkg[:, good_planes]
         model = model[:, good_planes]
 
-        # NOTE: weights are calculated as expected number of gamma-rays/number
-        # of background counts. Here, use max_radius to evaluate the number of
-        # gamma-rays/bkg counts. The weights do not depend on the radius,
-        # but fill a matrix anyway so there's no confusion when multiplying
-        # them to the data later. Weight is normalized (sum of weights over
-        # the bins = 1).
+        # Weights are Li-Ma optimal: w[k] = model_k / bkg_k.
+        # We use an unnormalized weighted sum (not weighted average) so that the
+        # result does not shrink artificially when more analysis bins are present
+        # (e.g. fHit with 9 bins vs a 2D estimator which represent the
+        # same data and should yield similar excess scale).
         _, _, total_bkg, total_model = self._top_hat_excess(
             ra, dec, max_radius, exclusion_regions, excluded_pixels
         )
@@ -609,20 +608,15 @@ class HAL(PluginPrototype):
         w = np.nan_to_num(w, nan=0.0, posinf=0.0)
 
         if w.sum() == 0:
-            alpha = np.ones_like(w) / len(w)
+            alpha = np.ones_like(w)
         else:
-            alpha = w / w.sum()
+            alpha = w
 
-        # shape: (n_radii, n_planes)
-        x_data = signal / area
-        x_model = model / area
-        var_x = (signal + bkg) / area**2
+        excess_model = np.einsum("k,rk->r", alpha, model / area)
+        excess_obs = np.einsum("k,rk->r", alpha, signal / area)
+        excess_error = np.sqrt(np.einsum("k,rk->r", alpha**2, (signal + bkg) / area**2))
 
-        excess_data = x_data @ alpha
-        excess_model = x_model @ alpha
-        excess_error = np.sqrt(var_x @ alpha**2)
-
-        return radii, excess_model, excess_data, excess_error, plane_ids, alpha
+        return radii, excess_model, excess_obs, excess_error, plane_ids, alpha
 
     def _get_radial_profile_sector(
         self, ra: float, dec: float, phi_min: float, phi_max: float, **kwargs
