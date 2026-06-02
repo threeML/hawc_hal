@@ -95,9 +95,7 @@ class HAL(PluginPrototype):
         )
 
         # Read detector response_file
-        self._response = hawc_response_factory(
-            response_file_name=response_file, n_workers=self._n_workers
-        )
+        self._response = hawc_response_factory(response_file_name=response_file)
 
         # Use a renormalization of the background as nuisance parameter
         # NOTE: it is fixed to 1.0 unless the user explicitly sets it free (experimental)

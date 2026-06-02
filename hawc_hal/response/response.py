@@ -1,7 +1,6 @@
 from __future__ import absolute_import, division
 
 import collections
-import multiprocessing
 import os
 from builtins import zip
 from dataclasses import dataclass
@@ -28,13 +27,11 @@ ndarray = NDArray[np.float64]
 nstrarray = NDArray[np.bytes_]
 
 
-def hawc_response_factory(response_file_name: str, n_workers: int = 1):
+def hawc_response_factory(response_file_name: Path):
     """A factory function for the response which keeps a cache, so that the
     same response is not read over and over again.
 
     :param response_file_name: response file name (ROOT or HDF5)
-    :param n_workers: number of processes to parallelize reading of ROOT file
-    with uproot, defaults to 1
     :raises NotImplementedError: extension of the response file is not recognized
     :return: New instance of HAWCResponse
     :rtype: HAWCResponse
@@ -53,7 +50,7 @@ def hawc_response_factory(response_file_name: str, n_workers: int = 1):
         extension = os.path.splitext(response_file_name)[-1]
 
         if extension == ".root":
-            new_instance = HAWCResponse.from_root_file(response_file_name, n_workers)
+            new_instance = HAWCResponse.from_root_file(response_file_name)
 
         elif extension in [".hd5", ".hdf5", ".hdf"]:
             new_instance = HAWCResponse.from_hdf5(response_file_name)
@@ -81,88 +78,78 @@ class ResponseMetaData:
     @staticmethod
     def get_energy_hist(
         response_ttree_directory: uproot.ReadOnlyDirectory, dec_id: int, bin_id: str
-    ) -> tuple[int, str, bh.Histogram]:
+    ) -> bh.Histogram:
         """Retrieve the signal energy histogram from response file
 
         :param response_ttree_directory:  read only directory for response file
         :param dec_id: declination bin
         :param bin_id: active analysis bin id
         :raises KeyError: unknown binning scheme in response file
-        :return: tuple of declination bin, analysis bin id, and energy histogram
+        :return: signal energy histogram for the given (dec, bin)
         """
 
         energy_hist_prefix = f"dec_{dec_id:02d}/nh_{bin_id}/EnSig_dec{dec_id}_nh{bin_id}"
         if response_ttree_directory.get(energy_hist_prefix, None) is not None:
-            energy_hist = response_ttree_directory[energy_hist_prefix]
-
-            return dec_id, bin_id, energy_hist.to_boost()  # type: ignore
+            return response_ttree_directory[energy_hist_prefix].to_boost()  # type: ignore
 
         energy_hist_prefix = (
             f"dec_{dec_id:02d}/nh_{bin_id.zfill(2)}/EnSig_dec{dec_id}_nh{bin_id}"
         )
 
         if response_ttree_directory.get(energy_hist_prefix, None) is not None:
-            energy_hist = response_ttree_directory[energy_hist_prefix]
-
-            return dec_id, bin_id, energy_hist.to_boost()  # type: ignore
+            return response_ttree_directory[energy_hist_prefix].to_boost()  # type: ignore
 
         raise KeyError("Unknown binning scheme in response file")
 
     @staticmethod
     def get_energy_bkg_hist(
         response_ttree_directory: uproot.ReadOnlyDirectory, dec_id: int, bin_id: str
-    ) -> tuple[int, str, bh.Histogram]:
+    ) -> bh.Histogram:
         """Retrieves the background energy histogram from response file
 
         :param response_ttree_directory: uproot read only directory for response file
         :param dec_id: declination bin id
         :param bin_id: active analysis bin id
         :raises KeyError: raised if the binning scheme is not recognized
-        :return: tuple of declination bin id, analysis bin id, and background energy histogram
+        :return: background energy histogram for the given (dec, bin)
         """
 
         energy_bkg_prefix = f"dec_{dec_id:02d}/nh_{bin_id}/EnBg_dec{dec_id}_nh{bin_id}"
 
         if response_ttree_directory.get(energy_bkg_prefix, None) is not None:
-            energy_bkg_hist = response_ttree_directory[energy_bkg_prefix]
-            return dec_id, bin_id, energy_bkg_hist.to_boost()  # type: ignore
+            return response_ttree_directory[energy_bkg_prefix].to_boost()  # type: ignore
 
         energy_bkg_prefix = (
             f"dec_{dec_id:02d}/nh_{bin_id.zfill(2)}/EnBg_dec{dec_id}_nh{bin_id}"
         )
 
         if response_ttree_directory.get(energy_bkg_prefix, None) is not None:
-            energy_bkg_hist = response_ttree_directory[energy_bkg_prefix]
-
-            return dec_id, bin_id, energy_bkg_hist.to_boost()  # type: ignore
+            return response_ttree_directory[energy_bkg_prefix].to_boost()  # type: ignore
 
         raise KeyError("Unknown binning scheme in response file")
 
     @staticmethod
     def get_psf_params(
         response_ttree_directory: uproot.ReadOnlyDirectory, dec_id: int, bin_id: str
-    ) -> tuple[int, str, ndarray]:
+    ) -> ndarray:
         """Read the list of best-fit PSF parameters from response file
 
         :param response_ttree_directory: read only directory for response file
         :param dec_id: declination bin id
         :param bin_id: active analysis bin id
         :raises KeyError: raised if the binning scheme is not recognized
-        :return: tuple of declination bin, analysis bin id and best-fit PSF parameters
+        :return: best-fit PSF parameters for the given (dec, bin)
         """
         psf_prefix = f"dec_{dec_id:02d}/nh_{bin_id}/PSF_dec{dec_id}_nh{bin_id}_fit"
 
         if response_ttree_directory.get(psf_prefix, None) is not None:
-            psf_meta = response_ttree_directory[psf_prefix]
-            return dec_id, bin_id, psf_meta.member("fParams")  # type: ignore
+            return response_ttree_directory[psf_prefix].member("fParams")  # type: ignore
 
         psf_prefix = (
             f"dec_{dec_id:02d}/nh_{bin_id.zfill(2)}/PSF_dec{dec_id}_nh{bin_id}_fit"
         )
         if response_ttree_directory.get(psf_prefix, None) is not None:
-            psf_meta = response_ttree_directory[psf_prefix]
-
-            return dec_id, bin_id, psf_meta.member("fParams")  # type: ignore
+            return response_ttree_directory[psf_prefix].member("fParams")  # type: ignore
 
         raise KeyError("Unknown binning scheme in response file")
 
@@ -373,19 +360,15 @@ class HAWCResponse:
 
         return cls(response_file_name, dec_bins, response_bins)
 
-    @staticmethod
-    def create_dict_from_results(results):
-        """Handles the calculation of the results from the multiprocessing pool"""
-        return {(result[0], result[1]): result[2] for result in results}
-
     @classmethod
-    def from_root_file(cls, response_file_name: Path, n_workers: int = 1):
+    def from_root_file(cls, response_file_name: Path):
         """Read the response ROOT file. Do not use directly, use the hawc_response_factory()
         method instead.
 
         :param response_file_name: file path to response ROOT file
         :type response_file_name: Path
-        :param n_workers: number of processes to parallelize reading of ROOT file with uproot
+        :param n_workers: Accepted for backward compatibility; ignored.
+            Per-bin histogram/PSF reads are too small for parallelism to win.
         :type n_workers: int
         :raises IOError: File is either nonexistent or corrupt
         :return: HAWCResponse object containing the response bins for all declinations within
@@ -406,21 +389,15 @@ class HAWCResponse:
                 f"Response {response_file_name} does not exist or is not readable"
             )
 
-        with (
-            multiprocessing.Pool(processes=n_workers) as pool,
-            uproot.open(
-                response_file_name,
-                handler=uproot.MemmapSource,
-                num_fallback_workers=n_workers,
-            ) as response_file_directory,
-        ):
-            # the handler for MemmapSource loads the file as it's needed
-            # suggested as the best for large local files
-            # otherwise use MultithreadedFileSource for remote files
-            # which requires setting the option for use_threads to True
+        # Per-bin reads are kilobyte-scale histogram and PSF-param
+        # lookups; serial reading against a single open handle is
+        # faster than any parallel scheme once pool startup and
+        # pickling the open directory are accounted for.
+        with uproot.open(
+            response_file_name, handler=uproot.MemmapSource
+        ) as response_file_directory:
             resp_metadata = ResponseMetaData(response_file_directory)
 
-            # NOTE:Get the Response function basic information
             log_log_params = resp_metadata.log_log_params
             log_log_shape = resp_metadata.spectrum_shape
             analysis_bins_arr = resp_metadata.analysis_bins
@@ -429,47 +406,36 @@ class HAWCResponse:
             dec_bins_sim = resp_metadata.declination_bins_center
 
             dec_bins = list(zip(dec_bins_lower_edge, dec_bins_sim, dec_bins_upper_edge))
-            number_of_dec_bins = len(dec_bins_sim)
 
-            args = [
-                (response_file_directory, dec_id, bin_id)
-                for dec_id in range(number_of_dec_bins)
-                for bin_id in analysis_bins_arr
-            ]
+            # TODO: read only the declinations needed for the ROI
+            response_bins = collections.OrderedDict()
+            for dec_id, (min_dec, dec_center, max_dec) in enumerate(dec_bins):
+                response_bins_per_dec = collections.OrderedDict()
 
-            results = list(pool.starmap(resp_metadata.get_energy_hist, args))
-            results_bkg = list(pool.starmap(resp_metadata.get_energy_bkg_hist, args))
-            psf_param = list(pool.starmap(resp_metadata.get_psf_params, args))
+                for bin_id in analysis_bins_arr:
+                    current_hist = ResponseMetaData.get_energy_hist(
+                        response_file_directory, dec_id, bin_id
+                    )
+                    current_hist_bkg = ResponseMetaData.get_energy_bkg_hist(
+                        response_file_directory, dec_id, bin_id
+                    )
+                    current_psf_params = ResponseMetaData.get_psf_params(
+                        response_file_directory, dec_id, bin_id
+                    )
 
-        energy_hists = cls.create_dict_from_results(results)
-        energy_bkgs = cls.create_dict_from_results(results_bkg)
-        psf_metas = cls.create_dict_from_results(psf_param)
+                    response_bins_per_dec[bin_id] = ResponseBin.from_ttree(
+                        bin_id,
+                        current_hist,
+                        current_hist_bkg,
+                        psf_fit_params=current_psf_params,
+                        log_log_params=log_log_params,
+                        log_log_shape=log_log_shape,
+                        min_dec=min_dec,
+                        dec_center=dec_center,
+                        max_dec=max_dec,
+                    )
 
-        # NOTE: Now we have all the info we need to build the response
-        # TODO: read only the declinations needed for the ROI
-        response_bins = collections.OrderedDict()
-        for dec_id, dec_bin in enumerate(dec_bins):
-            min_dec, dec_center, max_dec = dec_bin
-            response_bins_per_dec = collections.OrderedDict()
-
-            for bin_id in analysis_bins_arr:
-                current_hist = energy_hists[(dec_id, bin_id)]
-                current_hist_bkg = energy_bkgs[(dec_id, bin_id)]
-                current_psf_params = psf_metas[(dec_id, bin_id)]
-
-                this_response_bin = ResponseBin.from_ttree(
-                    bin_id,
-                    current_hist,
-                    current_hist_bkg,
-                    psf_fit_params=current_psf_params,
-                    log_log_params=log_log_params,
-                    log_log_shape=log_log_shape,
-                    min_dec=min_dec,
-                    dec_center=dec_center,
-                    max_dec=max_dec,
-                )
-                response_bins_per_dec[bin_id] = this_response_bin
-            response_bins[dec_center] = response_bins_per_dec
+                response_bins[dec_center] = response_bins_per_dec
 
         return cls(response_file_name, dec_bins, response_bins)
 
