@@ -512,7 +512,7 @@ class HAL(PluginPrototype):
         subtract_model_from_model: bool = False,
         exclusion_regions: list[tuple[float, float, float]] | None = None,
         excluded_pixels: NDArray[np.int64] | None = None,
-    ) -> tuple[*tuple[NDArray[np.float64], ...], list[set]]:
+    ) -> tuple[tuple[NDArray[np.float64], ...], list[set]]:
         """Calculate the radial profile for a source in units of excess counts per
         steradian
 
@@ -620,7 +620,7 @@ class HAL(PluginPrototype):
 
     def _get_radial_profile_sector(
         self, ra: float, dec: float, phi_min: float, phi_max: float, **kwargs
-    ) -> tuple[*tuple[NDArray[np.float64], ...], list[str]]:
+    ) -> tuple[tuple[NDArray[np.float64], ...], list[str]]:
         """Radial profile restricted to an azimuthal wedge [phi_min, phi_max].
 
         Computes the same weighted excess counts per steradian as
