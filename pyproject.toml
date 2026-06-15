@@ -1,49 +1,49 @@
-[build-system]
-requires = ["hatchling"]
-build-backend = "hatchling.build"
-
 [project]
 name = "hawc_hal"
 version = "1.1"
 description = "HAWC Accelerated Likelihood; Read and handle HAWC data"
+requires-python = ">=3.10"
 license = "BSD-3-Clause"
-requires-python = ">=3.11"
 authors = [{ name = "Giacomo Vianello", email = "giacomov@stanford.edu" }]
 maintainers = [
   { name = "Xiaojie Wang", email = "xwang32@mtu.edu" },
   { name = "Ramiro Torres-Escobedo", email = "rtorrese@proton.me" },
 ]
 dependencies = [
-  "numpy>=1.14",
-  "healpy",
-  "threeml",
   "astromodels",
-  "pandas",
-  "six",
   "astropy",
-  "scipy",
+  "awkward",
+  "healpy",
+  "hist",
   "matplotlib",
+  "mplhep",
   "numba",
+  "numpy>=1.14",
+  "pandas",
   "reproject",
+  "scipy",
+  "six",
+  "threeml",
   "tqdm",
   "uproot",
-  "awkward",
-  "mplhep",
-  "hist",
 ]
 
 [project.urls]
+"Bug Tracker" = "https://github.com/threeML/hawc_hal/issues"
+Documentation = "https://threeml.readthedocs.io/en/stable/notebooks/hal_example.html"
 Homepage = "https://threeml.readthedocs.io/en/stable/index.html"
 Repository = "https://github.com/threeML/hawc_hal"
-Documentation = "https://threeml.readthedocs.io/en/stable/notebooks/hal_example.html"
-"Bug Tracker" = "https://github.com/threeML/hawc_hal/issues"
 
 [project.scripts]
-hdf5tofits = "scripts.hal_hdf5_to_fits:main"
 halfitpointsrc = "scripts.hal_fit_point_source:main"
+hdf5tofits = "scripts.hal_hdf5_to_fits:main"
 
 [dependency-groups]
-dev = ["pytest", "ruff", "pyright"]
+dev = ["pyright", "pytest", "ruff"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["hawc_hal", "scripts"]
@@ -85,10 +85,9 @@ exclude = [
 ]
 line-length = 88
 indent-width = 4
-docstring-code-format = false
-
 
 [tool.ruff.format]
+docstring-code-format = false
 quote-style = "double"
 indent-style = "space"
 skip-magic-trailing-comma = false
