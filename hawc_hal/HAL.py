@@ -468,7 +468,7 @@ class HAL(PluginPrototype):
         n_radial_bins: int = 30,
         model_to_subtract: astromodels.Model | None = None,
         subtract_model_from_model: bool = False,
-    ) -> tuple[*tuple[NDArray[np.float64], ...], list[str]]:
+    ) -> tuple[tuple[NDArray[np.float64], ...], list[str]]:
         """Calculate the radial profile for a source in units of excess counts per
         steradian
 
