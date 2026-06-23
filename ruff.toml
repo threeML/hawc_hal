@@ -1,15 +1,46 @@
 line-length = 90
-target-version = "py310"
+indent-width = 4
+
+include = [
+  "pyproject.toml",
+  "hawc_hal/**/*.py",
+  "scripts/**/*.py",
+  "notebooks/**/*.ipynb",
+]
+exclude = [
+  "codecov.yml",
+  "data/*",
+  "ci/*",
+  "notebooks",
+  "tests",
+  ".eggs",
+  ".git",
+  ".git-rewrite",
+  ".ipynb_checkpoints",
+  ".mypy_cache",
+  ".nox",
+  ".pants.d",
+  ".pyenv",
+  ".pytest_cache",
+  ".pytype",
+  ".ruff_cache",
+  ".venv",
+  ".vscode",
+  "__pypackages__",
+  "_build",
+  "buck-out",
+  "build",
+  "dist",
+  "node_modules",
+  "site-packages",
+  "venv",
+]
 [lint]
 select = ["F"]
 ignore = ["E501"]
 
-# [lint.isort]
-# line-after-imports = 2
-
 [format]
 quote-style = "double"
 docstring-code-format = true
-docstring-code-line-length = 60
+docstring-code-line-length = "dynamic"
 skip-magic-trailing-comma = true
-# quote-style = "single"
