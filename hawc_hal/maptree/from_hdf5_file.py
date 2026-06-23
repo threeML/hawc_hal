@@ -97,14 +97,8 @@ def from_hdf5_file(map_tree_file, roi, transits):
 
         else:
             # Full sky
-            observation_hpx_map = DenseHealpix(
-                this_df.loc[:, "observation"].values
-                * (n_transits / meta_df["n_transits"].max())
-            )
-            background_hpx_map = DenseHealpix(
-                this_df.loc[:, "background"].values
-                * (n_transits / meta_df["n_transits"].max())
-            )
+            observation_hpx_map = DenseHealpix(this_df.loc[:, "observation"].values)
+            background_hpx_map = DenseHealpix(this_df.loc[:, "background"].values)
 
             # This signals the DataAnalysisBin that we are dealing with a full sky map
             active_pixels_user = None
